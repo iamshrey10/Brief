@@ -1,0 +1,26 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: brief-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: brief
+      POSTGRES_PASSWORD: brief_dev_password
+      POSTGRES_DB: brief
+    ports:
+      - "5432:5432"
+    volumes:
+      - brief_postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: brief-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - brief_redis_data:/data
+
+volumes:
+  brief_postgres_data:
+  brief_redis_data:
