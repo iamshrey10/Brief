@@ -1,5 +1,10 @@
 # web
 
-Frontend. Next.js, TypeScript, Tailwind, Vercel AI SDK.
+Frontend for Brief. Next.js, TypeScript, Tailwind, Vercel AI SDK.
 
-Built starting Day 2.
+## Running locally
+
+    pnpm install
+    pnpm dev
+
+Open http://localhost:3000

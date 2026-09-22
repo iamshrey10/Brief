@@ -4,6 +4,8 @@ node_modules/
 out/
 .pnpm-store/
 npm-debug.log*
+AGENTS.md
+CLAUDE.md
 
 # Python
 __pycache__/
