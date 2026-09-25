@@ -32,8 +32,11 @@ class Document(Base):
     filename: Mapped[str] = mapped_column(String(500))
     # loan, lease, offer, or other
     doc_type: Mapped[str] = mapped_column(String(50))
-    # pending, processing, ready, or failed
+    # pending, uploaded, processing, ready, or failed
     status: Mapped[str] = mapped_column(String(50), default="pending")
+    # where this file lives in object storage, not a public URL
+    storage_key: Mapped[str] = mapped_column(String(500))
+    file_size_bytes: Mapped[int] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     user: Mapped["User"] = relationship(back_populates="documents")

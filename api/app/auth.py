@@ -1,7 +1,11 @@
-from fastapi import Header, HTTPException
+from fastapi import Depends, Header, HTTPException
 from jose import JWTError, jwt
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
+from app.db import get_session
+from app.models import User
 
 
 async def verify_service_token(authorization: str = Header(...)) -> str:
@@ -24,3 +28,20 @@ async def verify_service_token(authorization: str = Header(...)) -> str:
     if not email:
         raise HTTPException(status_code=401, detail="invalid token")
     return email
+
+
+async def get_current_user(
+    email: str = Depends(verify_service_token),
+    session: AsyncSession = Depends(get_session),
+) -> User:
+    """Looks up the signed-in user, creating a row the first time they're ever seen."""
+    result = await session.execute(select(User).where(User.email == email))
+    user = result.scalar_one_or_none()
+
+    if user is None:
+        user = User(email=email)
+        session.add(user)
+        await session.commit()
+        await session.refresh(user)
+
+    return user
