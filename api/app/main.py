@@ -1,12 +1,13 @@
 import uuid
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import get_current_user
 from app.db import get_session
+from app.ingestion import ingest_document
 from app.models import Document, User
 from app.storage import (
     ALLOWED_CONTENT_TYPES,
@@ -107,6 +108,7 @@ async def _get_owned_document(
 @app.patch("/documents/{document_id}/confirm")
 async def confirm_upload(
     document_id: str,
+    background_tasks: BackgroundTasks,
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> DocumentSummary:
@@ -114,6 +116,8 @@ async def confirm_upload(
     document.status = "uploaded"
     await session.commit()
     await session.refresh(document)
+
+    background_tasks.add_task(ingest_document, document.id)
 
     return DocumentSummary(
         id=str(document.id),

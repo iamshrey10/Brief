@@ -6,7 +6,8 @@ from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
-# Matches Gemini's text-embedding-004 output size. Revisit if the embedding model changes.
+# Gemini's gemini-embedding-001 defaults to 3072 dims but supports a smaller requested
+# output; 768 keeps storage and query cost down. Revisit if the embedding model changes.
 EMBEDDING_DIM = 768
 
 

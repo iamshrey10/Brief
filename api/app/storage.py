@@ -46,3 +46,8 @@ def create_presigned_upload_url(storage_key: str, content_type: str) -> str:
         },
         ExpiresIn=PRESIGNED_URL_EXPIRY_SECONDS,
     )
+
+
+def download_file(storage_key: str) -> bytes:
+    response = get_client().get_object(Bucket=settings.r2_bucket_name, Key=storage_key)
+    return response["Body"].read()
