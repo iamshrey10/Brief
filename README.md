@@ -60,7 +60,7 @@ a Gemini API key, a JWT secret).
 
 Run the backend test suite (from `api/`, with the venv active and Postgres running):
 
-    pytest
+    python -m pytest
 
 Frontend (from `web/`):
 
