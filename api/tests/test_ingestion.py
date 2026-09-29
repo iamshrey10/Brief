@@ -1,7 +1,9 @@
+import io
 import math
 import uuid
 
 import pymupdf
+from PIL import Image, ImageDraw, ImageFont
 from sqlalchemy import select
 
 from app.ingestion import CHUNK_SIZE_CHARS, _normalize, chunk_page_text, ingest_document
@@ -14,6 +16,16 @@ def _make_pdf_bytes(page_texts: list[str]) -> bytes:
         page = doc.new_page()
         page.insert_text((72, 72), text)
     return doc.tobytes()
+
+
+def _make_image_bytes(text: str) -> bytes:
+    image = Image.new("RGB", (900, 250), color="white")
+    draw = ImageDraw.Draw(image)
+    font = ImageFont.load_default(size=48)
+    draw.text((30, 90), text, fill="black", font=font)
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG")
+    return buffer.getvalue()
 
 
 def _make_document(user: User, **overrides) -> Document:
@@ -168,3 +180,64 @@ async def test_ingest_document_marks_failed_when_pdf_has_no_extractable_text(
 async def test_ingest_document_does_nothing_for_missing_document_id():
     # should log and return quietly, not raise, since the document row simply doesn't exist
     await ingest_document(uuid.uuid4())
+
+
+# --- ingest_document: real image path, OCR runs for real, embeddings mocked ---
+
+
+async def test_ingest_document_processes_a_real_photographed_page_via_ocr(
+    db_session, test_user, monkeypatch
+):
+    document = _make_document(
+        test_user, filename="photo.png", content_type="image/png", storage_key="fake/photo.png"
+    )
+    db_session.add(document)
+    await db_session.commit()
+    await db_session.refresh(document)
+
+    image_bytes = _make_image_bytes("Late fee is two hundred dollars")
+
+    monkeypatch.setattr("app.ingestion.download_file", lambda storage_key: image_bytes)
+    monkeypatch.setattr(
+        "app.ingestion.embed_texts",
+        lambda texts: [[0.1] * EMBEDDING_DIM for _ in texts],
+    )
+
+    await ingest_document(document.id)
+
+    await db_session.refresh(document)
+    assert document.status == "ready"
+    assert document.ocr_confidence is not None
+    assert document.ocr_confidence > 0
+
+    clauses = (
+        await db_session.execute(select(Clause).where(Clause.document_id == document.id))
+    ).scalars().all()
+    assert len(clauses) == 1
+    assert "fee" in clauses[0].text.lower() or "dollars" in clauses[0].text.lower()
+
+
+async def test_ingest_document_marks_needs_retake_for_low_confidence_ocr(
+    db_session, test_user, monkeypatch
+):
+    document = _make_document(
+        test_user, filename="blurry.png", content_type="image/png", storage_key="fake/blurry.png"
+    )
+    db_session.add(document)
+    await db_session.commit()
+    await db_session.refresh(document)
+
+    monkeypatch.setattr("app.ingestion.download_file", lambda storage_key: b"fake-bytes")
+    monkeypatch.setattr(
+        "app.ingestion.ocr_image", lambda image_bytes: ("some garbled text", 25.0)
+    )
+    monkeypatch.setattr(
+        "app.ingestion.embed_texts",
+        lambda texts: [[0.1] * EMBEDDING_DIM for _ in texts],
+    )
+
+    await ingest_document(document.id)
+
+    await db_session.refresh(document)
+    assert document.status == "needs_retake"
+    assert document.ocr_confidence == 25.0

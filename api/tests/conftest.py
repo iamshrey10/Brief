@@ -56,6 +56,10 @@ async def _setup_schema() -> None:
     await _ensure_test_database_exists()
     async with engine.begin() as connection:
         await connection.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+        # brief_test is throwaway and never holds real data, so drop and recreate every
+        # run rather than relying on create_all alone, which only adds missing tables
+        # and silently leaves a stale schema behind once a model gains a new column.
+        await connection.run_sync(Base.metadata.drop_all)
         await connection.run_sync(Base.metadata.create_all)
 
 

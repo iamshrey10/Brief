@@ -33,11 +33,14 @@ class Document(Base):
     filename: Mapped[str] = mapped_column(String(500))
     # loan, lease, offer, or other
     doc_type: Mapped[str] = mapped_column(String(50))
-    # pending, uploaded, processing, ready, or failed
+    # pending, uploaded, processing, ready, needs_retake, or failed
     status: Mapped[str] = mapped_column(String(50), default="pending")
     # where this file lives in object storage, not a public URL
     storage_key: Mapped[str] = mapped_column(String(500))
     file_size_bytes: Mapped[int] = mapped_column(Integer)
+    content_type: Mapped[str] = mapped_column(String(100), default="application/pdf")
+    # only set for image-sourced (OCR'd) documents, 0-100, null for born-digital PDFs
+    ocr_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     user: Mapped["User"] = relationship(back_populates="documents")

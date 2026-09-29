@@ -7,6 +7,7 @@ from google.genai import types
 
 from app.config import settings
 from app.db import async_session
+from app.image_processing import OCR_CONFIDENCE_THRESHOLD, ocr_image
 from app.models import EMBEDDING_DIM, Clause, Document, Embedding
 from app.storage import download_file
 
@@ -30,10 +31,16 @@ def get_genai_client() -> genai.Client:
     return _client
 
 
-def extract_pages(pdf_bytes: bytes) -> list[str]:
-    doc = pymupdf.open(stream=pdf_bytes, filetype="pdf")
+def extract_pages(file_bytes: bytes, content_type: str) -> tuple[list[str], float | None]:
+    """Returns (page_texts, ocr_confidence). Confidence is None for born-digital PDFs,
+    which don't go through OCR at all."""
+    if content_type.startswith("image/"):
+        text, confidence = ocr_image(file_bytes)
+        return [text], confidence
+
+    doc = pymupdf.open(stream=file_bytes, filetype="pdf")
     try:
-        return [page.get_text() for page in doc]
+        return [page.get_text() for page in doc], None
     finally:
         doc.close()
 
@@ -95,8 +102,9 @@ async def ingest_document(document_id: uuid.UUID) -> None:
             document.status = "processing"
             await session.commit()
 
-            pdf_bytes = download_file(document.storage_key)
-            pages = extract_pages(pdf_bytes)
+            file_bytes = download_file(document.storage_key)
+            pages, ocr_confidence = extract_pages(file_bytes, document.content_type)
+            document.ocr_confidence = ocr_confidence
 
             chunk_records: list[tuple[int, int, int, str]] = []
             for page_number, page_text in enumerate(pages, start=1):
@@ -126,7 +134,10 @@ async def ingest_document(document_id: uuid.UUID) -> None:
                 await session.flush()
                 session.add(Embedding(clause_id=clause.id, vector=vector))
 
-            document.status = "ready"
+            if ocr_confidence is not None and ocr_confidence < OCR_CONFIDENCE_THRESHOLD:
+                document.status = "needs_retake"
+            else:
+                document.status = "ready"
             await session.commit()
         except Exception:
             logger.exception("ingestion failed for document %s", document_id)

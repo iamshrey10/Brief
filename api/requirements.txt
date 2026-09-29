@@ -11,3 +11,6 @@ python-jose[cryptography]==3.3.0
 boto3==1.43.102
 pymupdf==1.28.2
 google-genai==2.25.0
+opencv-python-headless==4.11.0.86
+pytesseract==0.3.13
+pillow-heif==1.8.0

@@ -71,6 +71,7 @@ async def create_upload(
         status="pending",
         storage_key=storage_key,
         file_size_bytes=body.file_size_bytes,
+        content_type=body.content_type,
     )
     session.add(document)
     await session.commit()
@@ -86,6 +87,7 @@ class DocumentSummary(BaseModel):
     filename: str
     doc_type: str
     status: str
+    ocr_confidence: float | None = None
 
 
 async def _get_owned_document(
@@ -138,6 +140,12 @@ async def list_documents(
     documents = result.scalars().all()
 
     return [
-        DocumentSummary(id=str(d.id), filename=d.filename, doc_type=d.doc_type, status=d.status)
+        DocumentSummary(
+            id=str(d.id),
+            filename=d.filename,
+            doc_type=d.doc_type,
+            status=d.status,
+            ocr_confidence=d.ocr_confidence,
+        )
         for d in documents
     ]
