@@ -50,6 +50,13 @@ jobs:
     env:
       DATABASE_URL: postgresql+asyncpg://brief:brief_dev_password@localhost:5432/brief
       SERVICE_JWT_SECRET: ci-only-secret
+      # Generating a presigned URL is a local signing operation, no network call, so
+      # these just need to be well-formed, not real credentials.
+      R2_ACCOUNT_ID: ci-only-account
+      R2_ACCESS_KEY_ID: ci-only-key
+      R2_SECRET_ACCESS_KEY: ci-only-secret
+      R2_BUCKET_NAME: brief-documents-ci
+      R2_ENDPOINT_URL: https://ci-only-account.r2.cloudflarestorage.com
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
