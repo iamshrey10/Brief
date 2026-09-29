@@ -28,11 +28,28 @@ jobs:
       - run: pnpm build
 
   api:
-    name: api, lint and import check
+    name: api, lint and tests
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: api
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: brief
+          POSTGRES_PASSWORD: brief_dev_password
+          POSTGRES_DB: brief
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql+asyncpg://brief:brief_dev_password@localhost:5432/brief
+      SERVICE_JWT_SECRET: ci-only-secret
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -43,3 +60,5 @@ jobs:
       - run: pip install -r requirements-dev.txt
       - run: ruff check .
       - run: python -c "import app.main"
+      - run: alembic upgrade head
+      - run: pytest -v

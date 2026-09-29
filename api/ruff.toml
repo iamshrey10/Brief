@@ -1,0 +1,4 @@
+[lint.per-file-ignores]
+# conftest.py must set DATABASE_URL before any app module is imported, so the app
+# never touches the real dev database in tests. That forces imports after code.
+"tests/conftest.py" = ["E402"]
