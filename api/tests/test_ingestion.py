@@ -6,7 +6,7 @@ import pymupdf
 from PIL import Image, ImageDraw, ImageFont
 from sqlalchemy import select
 
-from app.ingestion import CHUNK_SIZE_CHARS, _normalize, chunk_page_text, ingest_document
+from app.ingestion import _normalize, ingest_document
 from app.models import EMBEDDING_DIM, Clause, Document, Embedding, User
 
 
@@ -39,44 +39,6 @@ def _make_document(user: User, **overrides) -> Document:
     )
     defaults.update(overrides)
     return Document(**defaults)
-
-
-# --- chunk_page_text: pure logic, no database needed ---
-
-
-def test_chunk_page_text_empty_string_returns_no_chunks():
-    assert chunk_page_text("") == []
-
-
-def test_chunk_page_text_short_text_returns_single_chunk():
-    text = "A short clause."
-    assert chunk_page_text(text) == [(0, len(text), text)]
-
-
-def test_chunk_page_text_covers_every_character_exactly_once_in_order():
-    text = "A" * (CHUNK_SIZE_CHARS * 2)
-    chunks = chunk_page_text(text)
-
-    assert len(chunks) == 2
-    assert chunks[0][0] == 0
-    assert chunks[-1][1] == len(text)
-    cursor = 0
-    for start, end, _ in chunks:
-        assert start == cursor
-        cursor = end
-
-
-def test_chunk_page_text_prefers_paragraph_boundary_over_hard_cutoff():
-    para1 = "Sentence one. " * 60  # well under CHUNK_SIZE_CHARS on its own
-    para2 = "Sentence two. " * 60
-    text = para1 + "\n\n" + para2  # combined length forces a chunk break
-
-    chunks = chunk_page_text(text)
-
-    assert len(chunks) == 2
-    first_start, first_end, first_text = chunks[0]
-    assert first_text == para1.strip()
-    assert first_end < CHUNK_SIZE_CHARS  # broke at the paragraph, not the naive cutoff
 
 
 # --- _normalize: pure logic, no database needed ---
@@ -129,6 +91,46 @@ async def test_ingest_document_creates_matching_clauses_and_embeddings(
     ).scalars().all()
     assert len(embeddings) == 2
     assert all(len(e.vector) == EMBEDDING_DIM for e in embeddings)
+
+
+async def test_ingest_document_segments_numbered_text_into_real_clauses(
+    db_session, test_user, monkeypatch
+):
+    document = _make_document(test_user)
+    db_session.add(document)
+    await db_session.commit()
+    await db_session.refresh(document)
+
+    numbered_text = (
+        "1. The Borrower shall repay the loan in full.\n"
+        "2. Interest accrues at six percent annually.\n"
+        "3. Late payments incur a twenty five dollar fee."
+    )
+    pdf_bytes = _make_pdf_bytes([numbered_text])
+
+    monkeypatch.setattr("app.ingestion.download_file", lambda storage_key: pdf_bytes)
+    monkeypatch.setattr(
+        "app.ingestion.embed_texts",
+        lambda texts: [[0.1] * EMBEDDING_DIM for _ in texts],
+    )
+
+    await ingest_document(document.id)
+
+    await db_session.refresh(document)
+    assert document.status == "ready"
+
+    clauses = (
+        await db_session.execute(
+            select(Clause).where(Clause.document_id == document.id).order_by(Clause.clause_index)
+        )
+    ).scalars().all()
+
+    # three real numbered clauses, not one naive blob, this is the whole point of
+    # structure-aware segmentation over the old fixed-size chunker
+    assert len(clauses) == 3
+    assert clauses[0].text.startswith("1.")
+    assert clauses[1].text.startswith("2.")
+    assert clauses[2].text.startswith("3.")
 
 
 async def test_ingest_document_marks_failed_when_embedding_call_errors(

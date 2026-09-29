@@ -5,6 +5,7 @@ import pymupdf
 from google import genai
 from google.genai import types
 
+from app.clause_segmentation import segment_page_into_clauses
 from app.config import settings
 from app.db import async_session
 from app.image_processing import OCR_CONFIDENCE_THRESHOLD, ocr_image
@@ -18,7 +19,6 @@ logger = logging.getLogger(__name__)
 # to match the pgvector column. Only the default 3072-dim output comes pre-normalized,
 # so smaller outputs need to be normalized by hand.
 EMBEDDING_MODEL = "gemini-embedding-001"
-CHUNK_SIZE_CHARS = 1500
 EMBEDDING_BATCH_SIZE = 100
 
 _client: genai.Client | None = None
@@ -43,32 +43,6 @@ def extract_pages(file_bytes: bytes, content_type: str) -> tuple[list[str], floa
         return [page.get_text() for page in doc], None
     finally:
         doc.close()
-
-
-def chunk_page_text(text: str) -> list[tuple[int, int, str]]:
-    """Splits one page's text into naive fixed-size chunks with soft boundaries.
-
-    Returns a list of (char_start, char_end, chunk_text), offsets relative to this page.
-    """
-    chunks: list[tuple[int, int, str]] = []
-    start = 0
-    length = len(text)
-
-    while start < length:
-        end = min(start + CHUNK_SIZE_CHARS, length)
-        if end < length:
-            boundary = text.rfind("\n\n", start, end)
-            if boundary == -1 or boundary <= start:
-                boundary = text.rfind(". ", start, end)
-            if boundary != -1 and boundary > start:
-                end = boundary + 1
-
-        chunk_text = text[start:end].strip()
-        if chunk_text:
-            chunks.append((start, end, chunk_text))
-        start = end
-
-    return chunks
 
 
 def _normalize(vector: list[float]) -> list[float]:
@@ -108,7 +82,7 @@ async def ingest_document(document_id: uuid.UUID) -> None:
 
             chunk_records: list[tuple[int, int, int, str]] = []
             for page_number, page_text in enumerate(pages, start=1):
-                for char_start, char_end, chunk_text in chunk_page_text(page_text):
+                for char_start, char_end, chunk_text in segment_page_into_clauses(page_text):
                     chunk_records.append((page_number, char_start, char_end, chunk_text))
 
             if not chunk_records:

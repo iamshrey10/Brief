@@ -1,6 +1,47 @@
 from app.clause_segmentation import CHUNK_SIZE_CHARS, chunk_page_text, segment_page_into_clauses
 
 
+# --- chunk_page_text: the naive fallback, pure logic, no database needed ---
+
+
+def test_chunk_page_text_empty_string_returns_no_chunks():
+    assert chunk_page_text("") == []
+
+
+def test_chunk_page_text_short_text_returns_single_chunk():
+    text = "A short clause."
+    assert chunk_page_text(text) == [(0, len(text), text)]
+
+
+def test_chunk_page_text_covers_every_character_exactly_once_in_order():
+    text = "A" * (CHUNK_SIZE_CHARS * 2)
+    chunks = chunk_page_text(text)
+
+    assert len(chunks) == 2
+    assert chunks[0][0] == 0
+    assert chunks[-1][1] == len(text)
+    cursor = 0
+    for start, end, _ in chunks:
+        assert start == cursor
+        cursor = end
+
+
+def test_chunk_page_text_prefers_paragraph_boundary_over_hard_cutoff():
+    para1 = "Sentence one. " * 60  # well under CHUNK_SIZE_CHARS on its own
+    para2 = "Sentence two. " * 60
+    text = para1 + "\n\n" + para2  # combined length forces a chunk break
+
+    chunks = chunk_page_text(text)
+
+    assert len(chunks) == 2
+    first_start, first_end, first_text = chunks[0]
+    assert first_text == para1.strip()
+    assert first_end < CHUNK_SIZE_CHARS  # broke at the paragraph, not the naive cutoff
+
+
+# --- segment_page_into_clauses: structure-aware segmentation ---
+
+
 def test_segment_detects_numbered_clauses():
     text = (
         "1. The Borrower shall repay the loan in full.\n"
