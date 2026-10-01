@@ -281,7 +281,7 @@ async def _ready_document(db_session, test_user) -> Document:
     return document
 
 
-async def test_search_document_reranks_by_default(client, db_session, test_user, monkeypatch):
+async def test_search_document_does_not_rerank_by_default(client, db_session, test_user, monkeypatch):
     calls: list[str] = []
 
     async def fake_reranked(session, document_id, query, limit):
@@ -299,10 +299,10 @@ async def test_search_document_reranks_by_default(client, db_session, test_user,
     response = await client.post(f"/documents/{document.id}/search", json={"query": "late fee"})
 
     assert response.status_code == 200
-    assert calls == ["reranked"]
+    assert calls == ["hybrid"]
 
 
-async def test_search_document_can_skip_reranking(client, db_session, test_user, monkeypatch):
+async def test_search_document_can_opt_in_to_reranking(client, db_session, test_user, monkeypatch):
     calls: list[str] = []
 
     async def fake_reranked(session, document_id, query, limit):
@@ -318,11 +318,11 @@ async def test_search_document_can_skip_reranking(client, db_session, test_user,
     document = await _ready_document(db_session, test_user)
 
     response = await client.post(
-        f"/documents/{document.id}/search", json={"query": "late fee", "rerank": False}
+        f"/documents/{document.id}/search", json={"query": "late fee", "rerank": True}
     )
 
     assert response.status_code == 200
-    assert calls == ["hybrid"]
+    assert calls == ["reranked"]
 
 
 async def test_search_document_rejects_an_out_of_range_limit(client, db_session, test_user):

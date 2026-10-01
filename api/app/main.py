@@ -157,8 +157,10 @@ async def list_documents(
 class SearchRequest(BaseModel):
     query: str
     limit: int = Field(default=10, ge=1, le=50)
-    # Cross-encoder rerank puts the best clause first but adds latency; off is the fast path.
-    rerank: bool = True
+    # Off by default: on the retrieval eval the MS MARCO cross-encoder lowered top-1
+    # accuracy from 96% to 67%, see evals/results. Kept as an opt-in for long documents,
+    # where a wider shortlist may change that, which the small fixture can't show.
+    rerank: bool = False
 
 
 class SearchResult(BaseModel):
