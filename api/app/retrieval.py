@@ -8,6 +8,10 @@ from app.models import Clause, Embedding
 
 DEFAULT_LIMIT = 10
 
+# Standard smoothing constant for reciprocal rank fusion, keeps a single very high rank
+# from one list alone from completely dominating the combined score.
+RRF_K = 60
+
 
 async def keyword_search(
     session: AsyncSession, document_id: uuid.UUID, query: str, limit: int = DEFAULT_LIMIT
@@ -61,3 +65,35 @@ async def vector_search(
 
     result = await session.execute(statement)
     return [(row.id, row.distance) for row in result]
+
+
+async def hybrid_search(
+    session: AsyncSession, document_id: uuid.UUID, query: str, limit: int = DEFAULT_LIMIT
+) -> list[Clause]:
+    """Combines keyword and vector search via reciprocal rank fusion (RRF).
+
+    A clause that ranks well in either list contributes to its combined score, based
+    purely on rank position, not the raw scores, which avoids having to normalize two
+    differently-scaled signals (a ts_rank score and a cosine distance) against each
+    other directly. Pulls more candidates from each underlying search than `limit`
+    asks for, since fusion needs a real pool to combine before trimming to the top N.
+    """
+    query_embedding = embed_query(query)
+    candidate_pool = limit * 2
+
+    keyword_results = await keyword_search(session, document_id, query, limit=candidate_pool)
+    vector_results = await vector_search(session, document_id, query_embedding, limit=candidate_pool)
+
+    scores: dict[uuid.UUID, float] = {}
+    for rank, (clause_id, _score) in enumerate(keyword_results):
+        scores[clause_id] = scores.get(clause_id, 0.0) + 1.0 / (RRF_K + rank + 1)
+    for rank, (clause_id, _score) in enumerate(vector_results):
+        scores[clause_id] = scores.get(clause_id, 0.0) + 1.0 / (RRF_K + rank + 1)
+
+    ranked_ids = sorted(scores, key=lambda clause_id: scores[clause_id], reverse=True)[:limit]
+    if not ranked_ids:
+        return []
+
+    result = await session.execute(select(Clause).where(Clause.id.in_(ranked_ids)))
+    clauses_by_id = {clause.id: clause for clause in result.scalars().all()}
+    return [clauses_by_id[clause_id] for clause_id in ranked_ids if clause_id in clauses_by_id]

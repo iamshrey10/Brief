@@ -1,7 +1,7 @@
 import uuid
 
 from app.models import EMBEDDING_DIM, Clause, Document, Embedding, User
-from app.retrieval import keyword_search, vector_search
+from app.retrieval import hybrid_search, keyword_search, vector_search
 
 
 def _make_document(user: User, **overrides) -> Document:
@@ -166,3 +166,88 @@ async def test_vector_search_only_searches_the_given_document(db_session, test_u
 
     assert len(results) == 1
     assert results[0][0] == my_clause.id
+
+
+# --- hybrid_search: reciprocal rank fusion of both signals ---
+
+
+async def test_hybrid_search_ranks_a_clause_strong_on_both_signals_first(
+    db_session, test_user, monkeypatch
+):
+    document = _make_document(test_user)
+    db_session.add(document)
+    await db_session.flush()
+
+    strong_on_both = _make_clause(
+        document, 0, "Prepayment penalty. Prepayment penalty is waived for early payoff."
+    )
+    keyword_only = _make_clause(document, 1, "A late fee may apply in some circumstances.")
+    unrelated = _make_clause(document, 2, "Insurance coverage is required throughout the lease.")
+    db_session.add_all([strong_on_both, keyword_only, unrelated])
+    await db_session.flush()
+
+    db_session.add_all(
+        [
+            Embedding(clause_id=strong_on_both.id, vector=_make_unit_vector(0)),
+            Embedding(clause_id=keyword_only.id, vector=_make_unit_vector(5)),
+            Embedding(clause_id=unrelated.id, vector=_make_unit_vector(10)),
+        ]
+    )
+    await db_session.commit()
+
+    monkeypatch.setattr("app.retrieval.embed_query", lambda query: _make_unit_vector(0))
+
+    results = await hybrid_search(db_session, document.id, "prepayment penalty")
+
+    assert results[0].id == strong_on_both.id
+
+
+async def test_hybrid_search_surfaces_a_vector_only_match_keyword_search_would_miss(
+    db_session, test_user, monkeypatch
+):
+    document = _make_document(test_user)
+    db_session.add(document)
+    await db_session.flush()
+
+    paraphrased = _make_clause(document, 0, "You may pay off the balance early at no extra cost.")
+    unrelated = _make_clause(document, 1, "The unit must be kept free of pets at all times.")
+    db_session.add_all([paraphrased, unrelated])
+    await db_session.flush()
+
+    db_session.add_all(
+        [
+            Embedding(clause_id=paraphrased.id, vector=_make_unit_vector(0)),
+            Embedding(clause_id=unrelated.id, vector=_make_unit_vector(10)),
+        ]
+    )
+    await db_session.commit()
+
+    # the query shares no real words with `paraphrased`, only keyword_search would miss it
+    monkeypatch.setattr("app.retrieval.embed_query", lambda query: _make_unit_vector(0))
+
+    results = await hybrid_search(db_session, document.id, "prepayment penalty")
+
+    assert paraphrased.id in [clause.id for clause in results]
+
+
+async def test_hybrid_search_respects_the_limit(db_session, test_user, monkeypatch):
+    document = _make_document(test_user)
+    db_session.add(document)
+    await db_session.flush()
+
+    clauses = [
+        _make_clause(document, i, f"Fee number {i} applies under certain conditions.")
+        for i in range(5)
+    ]
+    db_session.add_all(clauses)
+    await db_session.flush()
+    db_session.add_all(
+        [Embedding(clause_id=c.id, vector=_make_unit_vector(i)) for i, c in enumerate(clauses)]
+    )
+    await db_session.commit()
+
+    monkeypatch.setattr("app.retrieval.embed_query", lambda query: _make_unit_vector(0))
+
+    results = await hybrid_search(db_session, document.id, "fee applies", limit=2)
+
+    assert len(results) == 2
