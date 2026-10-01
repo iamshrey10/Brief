@@ -264,3 +264,76 @@ async def test_search_document_rejects_another_users_document(client, db_session
     response = await client.post(f"/documents/{document.id}/search", json={"query": "anything"})
 
     assert response.status_code == 404
+
+
+async def _ready_document(db_session, test_user) -> Document:
+    document = Document(
+        user_id=test_user.id,
+        filename="lease.pdf",
+        doc_type="lease",
+        status="ready",
+        storage_key="fake/key.pdf",
+        file_size_bytes=1024,
+    )
+    db_session.add(document)
+    await db_session.commit()
+    await db_session.refresh(document)
+    return document
+
+
+async def test_search_document_reranks_by_default(client, db_session, test_user, monkeypatch):
+    calls: list[str] = []
+
+    async def fake_reranked(session, document_id, query, limit):
+        calls.append("reranked")
+        return []
+
+    async def fake_hybrid(session, document_id, query, limit):
+        calls.append("hybrid")
+        return []
+
+    monkeypatch.setattr(main_module, "reranked_search", fake_reranked)
+    monkeypatch.setattr(main_module, "hybrid_search", fake_hybrid)
+    document = await _ready_document(db_session, test_user)
+
+    response = await client.post(f"/documents/{document.id}/search", json={"query": "late fee"})
+
+    assert response.status_code == 200
+    assert calls == ["reranked"]
+
+
+async def test_search_document_can_skip_reranking(client, db_session, test_user, monkeypatch):
+    calls: list[str] = []
+
+    async def fake_reranked(session, document_id, query, limit):
+        calls.append("reranked")
+        return []
+
+    async def fake_hybrid(session, document_id, query, limit):
+        calls.append("hybrid")
+        return []
+
+    monkeypatch.setattr(main_module, "reranked_search", fake_reranked)
+    monkeypatch.setattr(main_module, "hybrid_search", fake_hybrid)
+    document = await _ready_document(db_session, test_user)
+
+    response = await client.post(
+        f"/documents/{document.id}/search", json={"query": "late fee", "rerank": False}
+    )
+
+    assert response.status_code == 200
+    assert calls == ["hybrid"]
+
+
+async def test_search_document_rejects_an_out_of_range_limit(client, db_session, test_user):
+    document = await _ready_document(db_session, test_user)
+
+    too_big = await client.post(
+        f"/documents/{document.id}/search", json={"query": "late fee", "limit": 1_000_000}
+    )
+    too_small = await client.post(
+        f"/documents/{document.id}/search", json={"query": "late fee", "limit": 0}
+    )
+
+    assert too_big.status_code == 422
+    assert too_small.status_code == 422

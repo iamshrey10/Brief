@@ -1,7 +1,7 @@
 import uuid
 
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -9,7 +9,7 @@ from app.auth import get_current_user
 from app.db import get_session
 from app.ingestion import ingest_document
 from app.models import Document, User
-from app.retrieval import hybrid_search
+from app.retrieval import hybrid_search, reranked_search
 from app.storage import (
     ALLOWED_CONTENT_TYPES,
     MAX_FILE_SIZE_BYTES,
@@ -156,7 +156,9 @@ async def list_documents(
 
 class SearchRequest(BaseModel):
     query: str
-    limit: int = 10
+    limit: int = Field(default=10, ge=1, le=50)
+    # Cross-encoder rerank puts the best clause first but adds latency; off is the fast path.
+    rerank: bool = True
 
 
 class SearchResult(BaseModel):
@@ -180,7 +182,8 @@ async def search_document(
     if not body.query.strip():
         raise HTTPException(status_code=400, detail="query cannot be empty")
 
-    clauses = await hybrid_search(session, document.id, body.query, limit=body.limit)
+    search = reranked_search if body.rerank else hybrid_search
+    clauses = await search(session, document.id, body.query, limit=body.limit)
 
     return [
         SearchResult(
