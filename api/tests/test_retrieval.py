@@ -1,7 +1,7 @@
 import uuid
 
-from app.models import Clause, Document, User
-from app.retrieval import keyword_search
+from app.models import EMBEDDING_DIM, Clause, Document, Embedding, User
+from app.retrieval import keyword_search, vector_search
 
 
 def _make_document(user: User, **overrides) -> Document:
@@ -15,6 +15,14 @@ def _make_document(user: User, **overrides) -> Document:
     )
     defaults.update(overrides)
     return Document(**defaults)
+
+
+def _make_unit_vector(hot_index: int) -> list[float]:
+    """A one-hot unit vector, so cosine distance between two of these is predictable:
+    0 when hot_index matches, 1 (orthogonal) when it doesn't."""
+    vector = [0.0] * EMBEDDING_DIM
+    vector[hot_index] = 1.0
+    return vector
 
 
 def _make_clause(document: Document, index: int, text: str) -> Clause:
@@ -101,3 +109,60 @@ async def test_keyword_search_only_searches_the_given_document(db_session, test_
     assert len(results) == 1
     matched_clause = await db_session.get(Clause, results[0][0])
     assert matched_clause.document_id == mine.id
+
+
+# --- vector_search: pgvector cosine distance over real stored embeddings ---
+
+
+async def test_vector_search_ranks_the_closest_embedding_first(db_session, test_user):
+    document = _make_document(test_user)
+    db_session.add(document)
+    await db_session.flush()
+
+    close_clause = _make_clause(document, 0, "This clause means almost the same thing.")
+    far_clause = _make_clause(document, 1, "This clause means something unrelated.")
+    db_session.add_all([close_clause, far_clause])
+    await db_session.flush()
+
+    db_session.add_all(
+        [
+            Embedding(clause_id=close_clause.id, vector=_make_unit_vector(0)),
+            Embedding(clause_id=far_clause.id, vector=_make_unit_vector(1)),
+        ]
+    )
+    await db_session.commit()
+
+    query_embedding = _make_unit_vector(0)  # identical direction to close_clause
+    results = await vector_search(db_session, document.id, query_embedding)
+
+    assert len(results) == 2
+    assert results[0][0] == close_clause.id
+    assert results[0][1] < results[1][1]  # lower cosine distance means more similar
+
+
+async def test_vector_search_only_searches_the_given_document(db_session, test_user):
+    mine = _make_document(test_user, filename="mine.pdf")
+    other_user = User(email=f"{uuid.uuid4()}@example.com")
+    db_session.add_all([mine, other_user])
+    await db_session.flush()
+    theirs = _make_document(other_user, filename="theirs.pdf")
+    db_session.add(theirs)
+    await db_session.flush()
+
+    my_clause = _make_clause(mine, 0, "A clause that belongs to my document.")
+    their_clause = _make_clause(theirs, 0, "A clause that belongs to someone else's document.")
+    db_session.add_all([my_clause, their_clause])
+    await db_session.flush()
+
+    db_session.add_all(
+        [
+            Embedding(clause_id=my_clause.id, vector=_make_unit_vector(0)),
+            Embedding(clause_id=their_clause.id, vector=_make_unit_vector(0)),
+        ]
+    )
+    await db_session.commit()
+
+    results = await vector_search(db_session, mine.id, _make_unit_vector(0))
+
+    assert len(results) == 1
+    assert results[0][0] == my_clause.id
