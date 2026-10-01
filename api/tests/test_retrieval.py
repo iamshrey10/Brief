@@ -1,7 +1,7 @@
 import uuid
 
 from app.models import EMBEDDING_DIM, Clause, Document, Embedding, User
-from app.retrieval import hybrid_search, keyword_search, vector_search
+from app.retrieval import hybrid_search, keyword_search, reranked_search, vector_search
 
 
 def _make_document(user: User, **overrides) -> Document:
@@ -251,3 +251,81 @@ async def test_hybrid_search_respects_the_limit(db_session, test_user, monkeypat
     results = await hybrid_search(db_session, document.id, "fee applies", limit=2)
 
     assert len(results) == 2
+
+
+# --- reranked_search: hybrid shortlist, then a real cross-encoder re-judges it ---
+
+
+async def test_reranked_search_corrects_a_hybrid_ordering_mistake(
+    db_session, test_user, monkeypatch
+):
+    document = _make_document(test_user)
+    db_session.add(document)
+    await db_session.flush()
+
+    wrong = _make_clause(
+        document, 0, "A late fee of twenty five dollars applies if rent is more than five days overdue."
+    )
+    right = _make_clause(
+        document,
+        1,
+        "The borrower may repay all or part of the principal early without any prepayment penalty.",
+    )
+    unrelated = _make_clause(document, 2, "Pets are not permitted without prior written consent.")
+    db_session.add_all([wrong, right, unrelated])
+    await db_session.flush()
+
+    # `wrong` sits exactly on the query's embedding, so vector search favors it
+    db_session.add_all(
+        [
+            Embedding(clause_id=wrong.id, vector=_make_unit_vector(0)),
+            Embedding(clause_id=right.id, vector=_make_unit_vector(3)),
+            Embedding(clause_id=unrelated.id, vector=_make_unit_vector(10)),
+        ]
+    )
+    await db_session.commit()
+
+    monkeypatch.setattr("app.retrieval.embed_query", lambda query: _make_unit_vector(0))
+    query = "Can I pay off the loan early without a fee?"
+
+    hybrid_results = await hybrid_search(db_session, document.id, query)
+    assert hybrid_results[0].id == wrong.id  # precondition: hybrid alone gets this wrong
+
+    reranked_results = await reranked_search(db_session, document.id, query)
+
+    assert reranked_results[0].id == right.id
+
+
+async def test_reranked_search_respects_the_limit(db_session, test_user, monkeypatch):
+    document = _make_document(test_user)
+    db_session.add(document)
+    await db_session.flush()
+
+    clauses = [
+        _make_clause(document, i, f"Fee number {i} applies under certain conditions.")
+        for i in range(5)
+    ]
+    db_session.add_all(clauses)
+    await db_session.flush()
+    db_session.add_all(
+        [Embedding(clause_id=c.id, vector=_make_unit_vector(i)) for i, c in enumerate(clauses)]
+    )
+    await db_session.commit()
+
+    monkeypatch.setattr("app.retrieval.embed_query", lambda query: _make_unit_vector(0))
+
+    results = await reranked_search(db_session, document.id, "fee applies", limit=2)
+
+    assert len(results) == 2
+
+
+async def test_reranked_search_returns_nothing_for_a_document_with_no_clauses(
+    db_session, test_user, monkeypatch
+):
+    document = _make_document(test_user)
+    db_session.add(document)
+    await db_session.commit()
+
+    monkeypatch.setattr("app.retrieval.embed_query", lambda query: _make_unit_vector(0))
+
+    assert await reranked_search(db_session, document.id, "anything") == []

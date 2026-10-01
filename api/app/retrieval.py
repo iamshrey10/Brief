@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 
 from sqlalchemy import func, select
@@ -5,8 +6,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ingestion import embed_texts
 from app.models import Clause, Embedding
+from app.reranker import rerank
 
 DEFAULT_LIMIT = 10
+
+# How many hybrid results the cross-encoder gets to re-judge. Wide enough that the
+# truly best clause is almost certainly in the shortlist, narrow enough to stay fast.
+RERANK_CANDIDATES = 20
 
 # Standard smoothing constant for reciprocal rank fusion, keeps a single very high rank
 # from one list alone from completely dominating the combined score.
@@ -97,3 +103,25 @@ async def hybrid_search(
     result = await session.execute(select(Clause).where(Clause.id.in_(ranked_ids)))
     clauses_by_id = {clause.id: clause for clause in result.scalars().all()}
     return [clauses_by_id[clause_id] for clause_id in ranked_ids if clause_id in clauses_by_id]
+
+
+async def reranked_search(
+    session: AsyncSession, document_id: uuid.UUID, query: str, limit: int = DEFAULT_LIMIT
+) -> list[Clause]:
+    """hybrid_search for a shortlist, then a cross-encoder re-judges that shortlist.
+
+    The two stages play different roles: hybrid search is fast and wide, good at not
+    missing the right clause, while the cross-encoder is slower and precise, good at
+    putting the right clause first. The rerank runs in a worker thread because it's
+    blocking CPU work that would otherwise stall every other request on the event loop.
+    """
+    candidates = await hybrid_search(session, document_id, query, limit=RERANK_CANDIDATES)
+    if not candidates:
+        return []
+
+    ranked = await asyncio.to_thread(
+        rerank, query, [(clause.id, clause.text) for clause in candidates], limit
+    )
+
+    clauses_by_id = {clause.id: clause for clause in candidates}
+    return [clauses_by_id[clause_id] for clause_id, _score in ranked]
