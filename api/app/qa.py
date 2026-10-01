@@ -10,8 +10,13 @@ from app.ingestion import get_genai_client
 from app.retrieval import hybrid_search
 
 # Pinned rather than a moving "latest" alias, so an answer-quality change always traces
-# to a change we made, not a silent provider-side model update.
-ANSWER_MODEL = "gemini-2.5-flash"
+# to a change we made, not a silent provider-side model update. Pinning doesn't stop a model
+# being retired, though: gemini-2.5-flash-lite is still listed by the API but already
+# rejects new users, so re-run evals/qa_eval.py whenever this changes.
+# Chosen from the Q&A evaluation: 24/24 right citations and 8/8 correct abstentions, about
+# 2.5s per answer. gemini-2.5-flash, tried first, is capped at 20 requests a day on the
+# free tier and took 5-20s per answer.
+ANSWER_MODEL = "gemini-3.5-flash-lite"
 
 # How many retrieved clauses the model sees. Few enough to keep the prompt focused, enough
 # that the answering clause is almost certainly among them (vector search put it first
