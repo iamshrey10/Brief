@@ -6,7 +6,7 @@ from httpx import ASGITransport, AsyncClient
 import app.main as main_module
 from app.auth import get_current_user
 from app.main import app
-from app.models import Document, User
+from app.models import EMBEDDING_DIM, Clause, Document, Embedding, User
 
 
 @pytest_asyncio.fixture
@@ -166,3 +166,101 @@ async def test_list_documents_only_returns_current_users_documents(client, db_se
     assert response.status_code == 200
     filenames = {doc["filename"] for doc in response.json()}
     assert filenames == {"mine.pdf"}
+
+
+async def test_search_document_returns_matching_clauses(
+    client, db_session, test_user, monkeypatch
+):
+    document = Document(
+        user_id=test_user.id,
+        filename="lease.pdf",
+        doc_type="lease",
+        status="ready",
+        storage_key="fake/key.pdf",
+        file_size_bytes=1024,
+    )
+    db_session.add(document)
+    await db_session.flush()
+
+    clause = Clause(
+        document_id=document.id,
+        clause_index=0,
+        page_number=1,
+        char_start=0,
+        char_end=50,
+        text="The prepayment penalty is waived for early payoff.",
+    )
+    db_session.add(clause)
+    await db_session.flush()
+    db_session.add(Embedding(clause_id=clause.id, vector=[0.1] * EMBEDDING_DIM))
+    await db_session.commit()
+
+    monkeypatch.setattr("app.retrieval.embed_query", lambda query: [0.1] * EMBEDDING_DIM)
+
+    response = await client.post(
+        f"/documents/{document.id}/search", json={"query": "prepayment penalty"}
+    )
+
+    assert response.status_code == 200
+    results = response.json()
+    assert len(results) == 1
+    assert results[0]["clause_id"] == str(clause.id)
+    assert "prepayment penalty" in results[0]["text"]
+
+
+async def test_search_document_rejects_a_document_that_is_not_ready(client, db_session, test_user):
+    document = Document(
+        user_id=test_user.id,
+        filename="lease.pdf",
+        doc_type="lease",
+        status="processing",
+        storage_key="fake/key.pdf",
+        file_size_bytes=1024,
+    )
+    db_session.add(document)
+    await db_session.commit()
+    await db_session.refresh(document)
+
+    response = await client.post(f"/documents/{document.id}/search", json={"query": "anything"})
+
+    assert response.status_code == 409
+
+
+async def test_search_document_rejects_an_empty_query(client, db_session, test_user):
+    document = Document(
+        user_id=test_user.id,
+        filename="lease.pdf",
+        doc_type="lease",
+        status="ready",
+        storage_key="fake/key.pdf",
+        file_size_bytes=1024,
+    )
+    db_session.add(document)
+    await db_session.commit()
+    await db_session.refresh(document)
+
+    response = await client.post(f"/documents/{document.id}/search", json={"query": "   "})
+
+    assert response.status_code == 400
+
+
+async def test_search_document_rejects_another_users_document(client, db_session):
+    other_user = User(email=f"{uuid.uuid4()}@example.com")
+    db_session.add(other_user)
+    await db_session.flush()
+
+    document = Document(
+        user_id=other_user.id,
+        filename="lease.pdf",
+        doc_type="lease",
+        status="ready",
+        storage_key="fake/key.pdf",
+        file_size_bytes=1024,
+    )
+    db_session.add(document)
+    await db_session.commit()
+    await db_session.refresh(document)
+
+    response = await client.post(f"/documents/{document.id}/search", json={"query": "anything"})
+
+    assert response.status_code == 404

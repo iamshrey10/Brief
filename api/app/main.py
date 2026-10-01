@@ -9,12 +9,15 @@ from app.auth import get_current_user
 from app.db import get_session
 from app.ingestion import ingest_document
 from app.models import Document, User
+from app.retrieval import hybrid_search
 from app.storage import (
     ALLOWED_CONTENT_TYPES,
     MAX_FILE_SIZE_BYTES,
     build_storage_key,
     create_presigned_upload_url,
 )
+
+SEARCHABLE_STATUSES = {"ready", "needs_retake"}
 
 app = FastAPI(title="Brief API")
 
@@ -148,4 +151,43 @@ async def list_documents(
             ocr_confidence=d.ocr_confidence,
         )
         for d in documents
+    ]
+
+
+class SearchRequest(BaseModel):
+    query: str
+    limit: int = 10
+
+
+class SearchResult(BaseModel):
+    clause_id: str
+    text: str
+    page_number: int
+    clause_index: int
+
+
+@app.post("/documents/{document_id}/search")
+async def search_document(
+    document_id: str,
+    body: SearchRequest,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> list[SearchResult]:
+    document = await _get_owned_document(document_id, user, session)
+
+    if document.status not in SEARCHABLE_STATUSES:
+        raise HTTPException(status_code=409, detail="document is not ready to search yet")
+    if not body.query.strip():
+        raise HTTPException(status_code=400, detail="query cannot be empty")
+
+    clauses = await hybrid_search(session, document.id, body.query, limit=body.limit)
+
+    return [
+        SearchResult(
+            clause_id=str(clause.id),
+            text=clause.text,
+            page_number=clause.page_number,
+            clause_index=clause.clause_index,
+        )
+        for clause in clauses
     ]
