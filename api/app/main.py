@@ -1,6 +1,7 @@
 import uuid
 
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException
+from google.genai import errors as genai_errors
 from pydantic import BaseModel, Field
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,6 +10,7 @@ from app.auth import get_current_user
 from app.db import get_session
 from app.ingestion import ingest_document
 from app.models import Document, User
+from app.qa import AnswerGenerationError, AnswerResult, answer_question
 from app.retrieval import hybrid_search, reranked_search
 from app.storage import (
     ALLOWED_CONTENT_TYPES,
@@ -196,3 +198,31 @@ async def search_document(
         )
         for clause in clauses
     ]
+
+
+class AskRequest(BaseModel):
+    # Capped because the question goes straight into an LLM prompt, bounding both cost and
+    # how much room a hostile question has to work with.
+    question: str = Field(max_length=1000)
+
+
+@app.post("/documents/{document_id}/ask")
+async def ask_document(
+    document_id: str,
+    body: AskRequest,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> AnswerResult:
+    document = await _get_owned_document(document_id, user, session)
+
+    if document.status not in SEARCHABLE_STATUSES:
+        raise HTTPException(status_code=409, detail="document is not ready to ask about yet")
+    if not body.question.strip():
+        raise HTTPException(status_code=400, detail="question cannot be empty")
+
+    try:
+        return await answer_question(session, document.id, body.question)
+    except (AnswerGenerationError, genai_errors.APIError) as exc:
+        raise HTTPException(
+            status_code=502, detail="the answering service is unavailable, try again"
+        ) from exc

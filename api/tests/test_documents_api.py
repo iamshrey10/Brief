@@ -7,6 +7,7 @@ import app.main as main_module
 from app.auth import get_current_user
 from app.main import app
 from app.models import EMBEDDING_DIM, Clause, Document, Embedding, User
+from app.qa import AnswerGenerationError, AnswerResult, CitedClause
 
 
 @pytest_asyncio.fixture
@@ -337,3 +338,107 @@ async def test_search_document_rejects_an_out_of_range_limit(client, db_session,
 
     assert too_big.status_code == 422
     assert too_small.status_code == 422
+
+
+# --- POST /documents/{id}/ask ---
+
+
+async def test_ask_document_returns_the_grounded_answer(client, db_session, test_user, monkeypatch):
+    async def fake_answer(session, document_id, question):
+        return AnswerResult(
+            found=True,
+            answer="Yes, with no penalty.",
+            citations=[
+                CitedClause(
+                    clause_id=str(uuid.uuid4()),
+                    page_number=2,
+                    clause_text="The borrower may prepay at any time without penalty.",
+                    quote="without penalty",
+                )
+            ],
+        )
+
+    monkeypatch.setattr(main_module, "answer_question", fake_answer)
+    document = await _ready_document(db_session, test_user)
+
+    response = await client.post(
+        f"/documents/{document.id}/ask", json={"question": "Can I pay early?"}
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["found"] is True
+    assert body["answer"] == "Yes, with no penalty."
+    assert body["citations"][0]["page_number"] == 2
+    assert body["citations"][0]["quote"] == "without penalty"
+
+
+async def test_ask_document_rejects_a_document_that_is_not_ready(client, db_session, test_user):
+    document = Document(
+        user_id=test_user.id,
+        filename="lease.pdf",
+        doc_type="lease",
+        status="processing",
+        storage_key="fake/key.pdf",
+        file_size_bytes=1024,
+    )
+    db_session.add(document)
+    await db_session.commit()
+    await db_session.refresh(document)
+
+    response = await client.post(f"/documents/{document.id}/ask", json={"question": "Anything?"})
+
+    assert response.status_code == 409
+
+
+async def test_ask_document_rejects_an_empty_question(client, db_session, test_user):
+    document = await _ready_document(db_session, test_user)
+
+    response = await client.post(f"/documents/{document.id}/ask", json={"question": "   "})
+
+    assert response.status_code == 400
+
+
+async def test_ask_document_rejects_an_overlong_question(client, db_session, test_user):
+    document = await _ready_document(db_session, test_user)
+
+    response = await client.post(
+        f"/documents/{document.id}/ask", json={"question": "a" * 1001}
+    )
+
+    assert response.status_code == 422
+
+
+async def test_ask_document_rejects_another_users_document(client, db_session):
+    other_user = User(email=f"{uuid.uuid4()}@example.com")
+    db_session.add(other_user)
+    await db_session.flush()
+    document = Document(
+        user_id=other_user.id,
+        filename="lease.pdf",
+        doc_type="lease",
+        status="ready",
+        storage_key="fake/key.pdf",
+        file_size_bytes=1024,
+    )
+    db_session.add(document)
+    await db_session.commit()
+    await db_session.refresh(document)
+
+    response = await client.post(f"/documents/{document.id}/ask", json={"question": "Anything?"})
+
+    assert response.status_code == 404
+
+
+async def test_ask_document_returns_502_when_the_model_gives_nothing_usable(
+    client, db_session, test_user, monkeypatch
+):
+    async def failing_answer(session, document_id, question):
+        raise AnswerGenerationError("model did not return a valid structured answer")
+
+    monkeypatch.setattr(main_module, "answer_question", failing_answer)
+    document = await _ready_document(db_session, test_user)
+
+    response = await client.post(f"/documents/{document.id}/ask", json={"question": "Anything?"})
+
+    assert response.status_code == 502
