@@ -2,8 +2,8 @@ import uuid
 from datetime import datetime
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text, func
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Computed, DateTime, Float, ForeignKey, Index, Integer, String, Text, func
+from sqlalchemy.dialects.postgresql import TSVECTOR, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 # Gemini's gemini-embedding-001 defaults to 3072 dims but supports a smaller requested
@@ -54,6 +54,7 @@ class Document(Base):
 
 class Clause(Base):
     __tablename__ = "clauses"
+    __table_args__ = (Index("ix_clauses_search_vector", "search_vector", postgresql_using="gin"),)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     document_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("documents.id"), index=True)
@@ -62,6 +63,11 @@ class Clause(Base):
     char_start: Mapped[int] = mapped_column(Integer)
     char_end: Mapped[int] = mapped_column(Integer)
     text: Mapped[str] = mapped_column(Text)
+    # Postgres-generated, kept in sync automatically whenever text changes, used for
+    # the keyword half of hybrid retrieval alongside the embeddings table's vectors.
+    search_vector: Mapped[str] = mapped_column(
+        TSVECTOR, Computed("to_tsvector('english', text)", persisted=True)
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     document: Mapped["Document"] = relationship(back_populates="clauses")
