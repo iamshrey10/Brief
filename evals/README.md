@@ -17,3 +17,14 @@ It uses real Gemini embeddings and a real Postgres, so it needs both available, 
 
 Each run writes a dated report to `results/`. The fixture was written before any results were seen
 and is not tuned to the strategies it measures.
+
+## Grounded Q&A evaluation
+
+Runs the full question-answering pipeline (retrieval, Gemini, and the citation check) over the
+same fixture plus questions the document cannot answer. Scores whether it cites the right clause
+on answerable questions, and whether it says it couldn't find the answer on unanswerable ones.
+
+It makes one real Gemini call per question. The free tier caps requests per day per model, so
+the model under test can be swapped, and the report records which one it measured:
+
+    cd api && QA_EVAL_MODEL=gemini-3.5-flash-lite PYTHONPATH=. python ../evals/qa_eval.py

@@ -135,6 +135,16 @@ async def build_document(session: AsyncSession) -> tuple[Document, User, dict]:
     return document, user, key_to_id
 
 
+async def delete_document(session: AsyncSession, document: Document, user: User) -> None:
+    """Removes the temporary document, and the eval user too if nothing else it owns remains."""
+    await session.delete(document)
+    await session.flush()
+    still_owns = await session.execute(select(Document.id).where(Document.user_id == user.id))
+    if still_owns.first() is None:
+        await session.delete(user)
+    await session.commit()
+
+
 def render_report(overall, by_difficulty, misses) -> str:
     today = datetime.date.today().isoformat()
     lines = [
@@ -215,12 +225,7 @@ async def main() -> None:
             RESULTS_DIR.mkdir(exist_ok=True)
             (RESULTS_DIR / f"retrieval-{datetime.date.today().isoformat()}.md").write_text(report)
         finally:
-            await session.delete(document)
-            await session.flush()
-            still_owns = await session.execute(select(Document.id).where(Document.user_id == user.id))
-            if still_owns.first() is None:
-                await session.delete(user)
-            await session.commit()
+            await delete_document(session, document, user)
 
 
 if __name__ == "__main__":
