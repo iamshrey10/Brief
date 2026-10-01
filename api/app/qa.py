@@ -1,11 +1,28 @@
+import asyncio
+import re
+import uuid
+
 from google.genai import types
 from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ingestion import get_genai_client
+from app.retrieval import hybrid_search
 
 # Pinned rather than a moving "latest" alias, so an answer-quality change always traces
 # to a change we made, not a silent provider-side model update.
 ANSWER_MODEL = "gemini-2.5-flash"
+
+# How many retrieved clauses the model sees. Few enough to keep the prompt focused, enough
+# that the answering clause is almost certainly among them (vector search put it first
+# 96% of the time in the retrieval evaluation).
+CONTEXT_CLAUSES = 8
+
+NOT_FOUND_ANSWER = "I couldn't find this in the document."
+UNVERIFIED_ANSWER = (
+    "I couldn't confirm an answer to this from the document's exact wording, so I'd "
+    "rather not guess."
+)
 
 SYSTEM_INSTRUCTION = (
     "You explain contracts in plain English, using ONLY the numbered clauses you are given. "
@@ -60,3 +77,66 @@ def generate_answer(question: str, clauses: list[tuple[str, str]]) -> GroundedAn
     if not isinstance(parsed, GroundedAnswer):
         raise AnswerGenerationError("model did not return a valid structured answer")
     return parsed
+
+
+class CitedClause(BaseModel):
+    clause_id: str
+    page_number: int
+    clause_text: str
+    quote: str
+
+
+class AnswerResult(BaseModel):
+    found: bool
+    answer: str
+    citations: list[CitedClause]
+
+
+def _normalize(text: str) -> str:
+    return re.sub(r"\s+", " ", text).strip().lower()
+
+
+def _quote_appears_in(quote: str, clause_text: str) -> bool:
+    """A quote counts only if it really is in the clause, ignoring case and spacing, so
+    the model can't attach an invented or reworded 'quote' to a real clause."""
+    normalized_quote = _normalize(quote).strip("\"'")
+    return bool(normalized_quote) and normalized_quote in _normalize(clause_text)
+
+
+async def answer_question(
+    session: AsyncSession, document_id: uuid.UUID, question: str
+) -> AnswerResult:
+    """Answers `question` from the document, citing the exact clauses it relied on.
+
+    The model's output is never taken on trust: each citation must name a clause it was
+    actually shown and quote it verbatim. If it claims an answer but none of its
+    citations check out, this abstains rather than pass along an unsupported claim.
+    """
+    clauses = await hybrid_search(session, document_id, question, limit=CONTEXT_CLAUSES)
+    if not clauses:
+        return AnswerResult(found=False, answer=NOT_FOUND_ANSWER, citations=[])
+
+    labeled = [(f"C{position}", clause.text) for position, clause in enumerate(clauses, start=1)]
+    clause_by_label = {label: clause for (label, _text), clause in zip(labeled, clauses, strict=True)}
+
+    generated = await asyncio.to_thread(generate_answer, question, labeled)
+    if not generated.found:
+        return AnswerResult(found=False, answer=NOT_FOUND_ANSWER, citations=[])
+
+    verified: list[CitedClause] = []
+    for citation in generated.citations:
+        clause = clause_by_label.get(citation.clause_ref)
+        if clause is not None and _quote_appears_in(citation.quote, clause.text):
+            verified.append(
+                CitedClause(
+                    clause_id=str(clause.id),
+                    page_number=clause.page_number,
+                    clause_text=clause.text,
+                    quote=citation.quote,
+                )
+            )
+
+    if not verified:
+        return AnswerResult(found=False, answer=UNVERIFIED_ANSWER, citations=[])
+
+    return AnswerResult(found=True, answer=generated.answer, citations=verified)
