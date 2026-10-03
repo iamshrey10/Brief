@@ -3,12 +3,13 @@ import uuid
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException
 from google.genai import errors as genai_errors
 from pydantic import BaseModel, Field
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import get_current_user
 from app.db import get_session
 from app.ingestion import ingest_document
+from app.key_terms import KeyTermsGenerationError, KeyTermsResult, get_key_terms
 from app.models import Clause, Document, User
 from app.qa import AnswerGenerationError, AnswerResult, answer_question
 from app.retrieval import hybrid_search, reranked_search
@@ -273,3 +274,31 @@ async def list_clauses(
         )
         for clause in result.scalars().all()
     ]
+
+
+@app.get("/documents/{document_id}/key-terms")
+async def document_key_terms(
+    document_id: str,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> KeyTermsResult:
+    """The key facts for this document, each backed by a verified quote. The first request
+    reads the document once and saves the result, so later requests are free. Safe to call
+    again, which is why this is a GET even though the first call does the work."""
+    document = await _get_owned_document(document_id, user, session)
+
+    if document.status not in SEARCHABLE_STATUSES:
+        raise HTTPException(status_code=409, detail="document is not ready to read yet")
+
+    clause_count = await session.scalar(
+        select(func.count()).select_from(Clause).where(Clause.document_id == document.id)
+    )
+    if not clause_count:
+        raise HTTPException(status_code=409, detail="document has no readable text")
+
+    try:
+        return await get_key_terms(session, document.id, document.doc_type)
+    except (KeyTermsGenerationError, genai_errors.APIError) as exc:
+        raise HTTPException(
+            status_code=502, detail="the reading service is unavailable, try again"
+        ) from exc
