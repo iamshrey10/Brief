@@ -28,3 +28,19 @@ It makes one real Gemini call per question. The free tier caps requests per day 
 the model under test can be swapped, and the report records which one it measured:
 
     cd api && QA_EVAL_MODEL=gemini-3.5-flash-lite PYTHONPATH=. python ../evals/qa_eval.py
+
+## Key-terms evaluation
+
+Runs key-term extraction over a loan document and a lease document built from the same fixture,
+three times each, and scores two things: whether each term the document states is found with the
+right clause and value, and whether the terms it does not state come back as "not mentioned"
+instead of an invented value. Most fields are not stated on purpose. It also records what the
+model said before our quote and number checks ran, so a miss can be told apart: the model not
+finding a term, or our checks rejecting a correct one.
+
+Six real Gemini calls. The model under test can be swapped with `KEY_TERMS_EVAL_MODEL`:
+
+    cd api && PYTHONPATH=. python ../evals/key_terms_eval.py
+
+The ground truth in `key_terms_fixture.py` was written before any results were seen and is not
+tuned to them.
