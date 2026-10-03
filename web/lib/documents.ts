@@ -32,6 +32,35 @@ export function isReadable(status: string): boolean {
   return status === "ready" || status === "needs_retake";
 }
 
+/** Statuses a document passes through before it is either readable or has failed. */
+export function isInProgress(status: string): boolean {
+  return status === "pending" || status === "uploaded" || status === "processing";
+}
+
+/** Plain-language labels, so the raw database status never reaches the reader. */
+export function statusLabel(status: string): string {
+  switch (status) {
+    case "ready":
+      return "Ready";
+    case "needs_retake":
+      return "Hard to read";
+    case "failed":
+      return "Couldn't read";
+    case "pending":
+      return "Uploading";
+    case "uploaded":
+    case "processing":
+      return "Processing";
+    default:
+      return status;
+  }
+}
+
+// While something is still processing the dashboard re-checks on this interval, and stops
+// after the cap, so a document stuck in processing can't make a tab poll forever.
+export const POLL_INTERVAL_MS = 3000;
+export const MAX_POLL_DURATION_MS = 5 * 60 * 1000;
+
 export type PageGroup = { pageNumber: number; clauses: ClauseData[] };
 
 /** Groups clauses by page, keeping the order the backend returned them in. */

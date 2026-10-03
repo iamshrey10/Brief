@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { groupByPage, isReadable, type ClauseData } from "./documents";
+import { groupByPage, isInProgress, isReadable, statusLabel, type ClauseData } from "./documents";
 
 function clause(id: string, page: number, index: number): ClauseData {
   return { id, clause_index: index, page_number: page, text: `Clause ${id}` };
@@ -58,4 +58,44 @@ describe("isReadable", () => {
       expect(isReadable(status)).toBe(false);
     },
   );
+});
+
+describe("isInProgress", () => {
+  it.each(["pending", "uploaded", "processing"])("treats %s as still in progress", (status) => {
+    expect(isInProgress(status)).toBe(true);
+  });
+
+  it.each(["ready", "needs_retake", "failed", "", "something-new"])(
+    "does not treat %j as in progress, so polling can stop",
+    (status) => {
+      expect(isInProgress(status)).toBe(false);
+    },
+  );
+
+  it("never counts a status as both readable and in progress", () => {
+    for (const status of ["pending", "uploaded", "processing", "ready", "needs_retake", "failed"]) {
+      expect(isReadable(status) && isInProgress(status)).toBe(false);
+    }
+  });
+});
+
+describe("statusLabel", () => {
+  it.each([
+    ["ready", "Ready"],
+    ["needs_retake", "Hard to read"],
+    ["failed", "Couldn't read"],
+    ["pending", "Uploading"],
+    ["uploaded", "Processing"],
+    ["processing", "Processing"],
+  ])("labels %s as %s", (status, label) => {
+    expect(statusLabel(status)).toBe(label);
+  });
+
+  it("shows an unknown status as it is rather than hiding it", () => {
+    expect(statusLabel("something-new")).toBe("something-new");
+  });
+
+  it("never exposes a raw underscore status name", () => {
+    expect(statusLabel("needs_retake")).not.toContain("_");
+  });
 });

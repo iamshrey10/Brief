@@ -1,21 +1,17 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
+import { DocumentList } from "@/components/document-list";
 import { Button } from "@/components/ui/button";
+import {
+  DOC_TYPE_LABELS,
+  isInProgress,
+  MAX_POLL_DURATION_MS,
+  POLL_INTERVAL_MS,
+  type DocumentSummary,
+} from "@/lib/documents";
 
-type DocumentSummary = {
-  id: string;
-  filename: string;
-  doc_type: string;
-  status: string;
-};
-
-const DOC_TYPES = [
-  { value: "loan", label: "Education loan" },
-  { value: "lease", label: "Lease" },
-  { value: "offer", label: "Job offer" },
-  { value: "other", label: "Other" },
-];
+const DOC_TYPES = Object.entries(DOC_TYPE_LABELS).map(([value, label]) => ({ value, label }));
 
 const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024;
 
@@ -27,6 +23,32 @@ export function DocumentUpload({ initialDocuments }: { initialDocuments: Documen
   const [status, setStatus] = useState<Status>("idle");
   const [errorMessage, setErrorMessage] = useState("");
   const [documents, setDocuments] = useState(initialDocuments);
+
+  const hasInProgress = documents.some((doc) => isInProgress(doc.status));
+
+  // A finished upload is only "processing" for a moment, so while anything is, re-check the
+  // list and let it flip to ready by itself. Depends on the boolean and the count, not the
+  // list itself, so a fresh list from each check doesn't restart the timer, but a new upload
+  // does.
+  useEffect(() => {
+    if (!hasInProgress) return;
+
+    const startedAt = Date.now();
+    const timer = setInterval(async () => {
+      if (Date.now() - startedAt >= MAX_POLL_DURATION_MS) {
+        clearInterval(timer);
+        return;
+      }
+      try {
+        const res = await fetch("/api/backend/documents");
+        if (res.ok) setDocuments(await res.json());
+      } catch {
+        // Network blip, the next tick tries again.
+      }
+    }, POLL_INTERVAL_MS);
+
+    return () => clearInterval(timer);
+  }, [hasInProgress, documents.length]);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -112,20 +134,7 @@ export function DocumentUpload({ initialDocuments }: { initialDocuments: Documen
         {status === "error" && <p className="text-sm text-destructive">{errorMessage}</p>}
       </form>
 
-      {documents.length > 0 && (
-        <div className="flex flex-col gap-2">
-          <h2 className="text-sm font-medium text-muted-foreground">Your documents</h2>
-          {documents.map((doc) => (
-            <div
-              key={doc.id}
-              className="flex items-center justify-between rounded-md border border-border bg-card px-3 py-2 text-sm"
-            >
-              <span className="text-foreground">{doc.filename}</span>
-              <span className="text-xs text-muted-foreground">{doc.status}</span>
-            </div>
-          ))}
-        </div>
-      )}
+      <DocumentList documents={documents} />
     </div>
   );
 }
