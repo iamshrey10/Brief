@@ -7,7 +7,8 @@ plain English before you sign it. It pulls out the terms that actually cost you 
 anything unusual, and answers questions grounded in the exact clause they come from. If the answer
 isn't in the document, it says so.
 
-Status: actively being built, Sep 17 to Oct 10, 2026.
+Status: in active development. [STATUS.md](STATUS.md) has the honest picture: what works today,
+what is left, the numbers, and the expected finish. It is refreshed every week.
 
 ## Why this exists
 
