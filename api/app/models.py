@@ -2,7 +2,18 @@ import uuid
 from datetime import datetime
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import Computed, DateTime, Float, ForeignKey, Index, Integer, String, Text, func
+from sqlalchemy import (
+    Computed,
+    DateTime,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.dialects.postgresql import TSVECTOR, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -90,13 +101,21 @@ class Embedding(Base):
 
 
 class Extraction(Base):
+    """One key term for one document. Every field of the document type gets a row once
+    extraction has run, so the rows existing at all means it already ran and the model
+    isn't called again. A row with no value means the document doesn't state that term."""
+
     __tablename__ = "extractions"
+    __table_args__ = (UniqueConstraint("document_id", "field_name", name="uq_extractions_field"),)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     document_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("documents.id"), index=True)
     clause_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("clauses.id"), nullable=True)
     field_name: Mapped[str] = mapped_column(String(100))
-    value: Mapped[str] = mapped_column(Text)
+    # null when the document does not state this term
+    value: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # the passage copied from the clause that backs the value, checked word for word
+    quote: Mapped[str | None] = mapped_column(Text, nullable=True)
     confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
