@@ -3,9 +3,9 @@
 Every clause, explained.
 
 Brief reads a high stakes contract, an education loan, a lease, a job offer, and explains it in
-plain English before you sign it. It pulls out the terms that actually cost you money, flags
-anything unusual, and answers questions grounded in the exact clause they come from. If the answer
-isn't in the document, it says so.
+plain English before you sign it. Ask it a question and it answers from the exact clause, with
+the quote as proof. If the answer isn't in the document, it says so instead of guessing. It also
+pulls out the terms that actually cost you money, and flagging anything unusual is next.
 
 Status: in active development. [STATUS.md](STATUS.md) has the honest picture: what works today,
 what is left, the numbers, and the expected finish. It is refreshed every week.
@@ -13,6 +13,23 @@ what is left, the numbers, and the expected finish. It is refreshed every week.
 ## Why this exists
 
 Coming soon.
+
+## How an answer is checked
+
+An answer is only shown if its evidence holds up.
+
+1. Your question finds the most relevant clauses, using keyword and meaning-based search together.
+2. The model is told to answer from those clauses only, and to quote the passage it relied on.
+3. Brief checks that each quote really appears in the clause it names, word for word. A quote that
+   does not is thrown away.
+4. If nothing survives the check, you get "I couldn't find this in the document" and no guess.
+
+The text of an uploaded contract is treated as text to read, never as instructions to follow. Key
+terms such as the interest rate or the late fee go through the same checks, and every number in a
+term must also appear in its quote.
+
+Search and answers are measured, not assumed. The reports in [evals/](evals/) show the scores and
+where they fall short.
 
 ## Architecture
 
@@ -27,20 +44,25 @@ flowchart LR
     Gemini["Gemini API"]
 
     Browser -- session --> Web
+    Web -- per-user rate limit --> Redis
     Web -- signed service token --> API
-    API -- per-user rate limit --> Redis
-    API -- users, documents, clauses, embeddings --> DB
+    API -- users, documents, clauses, embeddings, key terms --> DB
     API -- upload / download files --> R2
-    API -- embeddings --> Gemini
+    API -- embeddings, answers, key terms --> Gemini
 ```
 
 The frontend is a Next.js app that handles Google sign-in and acts as a thin
-backend-for-frontend, it never talks to Postgres or R2 directly. It mints a short-lived
-signed token per request and calls the FastAPI service, which owns everything else: user
-lookup, per-user rate limiting via Redis, document storage in R2, and the ingestion
-pipeline that turns an uploaded PDF into searchable clauses and embeddings in Postgres.
+backend-for-frontend, it never talks to Postgres or R2 directly. For each request it checks the
+session, applies a per-user rate limit through Redis, then mints a short-lived signed token and
+calls the FastAPI service. FastAPI owns everything else: user lookup, document storage in R2,
+the ingestion pipeline (text extraction, or cleanup and OCR for photos, then splitting into clauses
+and embedding them), hybrid search, grounded answers, and key-term extraction, all backed by
+Postgres.
 
 ## Running locally
+
+You will need Docker, Python 3.12, Node 22 with pnpm, and Tesseract for reading photos of pages
+(`brew install tesseract` on a Mac, `sudo apt-get install tesseract-ocr` on Ubuntu).
 
 Start the shared services:
 
@@ -63,10 +85,25 @@ Run the backend test suite (from `api/`, with the venv active and Postgres runni
 
     python -m pytest
 
-Frontend (from `web/`):
+Frontend (from `web/`): create `web/.env.local` with these variables, then start it.
+
+    AUTH_SECRET=         # any long random string, for example from: openssl rand -base64 32
+    AUTH_GOOGLE_ID=      # Google OAuth client ID
+    AUTH_GOOGLE_SECRET=  # Google OAuth client secret
+    SERVICE_JWT_SECRET=  # must match SERVICE_JWT_SECRET in api/.env
+    BACKEND_URL=http://localhost:8000
+    REDIS_URL=redis://localhost:6379
+
+The Google OAuth client needs `http://localhost:3000/api/auth/callback/google` as an authorized
+redirect URI.
 
     pnpm install
     pnpm dev
+
+Frontend checks: `pnpm lint`, `pnpm test`, and `pnpm build`.
+
+The evaluations call the real Gemini API and need Postgres running. Each one is a single command,
+see [evals/README.md](evals/README.md).
 
 ## License
 
