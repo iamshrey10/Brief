@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
-import { ClauseViewer } from "@/components/clause-viewer";
+import { DocumentWorkspace } from "@/components/document-workspace";
 import {
   DOC_TYPE_LABELS,
   isReadable,
@@ -87,7 +87,7 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-6 py-10">
+    <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-6 py-10">
       <div className="flex flex-col gap-2">
         <Link href="/dashboard" className="text-sm text-primary underline-offset-4 hover:underline">
           ← Back to your documents
@@ -102,7 +102,7 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
 
       {isReadable(document.status) &&
         (clauses.length > 0 ? (
-          <ClauseViewer clauses={clauses} />
+          <DocumentWorkspace documentId={document.id} clauses={clauses} />
         ) : (
           <Notice title="No readable text found">
             This document finished processing but no text could be extracted from it.
