@@ -96,8 +96,9 @@ describe("DocumentWorkspace", () => {
 
     const clause = clauseElement("clause-b");
     expect(clause).toHaveAttribute("aria-current", "true");
-    expect(within(clause).getByText("without penalty").tagName).toBe("MARK");
-    expect(scrollIntoView.mock.contexts[0]).toBe(clause);
+    const highlighted = within(clause).getByText("without penalty");
+    expect(highlighted.tagName).toBe("MARK");
+    expect(scrollIntoView.mock.contexts[0]).toBe(highlighted);
     expect(clauseElement("clause-a")).not.toHaveAttribute("aria-current");
   });
 

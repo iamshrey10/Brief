@@ -79,12 +79,14 @@ describe("ClauseViewer", () => {
     expect(clauseElement("c1")).not.toHaveAttribute("aria-current");
   });
 
-  it("scrolls the chosen clause into view and moves keyboard focus to it", () => {
+  it("scrolls the highlighted words into view, not the whole clause, and focuses the clause", () => {
     render(<ClauseViewer clauses={CLAUSES} activeCitation={{ clauseId: "c2", quote: "without penalty" }} />);
 
     expect(scrollIntoView).toHaveBeenCalledTimes(1);
     expect(scrollIntoView).toHaveBeenCalledWith({ behavior: "smooth", block: "center" });
-    expect(scrollIntoView.mock.contexts[0]).toBe(clauseElement("c2"));
+    // A long clause can be taller than the screen, so centering the clause could leave the
+    // quoted words off screen. Centering the highlight always shows them.
+    expect(scrollIntoView.mock.contexts[0]).toBe(document.querySelector("mark"));
     expect(document.activeElement).toBe(clauseElement("c2"));
   });
 
@@ -130,6 +132,7 @@ describe("ClauseViewer", () => {
     expect(clauseElement("c1")).toHaveAttribute("aria-current", "true");
     expect(document.querySelector("mark")).toBeNull();
     expect(scrollIntoView).toHaveBeenCalledTimes(1);
+    expect(scrollIntoView.mock.contexts[0]).toBe(clauseElement("c1"));
   });
 
   it("ignores a citation for a clause that isn't on the page", () => {

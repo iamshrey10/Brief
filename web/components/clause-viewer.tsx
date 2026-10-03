@@ -35,8 +35,11 @@ export function ClauseViewer({
     const element = document.getElementById(`clause-${activeCitation.clauseId}`);
     if (!element) return;
 
+    // Clauses can be taller than the screen, so centre the highlighted words when there are
+    // some. Centring the whole clause could leave the quote off screen.
+    const target = element.querySelector("mark") ?? element;
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    element.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "center" });
+    target.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "center" });
     element.focus({ preventScroll: true });
   }, [activeCitation]);
 
