@@ -31,10 +31,13 @@ SYSTEM_INSTRUCTION = (
     "You are given a list of fields. Return one entry for every field, using its exact name. "
     "If the clauses do not state a field, set found to false and leave the other values empty, "
     "never guess and never use outside knowledge. "
-    "When found is true, value is the fact in a few plain words, copied from the quote and "
-    "never adding a number that the quote does not contain. clause_ref is the label of the "
-    "clause it came from, like C2, and quote is a short passage copied exactly, word for "
-    "word, from that clause. This is explanation, not legal advice."
+    "When found is true, value states the fact itself in a few plain words, the amount, date, "
+    "or rule and not just the name of the thing it is about, taken from the quote and never "
+    "adding a number that the quote does not contain. clause_ref is the label of the clause it "
+    "came from, like C2. quote is ONE continuous passage copied exactly, word for word, from "
+    "that clause: never join separate lines, never skip text in the middle. If the fact "
+    "appears in several separate places, quote the clearest single place and give the value "
+    "for that place only. This is explanation, not legal advice."
 )
 
 
