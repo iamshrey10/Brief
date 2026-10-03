@@ -1,11 +1,11 @@
 import asyncio
-import re
 import uuid
 
 from google.genai import types
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.grounding import quote_appears_in
 from app.ingestion import get_genai_client
 from app.retrieval import hybrid_search
 
@@ -97,17 +97,6 @@ class AnswerResult(BaseModel):
     citations: list[CitedClause]
 
 
-def _normalize(text: str) -> str:
-    return re.sub(r"\s+", " ", text).strip().lower()
-
-
-def _quote_appears_in(quote: str, clause_text: str) -> bool:
-    """A quote counts only if it really is in the clause, ignoring case and spacing, so
-    the model can't attach an invented or reworded 'quote' to a real clause."""
-    normalized_quote = _normalize(quote).strip("\"'")
-    return bool(normalized_quote) and normalized_quote in _normalize(clause_text)
-
-
 async def answer_question(
     session: AsyncSession, document_id: uuid.UUID, question: str
 ) -> AnswerResult:
@@ -131,7 +120,7 @@ async def answer_question(
     verified: list[CitedClause] = []
     for citation in generated.citations:
         clause = clause_by_label.get(citation.clause_ref)
-        if clause is not None and _quote_appears_in(citation.quote, clause.text):
+        if clause is not None and quote_appears_in(citation.quote, clause.text):
             verified.append(
                 CitedClause(
                     clause_id=str(clause.id),
