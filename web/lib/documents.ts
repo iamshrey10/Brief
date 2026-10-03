@@ -13,6 +13,9 @@ export type ClauseData = {
   text: string;
 };
 
+/** The clause and quoted words a reader picked from an answer's citations. */
+export type ActiveCitation = { clauseId: string; quote: string };
+
 export const DOC_TYPE_LABELS: Record<string, string> = {
   loan: "Education loan",
   lease: "Lease",

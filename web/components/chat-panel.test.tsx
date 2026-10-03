@@ -3,7 +3,13 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { askQuestion, MAX_QUESTION_LENGTH, type AskOutcome, type AskResult } from "@/lib/ask";
+import {
+  askQuestion,
+  MAX_QUESTION_LENGTH,
+  type AskCitation,
+  type AskOutcome,
+  type AskResult,
+} from "@/lib/ask";
 import { ChatPanel } from "./chat-panel";
 
 vi.mock("@/lib/ask", async (importOriginal) => {
@@ -42,9 +48,9 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-function renderPanel() {
+function renderPanel(onCitationSelect: (citation: AskCitation) => void = vi.fn()) {
   const user = userEvent.setup();
-  render(<ChatPanel documentId="doc-1" />);
+  render(<ChatPanel documentId="doc-1" onCitationSelect={onCitationSelect} />);
   return { user, box: screen.getByLabelText("Your question") };
 }
 
@@ -171,5 +177,37 @@ describe("ChatPanel", () => {
     ].map((text) => conversation.indexOf(text));
     expect(positions.every((position) => position >= 0)).toBe(true);
     expect(positions).toEqual([...positions].sort((a, b) => a - b));
+  });
+
+  it("lets the reader pick a citation to see it in the document", async () => {
+    askMock.mockResolvedValue({ ok: true, result: FOUND });
+    const onCitationSelect = vi.fn();
+    const { user, box } = renderPanel(onCitationSelect);
+
+    await user.type(box, "Can I pay early?{Enter}");
+    await user.click(await screen.findByRole("button", { name: /without penalty/ }));
+
+    expect(onCitationSelect).toHaveBeenCalledTimes(1);
+    expect(onCitationSelect).toHaveBeenCalledWith(FOUND.citations[0]);
+  });
+
+  it("hands over the right citation when an answer cites more than one clause", async () => {
+    const second: AskCitation = {
+      clause_id: "clause-2",
+      page_number: 3,
+      clause_text: "A late fee of fifty dollars applies after five days.",
+      quote: "late fee of fifty dollars",
+    };
+    askMock.mockResolvedValue({
+      ok: true,
+      result: { ...FOUND, citations: [...FOUND.citations, second] },
+    });
+    const onCitationSelect = vi.fn();
+    const { user, box } = renderPanel(onCitationSelect);
+
+    await user.type(box, "What are the payment terms?{Enter}");
+    await user.click(await screen.findByRole("button", { name: /late fee of fifty dollars/ }));
+
+    expect(onCitationSelect).toHaveBeenCalledWith(second);
   });
 });

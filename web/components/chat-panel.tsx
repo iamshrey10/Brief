@@ -2,14 +2,20 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
-import { askQuestion, MAX_QUESTION_LENGTH, type AskResult } from "@/lib/ask";
+import { askQuestion, MAX_QUESTION_LENGTH, type AskCitation, type AskResult } from "@/lib/ask";
 
 type Message =
   | { id: number; kind: "question"; text: string }
   | { id: number; kind: "answer"; result: AskResult }
   | { id: number; kind: "error"; text: string };
 
-function AnswerBubble({ result }: { result: AskResult }) {
+function AnswerBubble({
+  result,
+  onCitationSelect,
+}: {
+  result: AskResult;
+  onCitationSelect: (citation: AskCitation) => void;
+}) {
   // Not finding an answer is a correct outcome, not a failure, so it's styled calmly.
   if (!result.found) {
     return (
@@ -27,20 +33,29 @@ function AnswerBubble({ result }: { result: AskResult }) {
           From the document
         </p>
         {result.citations.map((citation) => (
-          <blockquote
+          <button
             key={`${citation.clause_id}-${citation.quote}`}
-            className="border-l-2 border-primary pl-3 text-muted-foreground"
+            type="button"
+            title="Show this in the document"
+            onClick={() => onCitationSelect(citation)}
+            className="block w-full rounded-md border-l-2 border-primary px-3 py-1.5 text-left text-muted-foreground transition-colors outline-none hover:bg-accent hover:text-accent-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
           >
             <span className="block text-xs">Page {citation.page_number}</span>
             <span className="italic">&ldquo;{citation.quote}&rdquo;</span>
-          </blockquote>
+          </button>
         ))}
       </div>
     </div>
   );
 }
 
-export function ChatPanel({ documentId }: { documentId: string }) {
+export function ChatPanel({
+  documentId,
+  onCitationSelect,
+}: {
+  documentId: string;
+  onCitationSelect: (citation: AskCitation) => void;
+}) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState(false);
@@ -107,7 +122,13 @@ export function ChatPanel({ documentId }: { documentId: string }) {
             );
           }
           if (message.kind === "answer") {
-            return <AnswerBubble key={message.id} result={message.result} />;
+            return (
+              <AnswerBubble
+                key={message.id}
+                result={message.result}
+                onCitationSelect={onCitationSelect}
+              />
+            );
           }
           return (
             <div
