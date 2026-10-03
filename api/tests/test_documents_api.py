@@ -442,3 +442,111 @@ async def test_ask_document_returns_502_when_the_model_gives_nothing_usable(
     response = await client.post(f"/documents/{document.id}/ask", json={"question": "Anything?"})
 
     assert response.status_code == 502
+
+
+# --- GET /documents/{id} and GET /documents/{id}/clauses ---
+
+
+async def _add_clause(db_session, document: Document, index: int, page: int, text: str) -> Clause:
+    clause = Clause(
+        document_id=document.id,
+        clause_index=index,
+        page_number=page,
+        char_start=0,
+        char_end=len(text),
+        text=text,
+    )
+    db_session.add(clause)
+    await db_session.flush()
+    return clause
+
+
+async def test_get_document_returns_its_summary(client, db_session, test_user):
+    document = await _ready_document(db_session, test_user)
+
+    response = await client.get(f"/documents/{document.id}")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["id"] == str(document.id)
+    assert body["filename"] == "lease.pdf"
+    assert body["status"] == "ready"
+
+
+async def test_get_document_rejects_another_users_document(client, db_session):
+    other_user = User(email=f"{uuid.uuid4()}@example.com")
+    db_session.add(other_user)
+    await db_session.flush()
+    document = Document(
+        user_id=other_user.id,
+        filename="theirs.pdf",
+        doc_type="lease",
+        status="ready",
+        storage_key="fake/key.pdf",
+        file_size_bytes=1024,
+    )
+    db_session.add(document)
+    await db_session.commit()
+    await db_session.refresh(document)
+
+    response = await client.get(f"/documents/{document.id}")
+
+    assert response.status_code == 404
+
+
+async def test_get_document_returns_404_for_a_malformed_id(client):
+    response = await client.get("/documents/not-a-uuid")
+
+    assert response.status_code == 404
+
+
+async def test_list_clauses_returns_them_in_document_order_with_page_numbers(
+    client, db_session, test_user
+):
+    document = await _ready_document(db_session, test_user)
+    # inserted out of order on purpose, the endpoint must sort by clause_index
+    second = await _add_clause(db_session, document, 1, 2, "Second clause, on page two.")
+    first = await _add_clause(db_session, document, 0, 1, "First clause, on page one.")
+    await db_session.commit()
+
+    response = await client.get(f"/documents/{document.id}/clauses")
+
+    assert response.status_code == 200
+    clauses = response.json()
+    assert [c["id"] for c in clauses] == [str(first.id), str(second.id)]
+    assert [c["page_number"] for c in clauses] == [1, 2]
+    assert clauses[0]["text"] == "First clause, on page one."
+
+
+async def test_list_clauses_returns_an_empty_list_for_a_document_with_none(
+    client, db_session, test_user
+):
+    document = await _ready_document(db_session, test_user)
+
+    response = await client.get(f"/documents/{document.id}/clauses")
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+async def test_list_clauses_rejects_another_users_document(client, db_session):
+    other_user = User(email=f"{uuid.uuid4()}@example.com")
+    db_session.add(other_user)
+    await db_session.flush()
+    document = Document(
+        user_id=other_user.id,
+        filename="theirs.pdf",
+        doc_type="lease",
+        status="ready",
+        storage_key="fake/key.pdf",
+        file_size_bytes=1024,
+    )
+    db_session.add(document)
+    await db_session.flush()
+    await _add_clause(db_session, document, 0, 1, "A clause that is not yours to read.")
+    await db_session.commit()
+    await db_session.refresh(document)
+
+    response = await client.get(f"/documents/{document.id}/clauses")
+
+    assert response.status_code == 404

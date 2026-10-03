@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth import get_current_user
 from app.db import get_session
 from app.ingestion import ingest_document
-from app.models import Document, User
+from app.models import Clause, Document, User
 from app.qa import AnswerGenerationError, AnswerResult, answer_question
 from app.retrieval import hybrid_search, reranked_search
 from app.storage import (
@@ -226,3 +226,50 @@ async def ask_document(
         raise HTTPException(
             status_code=502, detail="the answering service is unavailable, try again"
         ) from exc
+
+
+class ClauseOut(BaseModel):
+    id: str
+    clause_index: int
+    page_number: int
+    text: str
+
+
+@app.get("/documents/{document_id}")
+async def get_document(
+    document_id: str,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> DocumentSummary:
+    document = await _get_owned_document(document_id, user, session)
+
+    return DocumentSummary(
+        id=str(document.id),
+        filename=document.filename,
+        doc_type=document.doc_type,
+        status=document.status,
+        ocr_confidence=document.ocr_confidence,
+    )
+
+
+@app.get("/documents/{document_id}/clauses")
+async def list_clauses(
+    document_id: str,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> list[ClauseOut]:
+    document = await _get_owned_document(document_id, user, session)
+
+    result = await session.execute(
+        select(Clause).where(Clause.document_id == document.id).order_by(Clause.clause_index)
+    )
+
+    return [
+        ClauseOut(
+            id=str(clause.id),
+            clause_index=clause.clause_index,
+            page_number=clause.page_number,
+            text=clause.text,
+        )
+        for clause in result.scalars().all()
+    ]
