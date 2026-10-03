@@ -1,4 +1,5 @@
 import pytest
+from sqlalchemy import select
 
 from app import key_terms
 from app.key_term_fields import KeyTermField
@@ -7,12 +8,16 @@ from app.key_terms import (
     ExtractedField,
     ExtractionResponse,
     KeyTermsGenerationError,
+    KeyTermsResult,
     build_prompt,
     extract_key_terms,
     generate_key_terms,
+    get_key_terms,
+    load_key_terms,
+    save_key_terms,
     verify_terms,
 )
-from app.models import Clause, Document
+from app.models import Clause, Document, Extraction
 
 FIELDS = (
     KeyTermField("interest_rate", "Interest rate", "The interest rate."),
@@ -281,3 +286,126 @@ async def test_a_document_too_long_to_send_is_cut_and_flagged(db_session, test_u
 
     assert [label for label, _ in shown[0]] == ["C1"]
     assert result.truncated is True
+
+
+# --- saving and loading: extract once, then reuse ---
+
+def _rate_response(clauses) -> ExtractionResponse:
+    return ExtractionResponse(
+        fields=[_entry("interest_rate", "6.5% fixed", "C1", "fixed interest rate of 6.5%")]
+    )
+
+
+async def _saved_rows(db_session, document) -> list[Extraction]:
+    result = await db_session.execute(
+        select(Extraction).where(Extraction.document_id == document.id)
+    )
+    return list(result.scalars())
+
+
+async def test_nothing_is_loaded_before_extraction_has_run(db_session, test_user):
+    document = await _document(db_session, test_user, [RATE_TEXT])
+
+    assert await load_key_terms(db_session, document.id, "loan") is None
+
+
+async def test_saved_terms_load_back_with_their_clause_page_and_quote(
+    db_session, test_user, monkeypatch
+):
+    document = await _document(db_session, test_user, [RATE_TEXT, LATE_TEXT])
+    _fake_model(monkeypatch, _rate_response)
+    extracted = await extract_key_terms(db_session, document.id, "loan")
+
+    await save_key_terms(db_session, document.id, extracted)
+    loaded = await load_key_terms(db_session, document.id, "loan")
+
+    assert loaded == extracted
+    rate = next(t for t in loaded.terms if t.name == "interest_rate")
+    assert (rate.found, rate.value, rate.page_number) == (True, "6.5% fixed", 1)
+    assert rate.quote == "fixed interest rate of 6.5%"
+
+
+async def test_every_field_is_saved_including_the_ones_not_mentioned(
+    db_session, test_user, monkeypatch
+):
+    document = await _document(db_session, test_user, [RATE_TEXT])
+    _fake_model(monkeypatch, _rate_response)
+    await save_key_terms(
+        db_session, document.id, await extract_key_terms(db_session, document.id, "loan")
+    )
+
+    rows = await _saved_rows(db_session, document)
+
+    assert len(rows) == 13
+    assert [r.field_name for r in rows if r.value is None].count("late_fee") == 1
+    assert sum(1 for r in rows if r.value is not None) == 1
+
+
+async def test_loading_is_treated_as_missing_if_a_field_was_never_saved(
+    db_session, test_user, monkeypatch
+):
+    document = await _document(db_session, test_user, [RATE_TEXT])
+    _fake_model(monkeypatch, _rate_response)
+    await save_key_terms(
+        db_session, document.id, await extract_key_terms(db_session, document.id, "loan")
+    )
+    for row in await _saved_rows(db_session, document):
+        if row.field_name == "cosigner":
+            await db_session.delete(row)
+    await db_session.commit()
+
+    assert await load_key_terms(db_session, document.id, "loan") is None
+
+
+async def test_saving_twice_updates_in_place_instead_of_failing_or_duplicating(
+    db_session, test_user
+):
+    document = await _document(db_session, test_user, [RATE_TEXT])
+    first = KeyTermsResult(terms=[key_terms.KeyTerm(name="interest_rate", label="x", found=False)])
+    await save_key_terms(db_session, document.id, first)
+    clause = (await db_session.execute(select(Clause))).scalars().first()
+    second = KeyTermsResult(
+        terms=[
+            key_terms.KeyTerm(
+                name="interest_rate",
+                label="x",
+                found=True,
+                value="6.5%",
+                clause_id=str(clause.id),
+                page_number=1,
+                quote="6.5%",
+            )
+        ]
+    )
+
+    await save_key_terms(db_session, document.id, second)
+
+    rows = await _saved_rows(db_session, document)
+    assert len(rows) == 1
+    assert rows[0].value == "6.5%"
+
+
+async def test_the_model_is_called_once_then_the_saved_copy_is_reused(
+    db_session, test_user, monkeypatch
+):
+    document = await _document(db_session, test_user, [RATE_TEXT])
+    shown = _fake_model(monkeypatch, _rate_response)
+
+    first = await get_key_terms(db_session, document.id, "loan")
+    second = await get_key_terms(db_session, document.id, "loan")
+
+    assert len(shown) == 1
+    assert second == first
+
+
+async def test_a_cut_off_document_is_returned_but_not_saved(db_session, test_user, monkeypatch):
+    monkeypatch.setattr(key_terms, "MAX_PROMPT_CHARS", len(RATE_TEXT) + 5)
+    document = await _document(db_session, test_user, [RATE_TEXT, LATE_TEXT])
+    shown = _fake_model(monkeypatch, _rate_response)
+
+    first = await get_key_terms(db_session, document.id, "loan")
+    await get_key_terms(db_session, document.id, "loan")
+
+    assert first.truncated is True
+    assert await _saved_rows(db_session, document) == []
+    assert len(shown) == 2  # not cached, so it asks again

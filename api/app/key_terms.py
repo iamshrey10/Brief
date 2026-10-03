@@ -5,12 +5,13 @@ import uuid
 from google.genai import types
 from pydantic import BaseModel
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.grounding import quote_appears_in
 from app.ingestion import get_genai_client
 from app.key_term_fields import KeyTermField, fields_for
-from app.models import Clause
+from app.models import Clause, Extraction
 from app.qa import ANSWER_MODEL
 
 # Same pinned model as question answering, so one evaluation covers both. Re-run
@@ -181,3 +182,78 @@ async def extract_key_terms(
     return KeyTermsResult(
         terms=verify_terms(fields, generated, clause_by_label), truncated=truncated
     )
+
+
+async def load_key_terms(
+    session: AsyncSession, document_id: uuid.UUID, doc_type: str
+) -> KeyTermsResult | None:
+    """The saved key terms for this document, or None if extraction hasn't run for every
+    field of its type yet (including when the field list has grown since it last ran)."""
+    fields = fields_for(doc_type)
+    result = await session.execute(
+        select(Extraction, Clause.page_number)
+        .outerjoin(Clause, Extraction.clause_id == Clause.id)
+        .where(Extraction.document_id == document_id)
+    )
+    saved = {row.Extraction.field_name: row for row in result}
+    if not all(field.name in saved for field in fields):
+        return None
+
+    terms: list[KeyTerm] = []
+    for field in fields:
+        row = saved[field.name]
+        extraction = row.Extraction
+        if extraction.value is None:
+            terms.append(KeyTerm(name=field.name, label=field.label, found=False))
+        else:
+            terms.append(
+                KeyTerm(
+                    name=field.name,
+                    label=field.label,
+                    found=True,
+                    value=extraction.value,
+                    clause_id=str(extraction.clause_id),
+                    page_number=row.page_number,
+                    quote=extraction.quote,
+                )
+            )
+    return KeyTermsResult(terms=terms)
+
+
+async def save_key_terms(
+    session: AsyncSession, document_id: uuid.UUID, result: KeyTermsResult
+) -> None:
+    """Saves one row per field, found or not, so the rows existing at all means extraction
+    already ran. An upsert, so two requests racing to save can't collide."""
+    for term in result.terms:
+        values = {
+            "document_id": document_id,
+            "field_name": term.name,
+            "clause_id": uuid.UUID(term.clause_id) if term.clause_id else None,
+            "value": term.value,
+            "quote": term.quote,
+        }
+        statement = insert(Extraction).values(**values)
+        await session.execute(
+            statement.on_conflict_do_update(
+                constraint="uq_extractions_field",
+                set_={key: values[key] for key in ("clause_id", "value", "quote")},
+            )
+        )
+    await session.commit()
+
+
+async def get_key_terms(
+    session: AsyncSession, document_id: uuid.UUID, doc_type: str
+) -> KeyTermsResult:
+    """The key terms for a document: from the saved copy if there is one, otherwise
+    extracted now (one model call) and saved. A document too long to read in full is
+    returned but not saved, so the cut-off result is never mistaken for a complete one."""
+    saved = await load_key_terms(session, document_id, doc_type)
+    if saved is not None:
+        return saved
+
+    extracted = await extract_key_terms(session, document_id, doc_type)
+    if not extracted.truncated:
+        await save_key_terms(session, document_id, extracted)
+    return extracted
