@@ -20,34 +20,29 @@ The last row is the cost of our safety checks: the model found the answer but it
 
 | Outcome | Count |
 |---|---|
-| Correctly said not mentioned | 90% (19/21) |
-| Invented an answer | 10% (2/21) |
+| Correctly said not mentioned | 100% (21/21) |
+| Invented an answer | 0% (0/21) |
 
 ## Gaps and the multi-part answer
 
-- Important questions the document does not answer, flagged as a gap: 83% (10/12).
+- Important questions the document does not answer, flagged as a gap: 100% (12/12).
 - The fee question needs two separate quotes. Of the runs that got it right, 100% (3/3) used more than one quote.
 
 ## Stability across the repeated runs
 
-Questions whose outcome changed between runs of the same document: 1.
-- lease.early_termination: ['correctly not mentioned', 'invented an answer']
+Questions whose outcome changed between runs of the same document: 0.
 
 ## Latency
 
-Mean 2.8s per document, slowest 3.2s.
+Mean 2.9s per document, slowest 3.2s.
 
 ## Every miss
 
-- [invented an answer] lease.early_termination (run 1)
-  - answer: 'Tenant remains responsible for any early termination fee that is unpaid when this lease ends.'
-  - quote: 'Tenant remains responsible for any early termination fee, late'
-- [invented an answer] lease.early_termination (run 3)
-  - answer: 'Tenant remains responsible for any early termination fee that is unpaid when the lease ends.'
-  - quote: 'Tenant remains responsible for any early termination fee, late'
+None.
 
 ## Caveats
 
+- After this wording change the decoy clauses are handled, but a separate check on one real three-page lease still counted a passing mention as an answer in 1 of 2 runs, so the wording alone is not reliable and a second check is being added.
 - Two documents of 11 and 12 clauses and 20 scored questions is a small sample, one or two questions is not strong evidence.
 - The documents are short and written by me. Real contracts are longer, messier, and scanned, and I have not run this on one yet.
 - Whether an answer is right is judged by words it must contain, not by reading it, so a correct answer phrased unexpectedly would count as wrong, and a sloppy one that happens to contain the words would count as right.
