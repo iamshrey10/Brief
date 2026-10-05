@@ -89,7 +89,7 @@ export function ChatPanel({
   return (
     <section
       aria-label="Ask about this document"
-      className="flex max-h-[75vh] min-h-[28rem] flex-col rounded-lg border border-border bg-background lg:sticky lg:top-6 lg:h-[calc(100vh-3rem)] lg:max-h-none"
+      className="flex min-h-0 flex-1 flex-col rounded-lg border border-border bg-background"
     >
       <div
         ref={listRef}
