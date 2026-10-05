@@ -14,7 +14,7 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
 )
-from sqlalchemy.dialects.postgresql import TSVECTOR, UUID
+from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 # Gemini's gemini-embedding-001 defaults to 3072 dims but supports a smaller requested
@@ -59,6 +59,9 @@ class Document(Base):
         back_populates="document", cascade="all, delete-orphan"
     )
     extractions: Mapped[list["Extraction"]] = relationship(
+        back_populates="document", cascade="all, delete-orphan"
+    )
+    checklist_answers: Mapped[list["ChecklistAnswerRow"]] = relationship(
         back_populates="document", cascade="all, delete-orphan"
     )
 
@@ -120,3 +123,31 @@ class Extraction(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     document: Mapped["Document"] = relationship(back_populates="extractions")
+
+
+class ChecklistAnswerRow(Base):
+    """One must-ask question for one document. Every question of the document type gets a row
+    once the checklist has run, so the rows existing at all means it already ran and the model
+    isn't called again. A row with no answer means the document does not answer that question.
+
+    Which questions are important, and how to ask the other side, are deliberately not stored:
+    they come from the question list when a row is read, so improving that wording improves
+    documents that were already checked."""
+
+    __tablename__ = "checklist_answers"
+    __table_args__ = (
+        UniqueConstraint("document_id", "question_id", name="uq_checklist_answers_question"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    document_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("documents.id"), index=True)
+    question_id: Mapped[str] = mapped_column(String(100))
+    # null when the document does not answer the question
+    answer: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # up to three {clause_id, page_number, quote} items, each quote checked word for word. The
+    # page number is copied in so reading an answer needs no join, clauses never change after
+    # ingestion.
+    evidence: Mapped[list[dict]] = mapped_column(JSONB, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    document: Mapped["Document"] = relationship(back_populates="checklist_answers")
