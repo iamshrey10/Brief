@@ -1,16 +1,6 @@
 import Link from "next/link";
-import {
-  Briefcase,
-  ChevronRight,
-  CircleCheck,
-  CircleX,
-  FileText,
-  House,
-  Landmark,
-  LoaderCircle,
-  TriangleAlert,
-  type LucideIcon,
-} from "lucide-react";
+import { ChevronRight, CircleCheck, CircleX, LoaderCircle, TriangleAlert } from "lucide-react";
+import { DocTypeIcon } from "@/components/doc-type-icon";
 import { cn } from "@/lib/utils";
 import {
   DOC_TYPE_LABELS,
@@ -19,12 +9,6 @@ import {
   statusLabel,
   type DocumentSummary,
 } from "@/lib/documents";
-
-const TYPE_ICONS: Record<string, LucideIcon> = {
-  loan: Landmark,
-  lease: House,
-  offer: Briefcase,
-};
 
 function StatusBadge({ status }: { status: string }) {
   const label = statusLabel(status);
@@ -69,7 +53,6 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 function DocumentRow({ doc }: { doc: DocumentSummary }) {
-  const Icon = TYPE_ICONS[doc.doc_type] ?? FileText;
   const uploaded = formatUploaded(doc.created_at);
   const typeLabel = DOC_TYPE_LABELS[doc.doc_type] ?? doc.doc_type;
   // Only a document that has clauses to show gets a link, anything else would open an empty page.
@@ -81,7 +64,7 @@ function DocumentRow({ doc }: { doc: DocumentSummary }) {
         aria-hidden
         className="flex size-9 shrink-0 items-center justify-center rounded-md bg-secondary text-secondary-foreground"
       >
-        <Icon className="size-4.5" />
+        <DocTypeIcon type={doc.doc_type} className="size-4.5" />
       </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-medium text-foreground">{doc.filename}</span>

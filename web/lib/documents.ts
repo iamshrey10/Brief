@@ -104,3 +104,35 @@ export function formatUploaded(iso: string | null | undefined, now: Date = new D
     ...(sameYear ? {} : { year: "numeric" }),
   });
 }
+
+export const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024;
+
+/** The types the backend accepts, and the file extensions that identify each one. */
+const CONTENT_TYPE_BY_EXTENSION: Record<string, string> = {
+  pdf: "application/pdf",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  heic: "image/heic",
+};
+
+export const ACCEPTED_FILE_TYPES = Array.from(new Set(Object.values(CONTENT_TYPE_BY_EXTENSION)));
+
+/**
+ * The content type to upload a file as, or null if it is not a kind Brief can read. The browser's
+ * own type is trusted when it is one we accept. Some files, HEIC photos especially, arrive with
+ * no type at all, so fall back to the extension rather than guessing it is a PDF.
+ */
+export function contentTypeFor(file: { name: string; type: string }): string | null {
+  if (ACCEPTED_FILE_TYPES.includes(file.type)) return file.type;
+  if (file.type !== "") return null;
+  const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
+  return CONTENT_TYPE_BY_EXTENSION[extension] ?? null;
+}
+
+/** A file size a person reads easily: "850 KB", "2.4 MB". */
+export function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}

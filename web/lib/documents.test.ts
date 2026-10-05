@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  contentTypeFor,
+  formatFileSize,
   formatUploaded,
   groupByPage,
   isInProgress,
@@ -134,5 +136,54 @@ describe("formatUploaded", () => {
     expect(formatUploaded(undefined, now)).toBe("");
     expect(formatUploaded(null, now)).toBe("");
     expect(formatUploaded("not a date", now)).toBe("");
+  });
+});
+
+
+describe("contentTypeFor", () => {
+  it.each([
+    ["application/pdf", "contract.pdf"],
+    ["image/jpeg", "photo.jpg"],
+    ["image/png", "scan.png"],
+    ["image/heic", "photo.heic"],
+  ])("accepts a file the browser calls %s", (type, name) => {
+    expect(contentTypeFor({ name, type })).toBe(type);
+  });
+
+  it("trusts the browser's type over the file name", () => {
+    expect(contentTypeFor({ name: "really-a-photo.pdf", type: "image/png" })).toBe("image/png");
+  });
+
+  it.each([
+    ["photo.HEIC", "image/heic"],
+    ["scan.jpeg", "image/jpeg"],
+    ["scan.JPG", "image/jpeg"],
+    ["contract.pdf", "application/pdf"],
+  ])("falls back to the extension when the browser gives no type: %s", (name, expected) => {
+    expect(contentTypeFor({ name, type: "" })).toBe(expected);
+  });
+
+  it("does not guess that an unknown file is a PDF", () => {
+    expect(contentTypeFor({ name: "notes.txt", type: "" })).toBeNull();
+    expect(contentTypeFor({ name: "no-extension", type: "" })).toBeNull();
+  });
+
+  it("rejects a type it does not accept, whatever the file is called", () => {
+    expect(contentTypeFor({ name: "contract.pdf", type: "text/plain" })).toBeNull();
+    expect(contentTypeFor({ name: "doc.docx", type: "application/vnd.openxmlformats" })).toBeNull();
+  });
+});
+
+describe("formatFileSize", () => {
+  it.each([
+    [0, "0 B"],
+    [999, "999 B"],
+    [1024, "1 KB"],
+    [850 * 1024, "850 KB"],
+    [1024 * 1024, "1.0 MB"],
+    [2.4 * 1024 * 1024, "2.4 MB"],
+    [50 * 1024 * 1024, "50.0 MB"],
+  ])("shows %d bytes as %s", (bytes, expected) => {
+    expect(formatFileSize(bytes)).toBe(expected);
   });
 });
