@@ -21,16 +21,14 @@ import time
 from dataclasses import dataclass
 
 from google.genai import errors as genai_errors
+from eval_common import build_document, percent
 from key_terms_fixture import DOCUMENTS
-from retrieval_eval import EVAL_EMAIL, RESULTS_DIR, delete_document
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from retrieval_eval import RESULTS_DIR, delete_document
 
 import app.key_terms as key_terms_module
 from app.db import async_session
 from app.key_term_fields import fields_for
 from app.key_terms import ExtractionResponse, KeyTerm, extract_key_terms
-from app.models import Clause, Document, User
 
 # Free-tier quotas are counted per model, so the model under test can be swapped with
 # KEY_TERMS_EVAL_MODEL. Left unset it measures whatever the app itself uses.
@@ -77,45 +75,6 @@ def classify(expected, term: KeyTerm, raw_found: bool, clause_key_by_id: dict[st
     return CORRECT
 
 
-async def build_document(
-    session: AsyncSession, doc_type: str, clauses: dict[str, str]
-) -> tuple[Document, User, dict[str, str]]:
-    user = (await session.execute(select(User).where(User.email == EVAL_EMAIL))).scalar_one_or_none()
-    if user is None:
-        user = User(email=EVAL_EMAIL)
-        session.add(user)
-        await session.flush()
-
-    document = Document(
-        user_id=user.id,
-        filename=f"key-terms-eval-{doc_type}.pdf",
-        doc_type=doc_type,
-        status="ready",
-        storage_key=f"eval/key-terms-{doc_type}.pdf",
-        file_size_bytes=0,
-        content_type="application/pdf",
-    )
-    session.add(document)
-    await session.flush()
-
-    clause_key_by_id: dict[str, str] = {}
-    for index, (key, text) in enumerate(clauses.items()):
-        clause = Clause(
-            document_id=document.id,
-            clause_index=index,
-            page_number=1,
-            char_start=0,
-            char_end=len(text),
-            text=text,
-        )
-        session.add(clause)
-        await session.flush()
-        clause_key_by_id[str(clause.id)] = key
-
-    await session.commit()
-    return document, user, clause_key_by_id
-
-
 def install_recording_model() -> list[ExtractionResponse]:
     """Wraps the real model call so each raw response is kept, with rate-limit retries."""
     real_generate = key_terms_module.generate_key_terms
@@ -140,10 +99,6 @@ def install_recording_model() -> list[ExtractionResponse]:
 
     key_terms_module.generate_key_terms = recording_generate
     return raw_responses
-
-
-def percent(part: int, total: int) -> str:
-    return f"{part / total:.0%} ({part}/{total})" if total else "n/a"
 
 
 def render_report(outcomes: list[FieldOutcome], seconds: list[float]) -> str:
@@ -242,7 +197,7 @@ async def main() -> None:
     async with async_session() as session:
         for doc_type, spec in DOCUMENTS.items():
             document, user, clause_key_by_id = await build_document(
-                session, doc_type, spec["clauses"]
+                session, doc_type, spec["clauses"], "key-terms"
             )
             try:
                 for run in range(1, REPEATS + 1):
