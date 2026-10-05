@@ -171,6 +171,51 @@ async def test_list_documents_only_returns_current_users_documents(client, db_se
     assert filenames == {"mine.pdf"}
 
 
+async def test_list_documents_includes_the_ocr_confidence_of_a_scan(client, db_session, test_user):
+    db_session.add(
+        Document(
+            user_id=test_user.id,
+            filename="photo.jpg",
+            doc_type="lease",
+            status="needs_retake",
+            storage_key="fake/photo.jpg",
+            file_size_bytes=1024,
+            ocr_confidence=41.5,
+        )
+    )
+    await db_session.commit()
+
+    (document,) = (await client.get("/documents")).json()
+
+    assert document["ocr_confidence"] == 41.5
+
+
+async def test_list_documents_says_when_each_was_uploaded_newest_first(client, db_session, test_user):
+    from datetime import datetime, timedelta, timezone
+
+    now = datetime.now(timezone.utc)
+    for name, age_days in (("old.pdf", 3), ("new.pdf", 0), ("middle.pdf", 1)):
+        db_session.add(
+            Document(
+                user_id=test_user.id,
+                filename=name,
+                doc_type="lease",
+                status="ready",
+                storage_key=f"fake/{name}",
+                file_size_bytes=1024,
+                created_at=now - timedelta(days=age_days),
+            )
+        )
+    await db_session.commit()
+
+    body = (await client.get("/documents")).json()
+
+    assert [d["filename"] for d in body] == ["new.pdf", "middle.pdf", "old.pdf"]
+    uploaded = [datetime.fromisoformat(d["created_at"]) for d in body]
+    assert uploaded == sorted(uploaded, reverse=True)
+    assert abs((uploaded[0] - now).total_seconds()) < 5
+
+
 async def test_search_document_returns_matching_clauses(
     client, db_session, test_user, monkeypatch
 ):
@@ -473,6 +518,7 @@ async def test_get_document_returns_its_summary(client, db_session, test_user):
     assert body["id"] == str(document.id)
     assert body["filename"] == "lease.pdf"
     assert body["status"] == "ready"
+    assert body["created_at"] is not None
 
 
 async def test_get_document_rejects_another_users_document(client, db_session):

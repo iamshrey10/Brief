@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException
 from google.genai import errors as genai_errors
@@ -95,6 +96,19 @@ class DocumentSummary(BaseModel):
     doc_type: str
     status: str
     ocr_confidence: float | None = None
+    # When it was uploaded, so two copies of the same file can be told apart.
+    created_at: datetime | None = None
+
+    @classmethod
+    def from_document(cls, document: Document) -> "DocumentSummary":
+        return cls(
+            id=str(document.id),
+            filename=document.filename,
+            doc_type=document.doc_type,
+            status=document.status,
+            ocr_confidence=document.ocr_confidence,
+            created_at=document.created_at,
+        )
 
 
 async def _get_owned_document(
@@ -128,12 +142,7 @@ async def confirm_upload(
 
     background_tasks.add_task(ingest_document, document.id)
 
-    return DocumentSummary(
-        id=str(document.id),
-        filename=document.filename,
-        doc_type=document.doc_type,
-        status=document.status,
-    )
+    return DocumentSummary.from_document(document)
 
 
 @app.get("/documents")
@@ -146,16 +155,7 @@ async def list_documents(
     )
     documents = result.scalars().all()
 
-    return [
-        DocumentSummary(
-            id=str(d.id),
-            filename=d.filename,
-            doc_type=d.doc_type,
-            status=d.status,
-            ocr_confidence=d.ocr_confidence,
-        )
-        for d in documents
-    ]
+    return [DocumentSummary.from_document(d) for d in documents]
 
 
 class SearchRequest(BaseModel):
@@ -245,13 +245,7 @@ async def get_document(
 ) -> DocumentSummary:
     document = await _get_owned_document(document_id, user, session)
 
-    return DocumentSummary(
-        id=str(document.id),
-        filename=document.filename,
-        doc_type=document.doc_type,
-        status=document.status,
-        ocr_confidence=document.ocr_confidence,
-    )
+    return DocumentSummary.from_document(document)
 
 
 @app.get("/documents/{document_id}/clauses")
