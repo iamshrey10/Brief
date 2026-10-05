@@ -86,17 +86,13 @@ def classify(
     return CORRECT if has_any and has_all else WRONG_VALUE
 
 
-def install_recording_model() -> list[ChecklistResponse]:
-    """Wraps the real model call so each raw response is kept, with rate-limit retries."""
-    real_generate = checklist_module.generate_checklist
-    raw_responses: list[ChecklistResponse] = []
+def _with_retries(call):
+    """Retries a model call patiently on a rate limit, and stops the run on a daily quota."""
 
-    def recording_generate(questions, clauses):
+    def wrapped(*args):
         for attempt in range(1, MAX_ATTEMPTS + 1):
             try:
-                response = real_generate(questions, clauses)
-                raw_responses.append(response)
-                return response
+                return call(*args)
             except genai_errors.APIError as error:
                 if "PerDay" in str(error):
                     raise SystemExit(
@@ -108,7 +104,22 @@ def install_recording_model() -> list[ChecklistResponse]:
                 time.sleep(RETRY_DELAY_SECONDS)
         raise AssertionError("unreachable")
 
+    return wrapped
+
+
+def install_recording_model() -> list[ChecklistResponse]:
+    """Wraps both real model calls with rate-limit retries, and keeps each raw answer response
+    so a miss can be told apart from our own checks rejecting a correct answer."""
+    real_generate = _with_retries(checklist_module.generate_checklist)
+    raw_responses: list[ChecklistResponse] = []
+
+    def recording_generate(questions, clauses):
+        response = real_generate(questions, clauses)
+        raw_responses.append(response)
+        return response
+
     checklist_module.generate_checklist = recording_generate
+    checklist_module.judge_answers = _with_retries(checklist_module.judge_answers)
     return raw_responses
 
 
@@ -214,6 +225,12 @@ def render_report(outcomes: list[QuestionOutcome], seconds: list[float]) -> str:
         "questions is not strong evidence.",
         "- The documents are short and written by me. Real contracts are longer, messier, and "
         "scanned, and I have not run this on one yet.",
+        "- The second check is a model call too. On a real lease it wrongly withheld a correct "
+        "answer about 1 time in 8 and once gave a different verdict on identical input, so a good "
+        "answer can show as not mentioned. The \"dropped by our checks\" row measures that cost, "
+        "and it was zero on this fixture, which is clean and not a promise about real contracts.",
+        "- The free Gemini tier allows 15 requests a minute, and the checklist now makes two calls "
+        "per document, so the slowest runs here include waiting on that limit.",
         "- Whether an answer is right is judged by words it must contain, not by reading it, so a "
         "correct answer phrased unexpectedly would count as wrong, and a sloppy one that happens "
         "to contain the words would count as right.",

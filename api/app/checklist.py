@@ -119,6 +119,56 @@ def generate_checklist(
     return parsed
 
 
+JUDGE_SYSTEM_INSTRUCTION = (
+    "You check whether quoted contract text answers a question. You are given items, each with "
+    "an id, a question, and the quoted text. Judge ONLY the quoted text, ignore everything else "
+    "and use no outside knowledge. A question may have several parts. Set answers to true if the "
+    "quoted text states the main thing the question asks for, an amount, a date, a time limit, "
+    "or a rule, even when another part of the question is not covered. Set answers to false only "
+    "when the text states none of what is asked: it merely mentions the topic, or says "
+    "something exists or is owed without saying what it is. Return one verdict for every item, "
+    "using its exact id."
+)
+
+
+class Verdict(BaseModel):
+    id: str
+    answers: bool
+
+
+class JudgeResponse(BaseModel):
+    verdicts: list[Verdict]
+
+
+def build_judge_prompt(items: list[tuple[ChecklistQuestion, ChecklistAnswer]]) -> str:
+    blocks = []
+    for question, answer in items:
+        quoted = "\n".join(f'"{evidence.quote}"' for evidence in answer.evidence)
+        blocks.append(f"id: {question.id}\nquestion: {question.question}\nquoted text:\n{quoted}")
+    return "\n\n".join(blocks)
+
+
+def judge_answers(items: list[tuple[ChecklistQuestion, ChecklistAnswer]]) -> set[str]:
+    """Asks a separate model call, shown only each question and its quoted text, whether the
+    text states the specific thing asked. Returns the ids it confirms. A fresh look at one quote
+    is much easier than finding answers in a whole contract, so it catches a clause that only
+    mentions a topic. Blocking network call, run it through asyncio.to_thread from async code."""
+    config = types.GenerateContentConfig(
+        system_instruction=JUDGE_SYSTEM_INSTRUCTION,
+        temperature=0.0,
+        response_mime_type="application/json",
+        response_schema=JudgeResponse,
+    )
+    response = get_genai_client().models.generate_content(
+        model=CHECKLIST_MODEL, contents=build_judge_prompt(items), config=config
+    )
+
+    parsed = response.parsed
+    if not isinstance(parsed, JudgeResponse):
+        raise ChecklistGenerationError("model did not return a valid structured verdict")
+    return {verdict.id for verdict in parsed.verdicts if verdict.answers}
+
+
 def _not_mentioned(question: ChecklistQuestion) -> ChecklistAnswer:
     return ChecklistAnswer(
         id=question.id,
@@ -197,9 +247,20 @@ async def answer_checklist(
         )
 
     generated = await asyncio.to_thread(generate_checklist, questions, loaded.labeled)
-    return ChecklistResult(
-        answers=verify_answers(questions, generated, loaded.by_label), truncated=loaded.truncated
-    )
+    verified = verify_answers(questions, generated, loaded.by_label)
+
+    # The quote and number checks prove the evidence is real, not that it answers the question.
+    # A second, independent look decides that. An answer it does not confirm is withheld, and
+    # if the check itself fails the whole request fails rather than show answers unchecked.
+    to_judge = [(q, a) for q, a in zip(questions, verified, strict=True) if a.status == "answered"]
+    if to_judge:
+        confirmed = await asyncio.to_thread(judge_answers, to_judge)
+        verified = [
+            _not_mentioned(q) if a.status == "answered" and a.id not in confirmed else a
+            for q, a in zip(questions, verified, strict=True)
+        ]
+
+    return ChecklistResult(answers=verified, truncated=loaded.truncated)
 
 
 async def load_checklist(

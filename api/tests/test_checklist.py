@@ -12,10 +12,14 @@ from app.checklist import (
     ChecklistGenerationError,
     ChecklistResponse,
     Evidence,
+    JudgeResponse,
+    Verdict,
     answer_checklist,
+    build_judge_prompt,
     build_prompt,
     generate_checklist,
     get_checklist,
+    judge_answers,
     load_checklist,
     save_checklist,
     verify_answers,
@@ -288,7 +292,9 @@ async def _document(db_session, test_user, texts: list[str], doc_type: str = "lo
     return document
 
 
-def _fake_model(monkeypatch, build_response):
+def _fake_model(monkeypatch, build_response, judge=None):
+    """Replaces both model calls. The judge confirms every answer unless `judge` says otherwise,
+    and receives the (question, answer) pairs it was shown."""
     seen: list[tuple] = []
 
     def fake_generate(questions, clauses):
@@ -296,6 +302,9 @@ def _fake_model(monkeypatch, build_response):
         return build_response(clauses)
 
     monkeypatch.setattr("app.checklist.generate_checklist", fake_generate)
+    monkeypatch.setattr(
+        "app.checklist.judge_answers", judge or (lambda items: {q.id for q, _ in items})
+    )
     return seen
 
 
@@ -352,6 +361,146 @@ async def test_a_document_too_long_to_send_is_cut_and_flagged(db_session, test_u
 
     assert [label for label, _ in seen[0][1]] == ["C1"]
     assert result.truncated is True
+
+
+# --- the second check: does the quoted text actually answer the question? ---
+
+
+def _answered(id="prepay", quote="without penalty"):
+    from app.checklist import ChecklistAnswer, EvidenceOut
+
+    return ChecklistAnswer(
+        id=id,
+        question="Can I pay it off early?",
+        why_it_matters="w",
+        importance="high",
+        status="answered",
+        answer="Yes.",
+        evidence=[EvidenceOut(clause_id="x", page_number=1, quote=quote)],
+    )
+
+
+def test_the_judge_prompt_shows_only_each_question_and_its_quotes():
+    items = [(QUESTIONS[0], _answered("prepay", "at any time without penalty"))]
+
+    prompt = build_judge_prompt(items)
+
+    assert "id: prepay" in prompt
+    assert "question: Can I pay it off early?" in prompt
+    assert '"at any time without penalty"' in prompt
+    # It must not carry the model's own answer, or the judge would just be agreeing with it.
+    assert "Yes." not in prompt
+
+
+def test_judge_answers_returns_only_the_ids_the_judge_confirms(monkeypatch):
+    client = _FakeClient(
+        JudgeResponse(verdicts=[Verdict(id="prepay", answers=True), Verdict(id="fees", answers=False)])
+    )
+    monkeypatch.setattr("app.checklist.get_genai_client", lambda: client)
+
+    confirmed = judge_answers([(QUESTIONS[0], _answered("prepay")), (QUESTIONS[2], _answered("fees"))])
+
+    assert confirmed == {"prepay"}
+    call = client.models.calls[0]
+    assert call["model"] == CHECKLIST_MODEL
+    assert call["config"].temperature == 0.0
+    assert call["config"].response_schema is JudgeResponse
+    assert "merely mentions the topic" in call["config"].system_instruction
+
+
+def test_judge_answers_rejects_an_unparseable_response(monkeypatch):
+    monkeypatch.setattr("app.checklist.get_genai_client", lambda: _FakeClient(None))
+
+    with pytest.raises(ChecklistGenerationError):
+        judge_answers([(QUESTIONS[0], _answered())])
+
+
+async def test_an_answer_the_judge_does_not_confirm_is_withheld_as_not_mentioned(
+    db_session, test_user, monkeypatch
+):
+    document = await _document(db_session, test_user, [PREPAY_TEXT])
+    _fake_model(monkeypatch, _prepay_response, judge=lambda items: set())
+
+    result = await answer_checklist(db_session, document.id, "loan")
+
+    prepay = next(a for a in result.answers if a.id == "prepayment")
+    assert prepay.status == "not_mentioned"
+    assert prepay.gap is True and prepay.ask_them
+    assert prepay.answer is None and prepay.evidence == []
+
+
+async def test_a_confirmed_answer_is_kept(db_session, test_user, monkeypatch):
+    document = await _document(db_session, test_user, [PREPAY_TEXT])
+    _fake_model(monkeypatch, _prepay_response, judge=lambda items: {q.id for q, _ in items})
+
+    result = await answer_checklist(db_session, document.id, "loan")
+
+    assert next(a for a in result.answers if a.id == "prepayment").status == "answered"
+
+
+async def test_an_answer_the_judge_says_nothing_about_is_withheld(db_session, test_user, monkeypatch):
+    # The judge leaves the id out entirely: not confirmed means not shown.
+    document = await _document(db_session, test_user, [PREPAY_TEXT])
+    _fake_model(monkeypatch, _prepay_response, judge=lambda items: {"some_other_id"})
+
+    result = await answer_checklist(db_session, document.id, "loan")
+
+    assert next(a for a in result.answers if a.id == "prepayment").status == "not_mentioned"
+
+
+async def test_the_judge_is_shown_only_the_answers_that_passed_the_first_checks(
+    db_session, test_user, monkeypatch
+):
+    document = await _document(db_session, test_user, [PREPAY_TEXT])
+    shown: list[list[str]] = []
+
+    def judge(items):
+        shown.append([q.id for q, _ in items])
+        return {q.id for q, _ in items}
+
+    # One answer with real evidence, one whose quote is invented and so never reaches the judge.
+    _fake_model(
+        monkeypatch,
+        lambda clauses: ChecklistResponse(
+            answers=[
+                _entry("prepayment", "Yes, free.", [("C1", "at any time without penalty")]),
+                _entry("late_payment", "Five percent.", [("C1", "an invented quote")]),
+            ]
+        ),
+        judge=judge,
+    )
+
+    await answer_checklist(db_session, document.id, "loan")
+
+    assert shown == [["prepayment"]]
+
+
+async def test_when_nothing_is_answered_the_judge_is_not_called(db_session, test_user, monkeypatch):
+    document = await _document(db_session, test_user, [PREPAY_TEXT])
+    shown: list = []
+    _fake_model(
+        monkeypatch,
+        lambda clauses: ChecklistResponse(answers=[]),
+        judge=lambda items: shown.append(items) or set(),
+    )
+
+    await answer_checklist(db_session, document.id, "loan")
+
+    assert shown == []
+
+
+async def test_if_the_judge_call_fails_the_whole_checklist_fails_instead_of_showing_unchecked_answers(
+    db_session, test_user, monkeypatch
+):
+    document = await _document(db_session, test_user, [PREPAY_TEXT])
+
+    def failing_judge(items):
+        raise ChecklistGenerationError("model did not return a valid structured verdict")
+
+    _fake_model(monkeypatch, _prepay_response, judge=failing_judge)
+
+    with pytest.raises(ChecklistGenerationError):
+        await answer_checklist(db_session, document.id, "loan")
 
 
 # --- saving and loading: answer once, then reuse ---

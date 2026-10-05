@@ -34,7 +34,7 @@ Questions whose outcome changed between runs of the same document: 0.
 
 ## Latency
 
-Mean 2.9s per document, slowest 3.2s.
+Mean 6.3s per document, slowest 18.0s.
 
 ## Every miss
 
@@ -42,7 +42,8 @@ None.
 
 ## Caveats
 
-- After this wording change the decoy clauses are handled, but a separate check on one real three-page lease still counted a passing mention as an answer in 1 of 2 runs, so the wording alone is not reliable and a second check is being added.
 - Two documents of 11 and 12 clauses and 20 scored questions is a small sample, one or two questions is not strong evidence.
 - The documents are short and written by me. Real contracts are longer, messier, and scanned, and I have not run this on one yet.
+- The second check is a model call too. On a real lease it wrongly withheld a correct answer about 1 time in 8 and once gave a different verdict on identical input, so a good answer can show as not mentioned. The "dropped by our checks" row measures that cost, and it was zero on this fixture, which is clean and not a promise about real contracts.
+- The free Gemini tier allows 15 requests a minute, and the checklist now makes two calls per document, so the slowest runs here include waiting on that limit.
 - Whether an answer is right is judged by words it must contain, not by reading it, so a correct answer phrased unexpectedly would count as wrong, and a sloppy one that happens to contain the words would count as right.
