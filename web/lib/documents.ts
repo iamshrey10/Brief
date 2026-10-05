@@ -4,6 +4,8 @@ export type DocumentSummary = {
   doc_type: string;
   status: string;
   ocr_confidence: number | null;
+  // When it was uploaded, as an ISO timestamp. Absent on older responses.
+  created_at?: string | null;
 };
 
 export type ClauseData = {
@@ -75,4 +77,30 @@ export function groupByPage(clauses: ClauseData[]): PageGroup[] {
     }
   }
   return groups;
+}
+
+/**
+ * When a document was uploaded, in words a person says: "today", "yesterday", "Oct 3", or
+ * "Oct 3, 2025" for another year. Calendar days are compared in the reader's own time zone, so
+ * something uploaded late last night reads "yesterday", not "today". Returns an empty string
+ * when the date is missing or unreadable, so the caller can simply leave it out.
+ */
+export function formatUploaded(iso: string | null | undefined, now: Date = new Date()): string {
+  if (!iso) return "";
+  const uploaded = new Date(iso);
+  if (Number.isNaN(uploaded.getTime())) return "";
+
+  const startOfDay = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const daysAgo = Math.round(
+    (startOfDay(now).getTime() - startOfDay(uploaded).getTime()) / 86_400_000,
+  );
+  if (daysAgo === 0) return "today";
+  if (daysAgo === 1) return "yesterday";
+
+  const sameYear = uploaded.getFullYear() === now.getFullYear();
+  return uploaded.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    ...(sameYear ? {} : { year: "numeric" }),
+  });
 }

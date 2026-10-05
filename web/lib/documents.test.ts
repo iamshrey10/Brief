@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { groupByPage, isInProgress, isReadable, statusLabel, type ClauseData } from "./documents";
+import {
+  formatUploaded,
+  groupByPage,
+  isInProgress,
+  isReadable,
+  statusLabel,
+  type ClauseData,
+} from "./documents";
 
 function clause(id: string, page: number, index: number): ClauseData {
   return { id, clause_index: index, page_number: page, text: `Clause ${id}` };
@@ -97,5 +104,35 @@ describe("statusLabel", () => {
 
   it("never exposes a raw underscore status name", () => {
     expect(statusLabel("needs_retake")).not.toContain("_");
+  });
+});
+
+
+describe("formatUploaded", () => {
+  // Built from local dates, so these hold in any time zone.
+  const now = new Date(2026, 9, 5, 15, 0, 0); // Oct 5, 2026, 3pm
+  const at = (y: number, m: number, d: number, h = 12) => new Date(y, m, d, h).toISOString();
+
+  it("says today for earlier the same day", () => {
+    expect(formatUploaded(at(2026, 9, 5, 8), now)).toBe("today");
+  });
+
+  it("says yesterday for the day before, even a few minutes before midnight", () => {
+    expect(formatUploaded(at(2026, 9, 4, 23), now)).toBe("yesterday");
+  });
+
+  it("says the month and day for earlier dates this year", () => {
+    expect(formatUploaded(at(2026, 8, 25), now)).toBe("Sep 25");
+    expect(formatUploaded(at(2026, 0, 2), now)).toBe("Jan 2");
+  });
+
+  it("adds the year for another year", () => {
+    expect(formatUploaded(at(2025, 11, 30), now)).toBe("Dec 30, 2025");
+  });
+
+  it("returns nothing for a missing or unreadable date, so it can be left out", () => {
+    expect(formatUploaded(undefined, now)).toBe("");
+    expect(formatUploaded(null, now)).toBe("");
+    expect(formatUploaded("not a date", now)).toBe("");
   });
 });
