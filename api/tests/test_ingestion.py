@@ -1,12 +1,24 @@
+import asyncio
 import io
 import math
+import time
 import uuid
+from types import SimpleNamespace
 
 import pymupdf
+import pytest
+from google.genai import errors as genai_errors
 from PIL import Image, ImageDraw, ImageFont
 from sqlalchemy import select
 
-from app.ingestion import _normalize, ingest_document
+from app.ingestion import (
+    DEFAULT_RETRY_WAIT_SECONDS,
+    MAX_RATE_LIMIT_RETRIES,
+    MAX_RETRY_WAIT_SECONDS,
+    _normalize,
+    embed_texts,
+    ingest_document,
+)
 from app.models import EMBEDDING_DIM, Clause, Document, Embedding, User
 
 
@@ -243,3 +255,150 @@ async def test_ingest_document_marks_needs_retake_for_low_confidence_ocr(
     await db_session.refresh(document)
     assert document.status == "needs_retake"
     assert document.ocr_confidence == 25.0
+
+
+# --- embed_texts: waiting out Gemini's rate limit instead of failing the whole document ---
+
+def _api_error(code: int, message: str) -> genai_errors.APIError:
+    status = "RESOURCE_EXHAUSTED" if code == 429 else "INTERNAL"
+    return genai_errors.ClientError(code, {"error": {"message": message, "status": status}}, None)
+
+
+def _rate_limited(retry_in: str = "7.89s") -> genai_errors.APIError:
+    return _api_error(429, f"You exceeded your current quota. Please retry in {retry_in}.")
+
+
+class _ScriptedEmbeddings:
+    """A fake embedding client that plays back a script: an exception to raise, or 'ok'."""
+
+    def __init__(self, script):
+        self.script = list(script)
+        self.requests: list[int] = []  # how many texts each request carried
+        self.models = self
+
+    def embed_content(self, *, model, contents, config):
+        self.requests.append(len(contents))
+        outcome = self.script.pop(0)
+        if isinstance(outcome, Exception):
+            raise outcome
+        return SimpleNamespace(embeddings=[SimpleNamespace(values=[3.0, 4.0]) for _ in contents])
+
+
+def _install(monkeypatch, script):
+    client = _ScriptedEmbeddings(script)
+    waits: list[float] = []
+    monkeypatch.setattr("app.ingestion.get_genai_client", lambda: client)
+    monkeypatch.setattr("app.ingestion._sleep", waits.append)
+    return client, waits
+
+
+def test_embed_texts_waits_as_long_as_gemini_says_and_then_succeeds(monkeypatch):
+    client, waits = _install(monkeypatch, [_rate_limited("7.89s"), "ok"])
+
+    vectors = embed_texts(["one", "two"])
+
+    assert len(vectors) == 2
+    assert waits == [7.89 + 1.0]
+    assert client.requests == [2, 2]  # the same batch, sent again
+
+
+def test_embed_texts_repeats_only_the_batch_that_was_refused(monkeypatch):
+    # 250 texts is three batches of 100, 100, and 50. The second is refused once.
+    client, waits = _install(monkeypatch, ["ok", _rate_limited(), "ok", "ok"])
+
+    vectors = embed_texts([f"text {i}" for i in range(250)])
+
+    assert len(vectors) == 250
+    assert client.requests == [100, 100, 100, 50]
+    assert len(waits) == 1
+
+
+def test_embed_texts_keeps_every_vector_in_order_across_retries(monkeypatch):
+    client, _ = _install(monkeypatch, ["ok", _rate_limited(), "ok"])
+
+    vectors = embed_texts([f"text {i}" for i in range(150)])
+
+    assert len(vectors) == 150
+    assert all(abs(sum(c * c for c in v) ** 0.5 - 1.0) < 1e-9 for v in vectors)  # still normalized
+
+
+def test_embed_texts_gives_up_after_the_retry_limit(monkeypatch):
+    errors = [_rate_limited() for _ in range(MAX_RATE_LIMIT_RETRIES + 1)]
+    client, waits = _install(monkeypatch, errors)
+
+    with pytest.raises(genai_errors.APIError):
+        embed_texts(["one"])
+
+    assert len(client.requests) == MAX_RATE_LIMIT_RETRIES + 1
+    assert len(waits) == MAX_RATE_LIMIT_RETRIES
+
+
+def test_embed_texts_does_not_wait_for_a_daily_quota_that_will_not_reset(monkeypatch):
+    daily = _api_error(
+        429, "Quota exceeded for metric: embed_content_free_tier_requests, quotaId: EmbedContentRequestsPerDay"
+    )
+    client, waits = _install(monkeypatch, [daily])
+
+    with pytest.raises(genai_errors.APIError):
+        embed_texts(["one"])
+
+    assert waits == []
+    assert len(client.requests) == 1
+
+
+@pytest.mark.parametrize("code", [400, 403, 404, 500, 503])
+def test_embed_texts_does_not_retry_errors_that_are_not_a_rate_limit(monkeypatch, code):
+    client, waits = _install(monkeypatch, [_api_error(code, "something else is wrong")])
+
+    with pytest.raises(genai_errors.APIError):
+        embed_texts(["one"])
+
+    assert waits == []
+    assert len(client.requests) == 1
+
+
+def test_embed_texts_caps_how_long_it_will_wait_for_one_retry(monkeypatch):
+    _, waits = _install(monkeypatch, [_rate_limited("500s"), "ok"])
+
+    embed_texts(["one"])
+
+    assert waits == [MAX_RETRY_WAIT_SECONDS]
+
+
+def test_embed_texts_uses_a_default_wait_when_gemini_gives_no_hint(monkeypatch):
+    _, waits = _install(monkeypatch, [_api_error(429, "Too many requests, slow down."), "ok"])
+
+    embed_texts(["one"])
+
+    assert waits == [DEFAULT_RETRY_WAIT_SECONDS]
+
+
+async def test_ingestion_does_not_freeze_the_server_while_waiting_on_the_rate_limit(
+    db_session, test_user, monkeypatch
+):
+    pdf_bytes = _make_pdf_bytes(["Interest accrues at six percent per year."])
+    document = _make_document(test_user, filename="slow.pdf")
+    db_session.add(document)
+    await db_session.commit()
+
+    def slow_embed(texts):
+        time.sleep(0.3)  # stands in for waiting out a rate limit
+        return [[1.0] + [0.0] * (EMBEDDING_DIM - 1) for _ in texts]
+
+    monkeypatch.setattr("app.ingestion.download_file", lambda storage_key: pdf_bytes)
+    monkeypatch.setattr("app.ingestion.embed_texts", slow_embed)
+
+    ticks = 0
+
+    async def heartbeat():
+        nonlocal ticks
+        while True:
+            await asyncio.sleep(0.01)
+            ticks += 1
+
+    beat = asyncio.create_task(heartbeat())
+    await ingest_document(document.id)
+    beat.cancel()
+
+    # If embedding blocked the event loop, the heartbeat could not have run during the 0.3s.
+    assert ticks >= 10

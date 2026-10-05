@@ -1,8 +1,12 @@
+import asyncio
 import logging
+import re
+import time
 import uuid
 
 import pymupdf
 from google import genai
+from google.genai import errors as genai_errors
 from google.genai import types
 
 from app.clause_segmentation import segment_page_into_clauses
@@ -20,6 +24,17 @@ logger = logging.getLogger(__name__)
 # so smaller outputs need to be normalized by hand.
 EMBEDDING_MODEL = "gemini-embedding-001"
 EMBEDDING_BATCH_SIZE = 100
+
+# The free Gemini tier allows only about 100 embedded pieces a minute, and a refused request says
+# how long to wait. A 40 page contract is nearly 300 pieces, so without waiting and trying again
+# any long document fails halfway and is thrown away. Each wait is capped, and the number of
+# retries is bounded, so a document that can never succeed still ends up marked failed.
+MAX_RATE_LIMIT_RETRIES = 8
+DEFAULT_RETRY_WAIT_SECONDS = 30.0
+MAX_RETRY_WAIT_SECONDS = 70.0
+
+# A name of its own so tests can skip the waiting.
+_sleep = time.sleep
 
 _client: genai.Client | None = None
 
@@ -52,14 +67,49 @@ def _normalize(vector: list[float]) -> list[float]:
     return [component / norm for component in vector]
 
 
+def _rate_limit_wait(error: genai_errors.APIError) -> float | None:
+    """How long to wait before trying again, or None when waiting will not help: it is not a
+    rate limit at all, or it is a daily quota that will not reset for hours."""
+    if error.code != 429:
+        return None
+    message = str(error)
+    if "PerDay" in message:
+        return None
+
+    hint = re.search(r"retry in ([\d.]+)s", message)
+    wait = float(hint.group(1)) + 1.0 if hint else DEFAULT_RETRY_WAIT_SECONDS
+    return min(wait, MAX_RETRY_WAIT_SECONDS)
+
+
 def embed_texts(texts: list[str]) -> list[list[float]]:
+    """Embeds every text, a batch at a time. When Gemini says to slow down it waits as long as
+    it is told and tries that same batch again, so batches already done are never repeated.
+    Blocking, and it can wait for minutes, so async code must call it through to_thread."""
     client = get_genai_client()
     config = types.EmbedContentConfig(output_dimensionality=EMBEDDING_DIM)
     vectors: list[list[float]] = []
 
     for batch_start in range(0, len(texts), EMBEDDING_BATCH_SIZE):
         batch = texts[batch_start : batch_start + EMBEDDING_BATCH_SIZE]
-        response = client.models.embed_content(model=EMBEDDING_MODEL, contents=batch, config=config)
+
+        for attempt in range(MAX_RATE_LIMIT_RETRIES + 1):
+            try:
+                response = client.models.embed_content(
+                    model=EMBEDDING_MODEL, contents=batch, config=config
+                )
+                break
+            except genai_errors.APIError as error:
+                wait = _rate_limit_wait(error)
+                if wait is None or attempt == MAX_RATE_LIMIT_RETRIES:
+                    raise
+                logger.warning(
+                    "embedding rate limited, waiting %.0fs (retry %d of %d)",
+                    wait,
+                    attempt + 1,
+                    MAX_RATE_LIMIT_RETRIES,
+                )
+                _sleep(wait)
+
         vectors.extend(_normalize(embedding.values) for embedding in response.embeddings)
 
     return vectors
@@ -91,7 +141,9 @@ async def ingest_document(document_id: uuid.UUID) -> None:
                 logger.error("no extractable text found in document %s", document_id)
                 return
 
-            vectors = embed_texts([text for *_rest, text in chunk_records])
+            # Off the event loop: a long document can wait minutes for the rate limit, and
+            # blocking here would freeze every other request the server is handling.
+            vectors = await asyncio.to_thread(embed_texts, [text for *_rest, text in chunk_records])
 
             for index, ((page_number, char_start, char_end, chunk_text), vector) in enumerate(
                 zip(chunk_records, vectors, strict=True)
