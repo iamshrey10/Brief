@@ -103,6 +103,8 @@ class DocumentSummary(BaseModel):
     ocr_confidence: float | None = None
     # When it was uploaded, so two copies of the same file can be told apart.
     created_at: datetime | None = None
+    # When its status last changed, which is what decides whether a read has stalled.
+    status_changed_at: datetime | None = None
 
     @classmethod
     def from_document(cls, document: Document) -> "DocumentSummary":
@@ -113,6 +115,7 @@ class DocumentSummary(BaseModel):
             status=document.status,
             ocr_confidence=document.ocr_confidence,
             created_at=document.created_at,
+            status_changed_at=document.status_changed_at,
         )
 
 
@@ -142,6 +145,7 @@ async def confirm_upload(
 ) -> DocumentSummary:
     document = await _get_owned_document(document_id, user, session)
     document.status = "uploaded"
+    document.status_changed_at = datetime.now(timezone.utc)
     await session.commit()
     await session.refresh(document)
 
@@ -161,9 +165,12 @@ async def retry_document(
     being read for a long time, so a read that is genuinely under way is never started twice."""
     document = await _get_owned_document(document_id, user, session)
 
+    # Measured from when the status last changed, not from the upload: a document that was just
+    # retried has a fresh status change and is not stuck, however long ago it was uploaded.
+    since = document.status_changed_at or document.created_at
     stuck = (
         document.status in {"pending", "uploaded", "processing"}
-        and datetime.now(timezone.utc) - document.created_at > STUCK_AFTER
+        and datetime.now(timezone.utc) - since > STUCK_AFTER
     )
     if document.status != "failed" and not stuck:
         raise HTTPException(status_code=409, detail="this document does not need another try")
@@ -174,6 +181,7 @@ async def retry_document(
         await session.delete(clause)
 
     document.status = "uploaded"
+    document.status_changed_at = datetime.now(timezone.utc)
     await session.commit()
     await session.refresh(document)
 

@@ -841,9 +841,18 @@ def _record_ingestion(monkeypatch) -> list:
     return started
 
 
-async def _document_with(db_session, test_user, status: str, age_minutes: int = 0) -> Document:
+async def _document_with(
+    db_session,
+    test_user,
+    status: str,
+    age_minutes: int = 0,
+    changed_minutes_ago: int | None = None,
+) -> Document:
+    """A document uploaded `age_minutes` ago whose status last changed `changed_minutes_ago`
+    minutes ago. Left out, the status is taken to have changed when it was uploaded."""
     from datetime import datetime, timedelta, timezone
 
+    now = datetime.now(timezone.utc)
     document = Document(
         user_id=test_user.id,
         filename="doc.pdf",
@@ -851,7 +860,10 @@ async def _document_with(db_session, test_user, status: str, age_minutes: int = 
         status=status,
         storage_key="fake/doc.pdf",
         file_size_bytes=1024,
-        created_at=datetime.now(timezone.utc) - timedelta(minutes=age_minutes),
+        created_at=now - timedelta(minutes=age_minutes),
+        status_changed_at=(
+            None if changed_minutes_ago is None else now - timedelta(minutes=changed_minutes_ago)
+        ),
     )
     db_session.add(document)
     await db_session.commit()
@@ -982,3 +994,66 @@ async def test_retry_returns_404_for_a_malformed_id(client):
     response = await client.post("/documents/not-a-uuid/retry")
 
     assert response.status_code == 404
+
+
+async def test_retry_refuses_a_document_whose_read_only_just_started_however_old_the_upload(
+    client, db_session, test_user, monkeypatch
+):
+    # Uploaded an hour ago, but its status changed two minutes ago: it was just retried.
+    started = _record_ingestion(monkeypatch)
+    document = await _document_with(
+        db_session, test_user, "processing", age_minutes=60, changed_minutes_ago=2
+    )
+
+    response = await client.post(f"/documents/{document.id}/retry")
+
+    assert response.status_code == 409
+    assert started == []
+
+
+async def test_a_retry_cannot_be_started_twice_in_a_row(client, db_session, test_user, monkeypatch):
+    started = _record_ingestion(monkeypatch)
+    document = await _document_with(db_session, test_user, "failed", age_minutes=600)
+
+    first = await client.post(f"/documents/{document.id}/retry")
+    second = await client.post(f"/documents/{document.id}/retry")
+
+    assert first.status_code == 200
+    assert second.status_code == 409
+    assert started == [document.id]  # one read, not two at once
+
+
+async def test_retry_reads_a_document_whose_status_has_not_changed_for_a_long_time(
+    client, db_session, test_user, monkeypatch
+):
+    started = _record_ingestion(monkeypatch)
+    document = await _document_with(
+        db_session, test_user, "processing", age_minutes=600, changed_minutes_ago=60
+    )
+
+    response = await client.post(f"/documents/{document.id}/retry")
+
+    assert response.status_code == 200
+    assert started == [document.id]
+
+
+async def test_a_retried_document_reports_when_its_status_changed(
+    client, db_session, test_user, monkeypatch
+):
+    from datetime import datetime, timezone
+
+    _record_ingestion(monkeypatch)
+    document = await _document_with(db_session, test_user, "failed", age_minutes=600)
+
+    body = (await client.post(f"/documents/{document.id}/retry")).json()
+
+    changed = datetime.fromisoformat(body["status_changed_at"])
+    assert abs((changed - datetime.now(timezone.utc)).total_seconds()) < 5
+
+
+async def test_the_document_list_carries_when_each_status_changed(client, db_session, test_user):
+    await _document_with(db_session, test_user, "ready", age_minutes=600, changed_minutes_ago=30)
+
+    (document,) = (await client.get("/documents")).json()
+
+    assert document["status_changed_at"] is not None

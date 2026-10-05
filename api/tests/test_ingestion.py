@@ -3,6 +3,7 @@ import io
 import math
 import time
 import uuid
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
 import pymupdf
@@ -11,6 +12,7 @@ from google.genai import errors as genai_errors
 from PIL import Image, ImageDraw, ImageFont
 from sqlalchemy import select
 
+from app import ingestion as ingestion_module
 from app.ingestion import (
     DEFAULT_RETRY_WAIT_SECONDS,
     MAX_RATE_LIMIT_RETRIES,
@@ -402,3 +404,99 @@ async def test_ingestion_does_not_freeze_the_server_while_waiting_on_the_rate_li
 
     # If embedding blocked the event loop, the heartbeat could not have run during the 0.3s.
     assert ticks >= 10
+
+
+# --- every status change records when it happened ---
+
+def _is_just_now(moment: datetime | None) -> bool:
+    return moment is not None and abs((datetime.now(timezone.utc) - moment).total_seconds()) < 10
+
+
+async def _document_long_ago(db_session, test_user) -> Document:
+    """A document uploaded and last changed an hour ago, so a fresh change is easy to spot."""
+    long_ago = datetime.now(timezone.utc) - timedelta(hours=1)
+    document = _make_document(test_user, created_at=long_ago, status_changed_at=long_ago)
+    db_session.add(document)
+    await db_session.commit()
+    await db_session.refresh(document)
+    return document
+
+
+def _record_stamps(monkeypatch) -> list[tuple[str, bool]]:
+    """Records each status change as it is stamped: the status, and whether the time was just set."""
+    stamped: list[tuple[str, bool]] = []
+    real_set_status = ingestion_module._set_status
+
+    def spying_set_status(doc, status):
+        real_set_status(doc, status)
+        stamped.append((status, _is_just_now(doc.status_changed_at)))
+
+    monkeypatch.setattr("app.ingestion._set_status", spying_set_status)
+    return stamped
+
+
+async def test_a_document_that_reads_successfully_records_when_it_became_ready(
+    db_session, test_user, monkeypatch
+):
+    document = await _document_long_ago(db_session, test_user)
+    pdf_bytes = _make_pdf_bytes(["Some real page text."])
+    monkeypatch.setattr("app.ingestion.download_file", lambda storage_key: pdf_bytes)
+    monkeypatch.setattr("app.ingestion.embed_texts", lambda texts: [[0.1] * EMBEDDING_DIM for _ in texts])
+    stamped = _record_stamps(monkeypatch)
+
+    await ingest_document(document.id)
+
+    await db_session.refresh(document)
+    assert document.status == "ready"
+    assert _is_just_now(document.status_changed_at)
+    assert stamped[-1] == ("ready", True)
+
+
+async def test_a_document_that_fails_records_when_it_failed(db_session, test_user, monkeypatch):
+    document = await _document_long_ago(db_session, test_user)
+    pdf_bytes = _make_pdf_bytes(["Some real page text."])
+
+    def _raise(texts):
+        raise RuntimeError("embedding api unavailable")
+
+    monkeypatch.setattr("app.ingestion.download_file", lambda storage_key: pdf_bytes)
+    monkeypatch.setattr("app.ingestion.embed_texts", _raise)
+    stamped = _record_stamps(monkeypatch)
+
+    await ingest_document(document.id)
+
+    await db_session.refresh(document)
+    assert document.status == "failed"
+    assert _is_just_now(document.status_changed_at)
+    assert stamped == [("processing", True), ("failed", True)]
+
+
+async def test_a_document_with_no_text_records_when_it_failed(db_session, test_user, monkeypatch):
+    document = await _document_long_ago(db_session, test_user)
+    blank_pdf = pymupdf.open()
+    blank_pdf.new_page()
+    monkeypatch.setattr("app.ingestion.download_file", lambda storage_key: blank_pdf.tobytes())
+    stamped = _record_stamps(monkeypatch)
+
+    await ingest_document(document.id)
+
+    await db_session.refresh(document)
+    assert document.status == "failed"
+    assert _is_just_now(document.status_changed_at)
+    assert stamped == [("processing", True), ("failed", True)]
+
+
+async def test_a_document_is_stamped_when_it_starts_being_read_not_only_when_it_finishes(
+    db_session, test_user, monkeypatch
+):
+    document = await _document_long_ago(db_session, test_user)
+    pdf_bytes = _make_pdf_bytes(["Some real page text."])
+    monkeypatch.setattr("app.ingestion.download_file", lambda storage_key: pdf_bytes)
+    monkeypatch.setattr("app.ingestion.embed_texts", lambda texts: [[0.1] * EMBEDDING_DIM for _ in texts])
+    stamped = _record_stamps(monkeypatch)
+
+    await ingest_document(document.id)
+
+    # A read that waits minutes on the rate limit is "processing" for all that time, and the moment
+    # it started is what a stalled read is measured from.
+    assert stamped == [("processing", True), ("ready", True)]

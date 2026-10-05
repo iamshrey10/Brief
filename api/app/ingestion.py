@@ -3,6 +3,7 @@ import logging
 import re
 import time
 import uuid
+from datetime import datetime, timezone
 
 import pymupdf
 from google import genai
@@ -37,6 +38,13 @@ MAX_RETRY_WAIT_SECONDS = 70.0
 _sleep = time.sleep
 
 _client: genai.Client | None = None
+
+
+def _set_status(document: Document, status: str) -> None:
+    """Changes a document's status and remembers when, so a read that stalls can be told apart
+    from one that is simply long."""
+    document.status = status
+    document.status_changed_at = datetime.now(timezone.utc)
 
 
 def get_genai_client() -> genai.Client:
@@ -123,7 +131,7 @@ async def ingest_document(document_id: uuid.UUID) -> None:
             return
 
         try:
-            document.status = "processing"
+            _set_status(document, "processing")
             await session.commit()
 
             file_bytes = download_file(document.storage_key)
@@ -136,7 +144,7 @@ async def ingest_document(document_id: uuid.UUID) -> None:
                     chunk_records.append((page_number, char_start, char_end, chunk_text))
 
             if not chunk_records:
-                document.status = "failed"
+                _set_status(document, "failed")
                 await session.commit()
                 logger.error("no extractable text found in document %s", document_id)
                 return
@@ -161,14 +169,14 @@ async def ingest_document(document_id: uuid.UUID) -> None:
                 session.add(Embedding(clause_id=clause.id, vector=vector))
 
             if ocr_confidence is not None and ocr_confidence < OCR_CONFIDENCE_THRESHOLD:
-                document.status = "needs_retake"
+                _set_status(document, "needs_retake")
             else:
-                document.status = "ready"
+                _set_status(document, "ready")
             await session.commit()
         except Exception:
             logger.exception("ingestion failed for document %s", document_id)
             await session.rollback()
             document = await session.get(Document, document_id)
             if document is not None:
-                document.status = "failed"
+                _set_status(document, "failed")
                 await session.commit()

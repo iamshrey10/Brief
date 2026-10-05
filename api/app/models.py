@@ -53,6 +53,12 @@ class Document(Base):
     # only set for image-sourced (OCR'd) documents, 0-100, null for born-digital PDFs
     ocr_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # When the status last changed. "Stuck" is measured from here, not from the upload, so a document
+    # that was just retried is not stuck just because it was uploaded long ago. Null on rows that
+    # existed before this column, which fall back to the upload time.
+    status_changed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     user: Mapped["User"] = relationship(back_populates="documents")
     clauses: Mapped[list["Clause"]] = relationship(
