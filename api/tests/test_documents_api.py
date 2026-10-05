@@ -830,3 +830,155 @@ async def test_checklist_returns_502_when_the_model_gives_nothing_usable(
     response = await client.get(f"/documents/{document.id}/checklist")
 
     assert response.status_code == 502
+
+
+# --- POST /documents/{id}/retry ---
+
+
+def _record_ingestion(monkeypatch) -> list:
+    started: list = []
+    monkeypatch.setattr(main_module, "ingest_document", lambda document_id: started.append(document_id))
+    return started
+
+
+async def _document_with(db_session, test_user, status: str, age_minutes: int = 0) -> Document:
+    from datetime import datetime, timedelta, timezone
+
+    document = Document(
+        user_id=test_user.id,
+        filename="doc.pdf",
+        doc_type="lease",
+        status=status,
+        storage_key="fake/doc.pdf",
+        file_size_bytes=1024,
+        created_at=datetime.now(timezone.utc) - timedelta(minutes=age_minutes),
+    )
+    db_session.add(document)
+    await db_session.commit()
+    await db_session.refresh(document)
+    return document
+
+
+async def test_retry_reads_a_failed_document_again(client, db_session, test_user, monkeypatch):
+    started = _record_ingestion(monkeypatch)
+    document = await _document_with(db_session, test_user, "failed")
+
+    response = await client.post(f"/documents/{document.id}/retry")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "uploaded"
+    assert started == [document.id]
+
+
+async def test_retry_reads_a_document_stuck_for_a_long_time_again(
+    client, db_session, test_user, monkeypatch
+):
+    started = _record_ingestion(monkeypatch)
+    document = await _document_with(db_session, test_user, "uploaded", age_minutes=60)
+
+    response = await client.post(f"/documents/{document.id}/retry")
+
+    assert response.status_code == 200
+    assert started == [document.id]
+
+
+async def test_retry_reads_a_long_stuck_processing_document_again(
+    client, db_session, test_user, monkeypatch
+):
+    started = _record_ingestion(monkeypatch)
+    document = await _document_with(db_session, test_user, "processing", age_minutes=60)
+
+    response = await client.post(f"/documents/{document.id}/retry")
+
+    assert response.status_code == 200
+    assert started == [document.id]
+
+
+async def test_retry_refuses_a_document_that_is_still_being_read(
+    client, db_session, test_user, monkeypatch
+):
+    started = _record_ingestion(monkeypatch)
+    document = await _document_with(db_session, test_user, "processing", age_minutes=2)
+
+    response = await client.post(f"/documents/{document.id}/retry")
+
+    assert response.status_code == 409
+    assert started == []
+
+
+async def test_retry_refuses_a_document_that_is_already_ready(
+    client, db_session, test_user, monkeypatch
+):
+    started = _record_ingestion(monkeypatch)
+    document = await _document_with(db_session, test_user, "ready", age_minutes=600)
+
+    response = await client.post(f"/documents/{document.id}/retry")
+
+    assert response.status_code == 409
+    assert started == []
+
+
+async def test_retry_refuses_a_hard_to_read_scan_that_did_read(
+    client, db_session, test_user, monkeypatch
+):
+    started = _record_ingestion(monkeypatch)
+    document = await _document_with(db_session, test_user, "needs_retake", age_minutes=600)
+
+    response = await client.post(f"/documents/{document.id}/retry")
+
+    assert response.status_code == 409
+    assert started == []
+
+
+async def test_retry_clears_anything_left_over_so_the_read_starts_clean(
+    client, db_session, test_user, monkeypatch
+):
+    _record_ingestion(monkeypatch)
+    document = await _document_with(db_session, test_user, "failed")
+    db_session.add(
+        Clause(
+            document_id=document.id,
+            clause_index=0,
+            page_number=1,
+            char_start=0,
+            char_end=5,
+            text="stale",
+        )
+    )
+    await db_session.commit()
+
+    await client.post(f"/documents/{document.id}/retry")
+
+    from sqlalchemy import select
+
+    remaining = (await db_session.execute(select(Clause).where(Clause.document_id == document.id))).all()
+    assert remaining == []
+
+
+async def test_retry_rejects_another_users_document(client, db_session, monkeypatch):
+    started = _record_ingestion(monkeypatch)
+    other_user = User(email=f"{uuid.uuid4()}@example.com")
+    db_session.add(other_user)
+    await db_session.flush()
+    document = Document(
+        user_id=other_user.id,
+        filename="theirs.pdf",
+        doc_type="lease",
+        status="failed",
+        storage_key="fake/theirs.pdf",
+        file_size_bytes=1024,
+    )
+    db_session.add(document)
+    await db_session.commit()
+    await db_session.refresh(document)
+
+    response = await client.post(f"/documents/{document.id}/retry")
+
+    assert response.status_code == 404
+    assert started == []
+
+
+async def test_retry_returns_404_for_a_malformed_id(client):
+    response = await client.post("/documents/not-a-uuid/retry")
+
+    assert response.status_code == 404

@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException
 from google.genai import errors as genai_errors
@@ -23,6 +23,11 @@ from app.storage import (
 )
 
 SEARCHABLE_STATUSES = {"ready", "needs_retake"}
+
+# A document still being read this long after it was uploaded is stuck. Reading a long one can
+# legitimately take several minutes while it waits out the embedding rate limit, so this leaves
+# plenty of room before anyone can start a second read.
+STUCK_AFTER = timedelta(minutes=15)
 
 app = FastAPI(title="Brief API")
 
@@ -142,6 +147,37 @@ async def confirm_upload(
 
     background_tasks.add_task(ingest_document, document.id)
 
+    return DocumentSummary.from_document(document)
+
+
+@app.post("/documents/{document_id}/retry")
+async def retry_document(
+    document_id: str,
+    background_tasks: BackgroundTasks,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> DocumentSummary:
+    """Reads a document again. Allowed only for one that failed, or one that has been stuck
+    being read for a long time, so a read that is genuinely under way is never started twice."""
+    document = await _get_owned_document(document_id, user, session)
+
+    stuck = (
+        document.status in {"pending", "uploaded", "processing"}
+        and datetime.now(timezone.utc) - document.created_at > STUCK_AFTER
+    )
+    if document.status != "failed" and not stuck:
+        raise HTTPException(status_code=409, detail="this document does not need another try")
+
+    # A failed read saves nothing, but clear any leftovers so a retry always starts clean.
+    leftovers = await session.execute(select(Clause).where(Clause.document_id == document.id))
+    for clause in leftovers.scalars().all():
+        await session.delete(clause)
+
+    document.status = "uploaded"
+    await session.commit()
+    await session.refresh(document)
+
+    background_tasks.add_task(ingest_document, document.id)
     return DocumentSummary.from_document(document)
 
 
