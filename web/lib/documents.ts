@@ -136,3 +136,19 @@ export function formatFileSize(bytes: number): string {
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
+
+/** Puts a document first, replacing any earlier version of it already in the list. */
+export function putFirst(list: DocumentSummary[], document: DocumentSummary): DocumentSummary[] {
+  return [document, ...list.filter((existing) => existing.id !== document.id)];
+}
+
+/**
+ * Combines the page's own list with a fresh one from the server. The server is right about every
+ * document it returns, but a refresh that started before an upload can come back without the new
+ * document, so anything only the page knows about stays in front instead of vanishing until the
+ * next refresh. Each document appears once.
+ */
+export function mergeFresh(local: DocumentSummary[], fresh: DocumentSummary[]): DocumentSummary[] {
+  const known = new Set(fresh.map((document) => document.id));
+  return [...local.filter((document) => !known.has(document.id)), ...fresh];
+}

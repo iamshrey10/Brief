@@ -6,6 +6,8 @@ import {
   groupByPage,
   isInProgress,
   isReadable,
+  mergeFresh,
+  putFirst,
   statusLabel,
   type ClauseData,
 } from "./documents";
@@ -185,5 +187,62 @@ describe("formatFileSize", () => {
     [50 * 1024 * 1024, "50.0 MB"],
   ])("shows %d bytes as %s", (bytes, expected) => {
     expect(formatFileSize(bytes)).toBe(expected);
+  });
+});
+
+
+describe("putFirst and mergeFresh", () => {
+  const doc = (id: string, status = "ready") => ({
+    id,
+    filename: `${id}.pdf`,
+    doc_type: "loan",
+    status,
+    ocr_confidence: null,
+  });
+
+  it("puts a document first", () => {
+    expect(putFirst([doc("a"), doc("b")], doc("c")).map((d) => d.id)).toEqual(["c", "a", "b"]);
+  });
+
+  it("replaces an earlier version of the same document instead of repeating it", () => {
+    const result = putFirst([doc("a"), doc("b", "pending")], doc("b", "uploaded"));
+
+    expect(result.map((d) => d.id)).toEqual(["b", "a"]);
+    expect(result[0].status).toBe("uploaded");
+  });
+
+  it("takes the server's version of every document it returns", () => {
+    const result = mergeFresh([doc("a", "processing")], [doc("a", "ready")]);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].status).toBe("ready");
+  });
+
+  it("keeps a document only the page knows about, in front of the server's list", () => {
+    const result = mergeFresh([doc("new", "uploaded"), doc("a")], [doc("a"), doc("b")]);
+
+    expect(result.map((d) => d.id)).toEqual(["new", "a", "b"]);
+  });
+
+  it("lists each document once however the two lists overlap", () => {
+    const ids = mergeFresh([doc("a"), doc("b"), doc("c")], [doc("b"), doc("c"), doc("d")]).map((d) => d.id);
+
+    expect(ids).toEqual(["a", "b", "c", "d"]);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("follows the server's order for what it returns", () => {
+    expect(mergeFresh([], [doc("z"), doc("y"), doc("x")]).map((d) => d.id)).toEqual(["z", "y", "x"]);
+  });
+
+  it("does not change the lists it was given", () => {
+    const local = [doc("a")];
+    const fresh = [doc("b")];
+
+    mergeFresh(local, fresh);
+    putFirst(local, doc("c"));
+
+    expect(local.map((d) => d.id)).toEqual(["a"]);
+    expect(fresh.map((d) => d.id)).toEqual(["b"]);
   });
 });

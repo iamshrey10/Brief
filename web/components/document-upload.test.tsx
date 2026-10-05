@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 import { MAX_POLL_DURATION_MS, POLL_INTERVAL_MS, type DocumentSummary } from "@/lib/documents";
 import { DocumentUpload } from "./document-upload";
@@ -394,5 +394,86 @@ describe("DocumentUpload form", () => {
     expect(screen.getByRole("button", { name: "Uploading..." })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Remove busy.pdf" })).toBeDisabled();
     expect(screen.getByRole("radio", { name: "Lease" })).toBeDisabled();
+  });
+
+  it("does not list a document twice when a refresh picks it up while it is still uploading", async () => {
+    // The refresh runs because another document is still processing. The new document already
+    // exists on the server before its upload finishes, so the refresh can include it, and the
+    // upload then reports it again.
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    let finishConfirm: (response: Response) => void = () => {};
+    fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+      const method = init?.method ?? "GET";
+      if (url === "/api/backend/documents" && method === "POST") {
+        return ok({ document_id: "d9", upload_url: "https://storage.example/upload" });
+      }
+      if (url === "https://storage.example/upload") return { ok: true } as Response;
+      if (url.endsWith("/confirm")) {
+        return new Promise<Response>((resolve) => {
+          finishConfirm = resolve;
+        });
+      }
+      if (url === "/api/backend/documents" && method === "GET") {
+        return ok([doc("pending", "d9", "new.pdf"), doc("processing", "d1", "old.pdf")]);
+      }
+      throw new Error(`unexpected request: ${method} ${url}`);
+    });
+    render(<DocumentUpload initialDocuments={[doc("processing", "d1", "old.pdf")]} />);
+
+    chooseFile(pdf("new.pdf"));
+    fireEvent.click(screen.getByRole("button", { name: "Upload" }));
+    await tick(0); // the upload is now waiting to be confirmed
+    await tick(POLL_INTERVAL_MS); // a refresh runs and already sees the new document
+    // Counted inside the list only, the upload card above it also shows the file's name.
+    const listed = () =>
+      within(screen.getByRole("region", { name: "Your documents" })).getAllByText("new.pdf");
+    expect(listed()).toHaveLength(1);
+
+    await act(async () => {
+      finishConfirm(ok(doc("uploaded", "d9", "new.pdf")));
+    });
+    await tick(0);
+
+    expect(listed()).toHaveLength(1);
+    const duplicateKeyWarnings = errorSpy.mock.calls.filter((call) =>
+      String(call[0]).includes("two children with the same key"),
+    );
+    expect(duplicateKeyWarnings).toHaveLength(0);
+    errorSpy.mockRestore();
+  });
+
+  it("keeps a just-uploaded document on screen when a refresh that started earlier does not include it", async () => {
+    // A refresh that was already in flight before the upload began can come back without the new
+    // document. It must not make the document vanish until the next refresh.
+    let releaseRefresh: (response: Response) => void = () => {};
+    fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+      const method = init?.method ?? "GET";
+      if (url === "/api/backend/documents" && method === "POST") {
+        return ok({ document_id: "d9", upload_url: "https://storage.example/upload" });
+      }
+      if (url === "https://storage.example/upload") return { ok: true } as Response;
+      if (url.endsWith("/confirm")) return ok(doc("uploaded", "d9", "new.pdf"));
+      if (url === "/api/backend/documents" && method === "GET") {
+        return new Promise<Response>((resolve) => {
+          releaseRefresh = resolve;
+        });
+      }
+      throw new Error(`unexpected request: ${method} ${url}`);
+    });
+    render(<DocumentUpload initialDocuments={[doc("processing", "d1", "old.pdf")]} />);
+
+    await tick(POLL_INTERVAL_MS); // a refresh starts and is left waiting
+    chooseFile(pdf("new.pdf"));
+    fireEvent.click(screen.getByRole("button", { name: "Upload" }));
+    await tick(0);
+    expect(screen.getByText("new.pdf")).toBeInTheDocument();
+
+    await act(async () => {
+      releaseRefresh(ok([doc("processing", "d1", "old.pdf")])); // an older snapshot, no new.pdf
+    });
+    await tick(0);
+
+    expect(screen.getByText("new.pdf")).toBeInTheDocument();
+    expect(screen.getByText("old.pdf")).toBeInTheDocument();
   });
 });

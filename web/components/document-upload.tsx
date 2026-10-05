@@ -13,7 +13,9 @@ import {
   isInProgress,
   MAX_FILE_SIZE_BYTES,
   MAX_POLL_DURATION_MS,
+  mergeFresh,
   POLL_INTERVAL_MS,
+  putFirst,
   type DocumentSummary,
 } from "@/lib/documents";
 import { cn } from "@/lib/utils";
@@ -47,7 +49,10 @@ export function DocumentUpload({ initialDocuments }: { initialDocuments: Documen
       }
       try {
         const res = await fetch("/api/backend/documents");
-        if (res.ok) setDocuments(await res.json());
+        if (res.ok) {
+          const fresh: DocumentSummary[] = await res.json();
+          setDocuments((previous) => mergeFresh(previous, fresh));
+        }
       } catch {
         // Network blip, the next tick tries again.
       }
@@ -123,7 +128,7 @@ export function DocumentUpload({ initialDocuments }: { initialDocuments: Documen
       if (!confirmRes.ok) throw new Error("could not confirm the upload");
       const confirmed: DocumentSummary = await confirmRes.json();
 
-      setDocuments((prev) => [confirmed, ...prev]);
+      setDocuments((previous) => putFirst(previous, confirmed));
       setFile(null);
       setStatus("idle");
     } catch (err) {
