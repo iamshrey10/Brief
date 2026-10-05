@@ -1,19 +1,24 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, type DragEvent, type FormEvent } from "react";
+import { CloudUpload, FileText } from "lucide-react";
+import { DocTypeIcon } from "@/components/doc-type-icon";
 import { DocumentList } from "@/components/document-list";
 import { Button } from "@/components/ui/button";
 import {
+  ACCEPTED_FILE_TYPES,
+  contentTypeFor,
   DOC_TYPE_LABELS,
+  formatFileSize,
   isInProgress,
+  MAX_FILE_SIZE_BYTES,
   MAX_POLL_DURATION_MS,
   POLL_INTERVAL_MS,
   type DocumentSummary,
 } from "@/lib/documents";
+import { cn } from "@/lib/utils";
 
 const DOC_TYPES = Object.entries(DOC_TYPE_LABELS).map(([value, label]) => ({ value, label }));
-
-const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024;
 
 type Status = "idle" | "uploading" | "error";
 
@@ -23,6 +28,7 @@ export function DocumentUpload({ initialDocuments }: { initialDocuments: Documen
   const [status, setStatus] = useState<Status>("idle");
   const [errorMessage, setErrorMessage] = useState("");
   const [documents, setDocuments] = useState(initialDocuments);
+  const [dragging, setDragging] = useState(false);
 
   const hasInProgress = documents.some((doc) => isInProgress(doc.status));
 
@@ -50,15 +56,42 @@ export function DocumentUpload({ initialDocuments }: { initialDocuments: Documen
     return () => clearInterval(timer);
   }, [hasInProgress, documents.length]);
 
-  async function handleSubmit(event: FormEvent) {
-    event.preventDefault();
-    if (!file) return;
+  // Checked as soon as a file is chosen or dropped, so a wrong file is turned away on the spot
+  // rather than after a click on Upload. The file picker's own filter does not apply to a drop.
+  function chooseFile(candidate: File | null | undefined) {
+    if (!candidate) return;
 
-    if (file.size > MAX_FILE_SIZE_BYTES) {
+    if (contentTypeFor(candidate) === null) {
       setStatus("error");
-      setErrorMessage("That file is larger than the 50MB limit.");
+      setErrorMessage("That kind of file isn't supported. Use a PDF, JPG, PNG, or HEIC.");
       return;
     }
+    if (candidate.size > MAX_FILE_SIZE_BYTES) {
+      setStatus("error");
+      setErrorMessage("That file is larger than the 50 MB limit.");
+      return;
+    }
+
+    setFile(candidate);
+    setStatus("idle");
+    setErrorMessage("");
+  }
+
+  function handleDragOver(event: DragEvent) {
+    event.preventDefault();
+    setDragging(true);
+  }
+
+  function handleDrop(event: DragEvent) {
+    event.preventDefault();
+    setDragging(false);
+    chooseFile(event.dataTransfer.files?.[0]);
+  }
+
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+    const contentType = file ? contentTypeFor(file) : null;
+    if (!file || !contentType) return;
 
     setStatus("uploading");
     setErrorMessage("");
@@ -70,7 +103,7 @@ export function DocumentUpload({ initialDocuments }: { initialDocuments: Documen
         body: JSON.stringify({
           filename: file.name,
           doc_type: docType,
-          content_type: file.type || "application/pdf",
+          content_type: contentType,
           file_size_bytes: file.size,
         }),
       });
@@ -79,7 +112,7 @@ export function DocumentUpload({ initialDocuments }: { initialDocuments: Documen
 
       const uploadRes = await fetch(upload_url, {
         method: "PUT",
-        headers: { "Content-Type": file.type || "application/pdf" },
+        headers: { "Content-Type": contentType },
         body: file,
       });
       if (!uploadRes.ok) throw new Error("the file upload failed");
@@ -99,39 +132,95 @@ export function DocumentUpload({ initialDocuments }: { initialDocuments: Documen
     }
   }
 
+  const uploading = status === "uploading";
+
   return (
-    <div className="flex w-full max-w-md flex-col gap-6">
-      <form onSubmit={handleSubmit} className="flex flex-col gap-3 rounded-lg border border-border bg-card p-5">
-        <label className="text-sm font-medium text-foreground">
-          Document
-          <input
-            type="file"
-            accept="application/pdf,image/jpeg,image/png,image/heic"
-            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-            className="mt-1 block w-full text-sm text-muted-foreground file:mr-3 file:rounded-md file:border-0 file:bg-secondary file:px-3 file:py-1.5 file:text-sm"
-          />
-        </label>
-
-        <label className="text-sm font-medium text-foreground">
-          Type
-          <select
-            value={docType}
-            onChange={(e) => setDocType(e.target.value)}
-            className="mt-1 block w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+    <div className="flex w-full flex-col gap-8">
+      <form
+        onSubmit={handleSubmit}
+        className="flex flex-col gap-5 rounded-xl border border-border bg-card p-5"
+      >
+        {file ? (
+          <div className="flex items-center gap-3 rounded-lg border border-border bg-background px-4 py-3">
+            <span
+              aria-hidden
+              className="flex size-9 shrink-0 items-center justify-center rounded-md bg-secondary text-secondary-foreground"
+            >
+              <FileText className="size-4.5" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-medium text-foreground">{file.name}</span>
+              <span className="block text-xs text-muted-foreground">{formatFileSize(file.size)}</span>
+            </span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={uploading}
+              aria-label={`Remove ${file.name}`}
+              onClick={() => setFile(null)}
+            >
+              Remove
+            </Button>
+          </div>
+        ) : (
+          <label
+            onDragOver={handleDragOver}
+            onDragLeave={() => setDragging(false)}
+            onDrop={handleDrop}
+            className={cn(
+              "flex cursor-pointer flex-col items-center gap-2 rounded-lg border-2 border-dashed px-6 py-10 text-center transition-colors focus-within:ring-3 focus-within:ring-ring/50",
+              dragging ? "border-primary bg-primary/5" : "border-border hover:bg-accent/50",
+            )}
           >
-            {DOC_TYPES.map((t) => (
-              <option key={t.value} value={t.value}>
-                {t.label}
-              </option>
+            <CloudUpload aria-hidden className="size-8 text-muted-foreground" />
+            <span className="text-sm font-medium text-foreground">
+              Drop a contract here, or <span className="text-primary underline">choose a file</span>
+            </span>
+            <span className="text-xs text-muted-foreground">PDF, JPG, PNG, or HEIC, up to 50 MB</span>
+            <input
+              type="file"
+              accept={ACCEPTED_FILE_TYPES.join(",")}
+              aria-label="Choose a file to upload"
+              onChange={(event) => chooseFile(event.target.files?.[0])}
+              className="sr-only"
+            />
+          </label>
+        )}
+
+        <fieldset disabled={uploading} className="flex flex-col gap-2">
+          <legend className="mb-2 text-sm font-medium text-foreground">
+            What kind of document is it?
+          </legend>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {DOC_TYPES.map((type) => (
+              <label key={type.value} className="relative cursor-pointer">
+                <input
+                  type="radio"
+                  name="doc-type"
+                  value={type.value}
+                  checked={docType === type.value}
+                  onChange={() => setDocType(type.value)}
+                  className="peer sr-only"
+                />
+                <span className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm text-muted-foreground transition-colors peer-checked:border-primary peer-checked:bg-primary/5 peer-checked:text-foreground peer-focus-visible:ring-3 peer-focus-visible:ring-ring/50 peer-disabled:opacity-50 hover:bg-accent">
+                  <DocTypeIcon type={type.value} className="size-4 shrink-0" />
+                  {type.label}
+                </span>
+              </label>
             ))}
-          </select>
-        </label>
+          </div>
+        </fieldset>
 
-        <Button type="submit" disabled={!file || status === "uploading"}>
-          {status === "uploading" ? "Uploading..." : "Upload"}
+        {status === "error" && (
+          <p role="alert" className="text-sm text-destructive">
+            {errorMessage}
+          </p>
+        )}
+
+        <Button type="submit" size="lg" disabled={!file || uploading}>
+          {uploading ? "Uploading..." : "Upload"}
         </Button>
-
-        {status === "error" && <p className="text-sm text-destructive">{errorMessage}</p>}
       </form>
 
       <DocumentList documents={documents} />
