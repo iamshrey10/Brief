@@ -1,7 +1,9 @@
 import uuid
 
 import pytest
+from sqlalchemy import select
 
+from app import checklist as checklist_module
 from app import document_text
 from app.checklist import (
     CHECKLIST_MODEL,
@@ -13,10 +15,13 @@ from app.checklist import (
     answer_checklist,
     build_prompt,
     generate_checklist,
+    get_checklist,
+    load_checklist,
+    save_checklist,
     verify_answers,
 )
 from app.checklist_questions import ChecklistQuestion
-from app.models import Clause, Document
+from app.models import ChecklistAnswerRow, Clause, Document
 
 QUESTIONS = (
     ChecklistQuestion(
@@ -347,3 +352,142 @@ async def test_a_document_too_long_to_send_is_cut_and_flagged(db_session, test_u
 
     assert [label for label, _ in seen[0][1]] == ["C1"]
     assert result.truncated is True
+
+
+# --- saving and loading: answer once, then reuse ---
+
+
+def _prepay_response(clauses) -> ChecklistResponse:
+    return ChecklistResponse(
+        answers=[_entry("prepayment", "Yes, free.", [("C1", "at any time without penalty")])]
+    )
+
+
+async def _saved_rows(db_session, document) -> list[ChecklistAnswerRow]:
+    result = await db_session.execute(
+        select(ChecklistAnswerRow).where(ChecklistAnswerRow.document_id == document.id)
+    )
+    return list(result.scalars())
+
+
+async def test_nothing_is_loaded_before_the_checklist_has_run(db_session, test_user):
+    document = await _document(db_session, test_user, [PREPAY_TEXT])
+
+    assert await load_checklist(db_session, document.id, "loan") is None
+
+
+async def test_saved_answers_load_back_with_their_evidence_and_page(
+    db_session, test_user, monkeypatch
+):
+    document = await _document(db_session, test_user, [PREPAY_TEXT, LATE_TEXT])
+    _fake_model(monkeypatch, _prepay_response)
+    answered = await answer_checklist(db_session, document.id, "loan")
+
+    await save_checklist(db_session, document.id, answered)
+    loaded = await load_checklist(db_session, document.id, "loan")
+
+    assert loaded == answered
+    prepay = next(a for a in loaded.answers if a.id == "prepayment")
+    assert prepay.status == "answered"
+    assert [(e.page_number, e.quote) for e in prepay.evidence] == [
+        (1, "at any time without penalty")
+    ]
+
+
+async def test_every_question_is_saved_including_the_ones_not_answered(
+    db_session, test_user, monkeypatch
+):
+    document = await _document(db_session, test_user, [PREPAY_TEXT])
+    _fake_model(monkeypatch, _prepay_response)
+    await save_checklist(
+        db_session, document.id, await answer_checklist(db_session, document.id, "loan")
+    )
+
+    rows = await _saved_rows(db_session, document)
+
+    assert len(rows) == 10
+    assert sum(1 for r in rows if r.answer is not None) == 1
+    assert all(r.evidence == [] for r in rows if r.answer is None)
+
+
+async def test_loading_is_treated_as_missing_if_a_question_was_never_saved(
+    db_session, test_user, monkeypatch
+):
+    document = await _document(db_session, test_user, [PREPAY_TEXT])
+    _fake_model(monkeypatch, _prepay_response)
+    await save_checklist(
+        db_session, document.id, await answer_checklist(db_session, document.id, "loan")
+    )
+    for row in await _saved_rows(db_session, document):
+        if row.question_id == "total_cost":
+            await db_session.delete(row)
+    await db_session.commit()
+
+    assert await load_checklist(db_session, document.id, "loan") is None
+
+
+async def test_saving_twice_updates_in_place_instead_of_failing_or_duplicating(
+    db_session, test_user, monkeypatch
+):
+    document = await _document(db_session, test_user, [PREPAY_TEXT])
+    _fake_model(monkeypatch, lambda clauses: ChecklistResponse(answers=[]))
+    await save_checklist(
+        db_session, document.id, await answer_checklist(db_session, document.id, "loan")
+    )
+    _fake_model(monkeypatch, _prepay_response)
+
+    await save_checklist(
+        db_session, document.id, await answer_checklist(db_session, document.id, "loan")
+    )
+
+    rows = await _saved_rows(db_session, document)
+    assert len(rows) == 10
+    assert next(r for r in rows if r.question_id == "prepayment").answer == "Yes, free."
+
+
+async def test_the_model_is_called_once_then_the_saved_copy_is_reused(
+    db_session, test_user, monkeypatch
+):
+    document = await _document(db_session, test_user, [PREPAY_TEXT])
+    seen = _fake_model(monkeypatch, _prepay_response)
+
+    first = await get_checklist(db_session, document.id, "loan")
+    second = await get_checklist(db_session, document.id, "loan")
+
+    assert len(seen) == 1
+    assert second == first
+
+
+async def test_a_cut_off_document_is_returned_but_not_saved(db_session, test_user, monkeypatch):
+    monkeypatch.setattr(document_text, "MAX_PROMPT_CHARS", len(PREPAY_TEXT) + 5)
+    document = await _document(db_session, test_user, [PREPAY_TEXT, LATE_TEXT])
+    seen = _fake_model(monkeypatch, _prepay_response)
+
+    first = await get_checklist(db_session, document.id, "loan")
+    await get_checklist(db_session, document.id, "loan")
+
+    assert first.truncated is True
+    assert await _saved_rows(db_session, document) == []
+    assert len(seen) == 2  # not cached, so it asks again
+
+
+async def test_improved_ask_them_wording_reaches_a_document_that_was_already_checked(
+    db_session, test_user, monkeypatch
+):
+    document = await _document(db_session, test_user, [PREPAY_TEXT])
+    _fake_model(monkeypatch, _prepay_response)
+    await get_checklist(db_session, document.id, "loan")
+
+    real_questions = checklist_module.questions_for
+
+    def reworded(doc_type):
+        return tuple(
+            ChecklistQuestion(q.id, q.question, q.why_it_matters, "NEW WORDING", q.importance)
+            for q in real_questions(doc_type)
+        )
+
+    monkeypatch.setattr(checklist_module, "questions_for", reworded)
+    loaded = await load_checklist(db_session, document.id, "loan")
+
+    unanswered = next(a for a in loaded.answers if a.status == "not_mentioned")
+    assert unanswered.ask_them == "NEW WORDING"

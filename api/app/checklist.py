@@ -4,13 +4,15 @@ from typing import Literal
 
 from google.genai import types
 from pydantic import BaseModel
+from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.checklist_questions import ChecklistQuestion, questions_for
 from app.document_text import load_prompt_clauses
 from app.grounding import numbers_supported, quote_appears_in
 from app.ingestion import get_genai_client
-from app.models import Clause
+from app.models import ChecklistAnswerRow, Clause
 from app.qa import ANSWER_MODEL
 
 # Same pinned model as question answering and key terms, so one set of evaluations covers all
@@ -194,3 +196,79 @@ async def answer_checklist(
     return ChecklistResult(
         answers=verify_answers(questions, generated, loaded.by_label), truncated=loaded.truncated
     )
+
+
+async def load_checklist(
+    session: AsyncSession, document_id: uuid.UUID, doc_type: str
+) -> ChecklistResult | None:
+    """The saved checklist for this document, or None if it hasn't been answered for every
+    current question yet (including when the question list has grown since it last ran).
+
+    Importance, the gap flag, and the wording for asking the other side come from the current
+    question list, not from what was saved, so improved wording reaches documents already
+    checked."""
+    questions = questions_for(doc_type)
+    result = await session.execute(
+        select(ChecklistAnswerRow).where(ChecklistAnswerRow.document_id == document_id)
+    )
+    saved = {row.question_id: row for row in result.scalars()}
+    if not all(question.id in saved for question in questions):
+        return None
+
+    answers: list[ChecklistAnswer] = []
+    for question in questions:
+        row = saved[question.id]
+        if row.answer is None:
+            answers.append(_not_mentioned(question))
+        else:
+            answers.append(
+                ChecklistAnswer(
+                    id=question.id,
+                    question=question.question,
+                    why_it_matters=question.why_it_matters,
+                    importance=question.importance,
+                    status="answered",
+                    answer=row.answer,
+                    evidence=[EvidenceOut(**item) for item in row.evidence],
+                )
+            )
+    return ChecklistResult(answers=answers)
+
+
+async def save_checklist(
+    session: AsyncSession, document_id: uuid.UUID, result: ChecklistResult
+) -> None:
+    """Saves one row per question, answered or not, so the rows existing at all means the
+    checklist already ran. An upsert, so two requests racing to save can't collide."""
+    for item in result.answers:
+        values = {
+            "document_id": document_id,
+            "question_id": item.id,
+            "answer": item.answer,
+            "evidence": [evidence.model_dump() for evidence in item.evidence],
+        }
+        await session.execute(
+            insert(ChecklistAnswerRow)
+            .values(**values)
+            .on_conflict_do_update(
+                constraint="uq_checklist_answers_question",
+                set_={"answer": values["answer"], "evidence": values["evidence"]},
+            )
+        )
+    await session.commit()
+
+
+async def get_checklist(
+    session: AsyncSession, document_id: uuid.UUID, doc_type: str
+) -> ChecklistResult:
+    """The checklist for a document: from the saved copy if there is one, otherwise answered
+    now (one model call) and saved. A document too long to read in full is returned but not
+    saved, so the cut-off result is never mistaken for a complete one."""
+    saved = await load_checklist(session, document_id, doc_type)
+    if saved is not None:
+        return saved
+
+    answered = await answer_checklist(session, document_id, doc_type)
+    if not answered.truncated:
+        await save_checklist(session, document_id, answered)
+    return answered
