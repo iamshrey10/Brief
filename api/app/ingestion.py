@@ -15,6 +15,7 @@ from app.config import settings
 from app.db import async_session
 from app.image_processing import OCR_CONFIDENCE_THRESHOLD, ocr_image
 from app.models import EMBEDDING_DIM, Clause, Document, Embedding
+from app.pdf_text import page_text
 from app.storage import download_file
 
 logger = logging.getLogger(__name__)
@@ -63,7 +64,7 @@ def extract_pages(file_bytes: bytes, content_type: str) -> tuple[list[str], floa
 
     doc = pymupdf.open(stream=file_bytes, filetype="pdf")
     try:
-        return [page.get_text() for page in doc], None
+        return [page_text(page) for page in doc], None
     finally:
         doc.close()
 
