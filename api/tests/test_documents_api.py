@@ -5,6 +5,7 @@ from httpx import ASGITransport, AsyncClient
 
 import app.main as main_module
 from app.auth import get_current_user
+from app.checklist import ChecklistEntry, ChecklistGenerationError, ChecklistResponse, Evidence
 from app.key_terms import ExtractedField, ExtractionResponse, KeyTermsGenerationError
 from app.main import app
 from app.models import EMBEDDING_DIM, Clause, Document, Embedding, User
@@ -661,5 +662,124 @@ async def test_key_terms_returns_502_when_the_model_gives_nothing_usable(
     await db_session.commit()
 
     response = await client.get(f"/documents/{document.id}/key-terms")
+
+    assert response.status_code == 502
+
+
+# --- GET /documents/{id}/checklist ---
+
+DEPOSIT_TEXT = "The security deposit is $500.00, refundable within 30 days after move-out."
+
+
+def _fake_checklist_model(monkeypatch, calls: list):
+    def fake_generate(questions, clauses):
+        calls.append(clauses)
+        return ChecklistResponse(
+            answers=[
+                ChecklistEntry(
+                    id="security_deposit",
+                    found=True,
+                    answer="$500.00, returned within 30 days of move-out.",
+                    evidence=[
+                        Evidence(
+                            clause_ref="C1",
+                            quote="The security deposit is $500.00, refundable within 30 days",
+                        )
+                    ],
+                )
+            ]
+        )
+
+    monkeypatch.setattr("app.checklist.generate_checklist", fake_generate)
+
+
+async def test_checklist_returns_answers_gaps_and_how_to_ask_and_reuses_them(
+    client, db_session, test_user, monkeypatch
+):
+    document = await _ready_document(db_session, test_user)
+    clause = await _add_clause(db_session, document, 0, 2, DEPOSIT_TEXT)
+    await db_session.commit()
+    calls: list = []
+    _fake_checklist_model(monkeypatch, calls)
+
+    first = await client.get(f"/documents/{document.id}/checklist")
+    second = await client.get(f"/documents/{document.id}/checklist")
+
+    assert first.status_code == 200
+    body = first.json()
+    assert body["truncated"] is False
+    assert len(body["answers"]) == 10  # the lease checklist
+    deposit = next(a for a in body["answers"] if a["id"] == "security_deposit")
+    assert deposit["status"] == "answered"
+    assert deposit["answer"] == "$500.00, returned within 30 days of move-out."
+    assert deposit["evidence"] == [
+        {
+            "clause_id": str(clause.id),
+            "page_number": 2,
+            "quote": "The security deposit is $500.00, refundable within 30 days",
+        }
+    ]
+    assert deposit["gap"] is False and deposit["ask_them"] is None
+    renewal = next(a for a in body["answers"] if a["id"] == "auto_renewal")
+    assert renewal["status"] == "not_mentioned"
+    assert renewal["gap"] is True and renewal["ask_them"]
+    assert second.json() == body
+    assert len(calls) == 1  # the second request used the saved copy
+
+
+async def test_checklist_rejects_a_document_that_is_not_ready(client, db_session, test_user):
+    document = await _ready_document(db_session, test_user)
+    # It has text, so only its status can be the reason it is refused.
+    await _add_clause(db_session, document, 0, 1, DEPOSIT_TEXT)
+    document.status = "processing"
+    await db_session.commit()
+
+    response = await client.get(f"/documents/{document.id}/checklist")
+
+    assert response.status_code == 409
+
+
+async def test_checklist_rejects_a_document_with_no_text(client, db_session, test_user):
+    document = await _ready_document(db_session, test_user)
+
+    response = await client.get(f"/documents/{document.id}/checklist")
+
+    assert response.status_code == 409
+
+
+async def test_checklist_rejects_another_users_document(client, db_session):
+    other_user = User(email=f"{uuid.uuid4()}@example.com")
+    db_session.add(other_user)
+    await db_session.flush()
+    document = Document(
+        user_id=other_user.id,
+        filename="lease.pdf",
+        doc_type="lease",
+        status="ready",
+        storage_key="fake/key.pdf",
+        file_size_bytes=1024,
+    )
+    db_session.add(document)
+    await db_session.flush()
+    await _add_clause(db_session, document, 0, 1, DEPOSIT_TEXT)
+    await db_session.commit()
+
+    response = await client.get(f"/documents/{document.id}/checklist")
+
+    assert response.status_code == 404
+
+
+async def test_checklist_returns_502_when_the_model_gives_nothing_usable(
+    client, db_session, test_user, monkeypatch
+):
+    async def failing(session, document_id, doc_type):
+        raise ChecklistGenerationError("model did not return a valid structured result")
+
+    monkeypatch.setattr(main_module, "get_checklist", failing)
+    document = await _ready_document(db_session, test_user)
+    await _add_clause(db_session, document, 0, 1, DEPOSIT_TEXT)
+    await db_session.commit()
+
+    response = await client.get(f"/documents/{document.id}/checklist")
 
     assert response.status_code == 502

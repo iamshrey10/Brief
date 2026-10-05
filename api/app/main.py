@@ -7,6 +7,7 @@ from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import get_current_user
+from app.checklist import ChecklistGenerationError, ChecklistResult, get_checklist
 from app.db import get_session
 from app.ingestion import ingest_document
 from app.key_terms import KeyTermsGenerationError, KeyTermsResult, get_key_terms
@@ -276,15 +277,11 @@ async def list_clauses(
     ]
 
 
-@app.get("/documents/{document_id}/key-terms")
-async def document_key_terms(
-    document_id: str,
-    user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
-) -> KeyTermsResult:
-    """The key facts for this document, each backed by a verified quote. The first request
-    reads the document once and saves the result, so later requests are free. Safe to call
-    again, which is why this is a GET even though the first call does the work."""
+async def _get_readable_document(
+    document_id: str, user: User, session: AsyncSession
+) -> Document:
+    """The user's own document, if it is ready and has text to read. Shared by every endpoint
+    that reads the whole document: 404 for someone else's, 409 when it can't be read yet."""
     document = await _get_owned_document(document_id, user, session)
 
     if document.status not in SEARCHABLE_STATUSES:
@@ -296,9 +293,43 @@ async def document_key_terms(
     if not clause_count:
         raise HTTPException(status_code=409, detail="document has no readable text")
 
+    return document
+
+
+@app.get("/documents/{document_id}/key-terms")
+async def document_key_terms(
+    document_id: str,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> KeyTermsResult:
+    """The key facts for this document, each backed by a verified quote. The first request
+    reads the document once and saves the result, so later requests are free. Safe to call
+    again, which is why this is a GET even though the first call does the work."""
+    document = await _get_readable_document(document_id, user, session)
+
     try:
         return await get_key_terms(session, document.id, document.doc_type)
     except (KeyTermsGenerationError, genai_errors.APIError) as exc:
+        raise HTTPException(
+            status_code=502, detail="the reading service is unavailable, try again"
+        ) from exc
+
+
+@app.get("/documents/{document_id}/checklist")
+async def document_checklist(
+    document_id: str,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> ChecklistResult:
+    """The must-ask questions for this kind of document, each answered with the exact quotes
+    behind it, or marked not mentioned. An important question the document does not answer
+    comes back flagged as a gap, with wording for asking the other side. Like key terms, the
+    first request does the work and later ones read the saved copy."""
+    document = await _get_readable_document(document_id, user, session)
+
+    try:
+        return await get_checklist(session, document.id, document.doc_type)
+    except (ChecklistGenerationError, genai_errors.APIError) as exc:
         raise HTTPException(
             status_code=502, detail="the reading service is unavailable, try again"
         ) from exc
