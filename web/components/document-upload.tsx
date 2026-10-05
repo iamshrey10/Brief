@@ -16,6 +16,7 @@ import {
   mergeFresh,
   POLL_INTERVAL_MS,
   putFirst,
+  replaceDocument,
   type DocumentSummary,
 } from "@/lib/documents";
 import { cn } from "@/lib/utils";
@@ -228,7 +229,10 @@ export function DocumentUpload({ initialDocuments }: { initialDocuments: Documen
         </Button>
       </form>
 
-      <DocumentList documents={documents} />
+      <DocumentList
+        documents={documents}
+        onRetried={(updated) => setDocuments((previous) => replaceDocument(previous, updated))}
+      />
     </div>
   );
 }

@@ -476,4 +476,30 @@ describe("DocumentUpload form", () => {
     expect(screen.getByText("new.pdf")).toBeInTheDocument();
     expect(screen.getByText("old.pdf")).toBeInTheDocument();
   });
+
+  it("starts reading a failed document again from its row, and shows it as processing", async () => {
+    fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url === "/api/backend/documents/d1/retry" && init?.method === "POST") {
+        return ok(doc("uploaded", "d1", "broken.pdf"));
+      }
+      if (url === "/api/backend/documents" && (init?.method ?? "GET") === "GET") {
+        return ok([doc("ready", "d1", "broken.pdf")]);
+      }
+      throw new Error(`unexpected request: ${init?.method ?? "GET"} ${url}`);
+    });
+    render(<DocumentUpload initialDocuments={[doc("failed", "d1", "broken.pdf")]} />);
+    expect(screen.getByText("Couldn't read")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Try reading broken.pdf again" }));
+    await tick(0);
+
+    expect(screen.getByText("Processing")).toBeInTheDocument();
+    expect(screen.queryByText("Couldn't read")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /try reading/i })).not.toBeInTheDocument();
+
+    // and the page starts checking on it by itself, until it is ready
+    await tick(POLL_INTERVAL_MS);
+
+    expect(screen.getByRole("link", { name: /broken\.pdf/ })).toBeInTheDocument();
+  });
 });

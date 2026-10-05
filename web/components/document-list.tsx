@@ -1,8 +1,14 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
 import { ChevronRight, CircleCheck, CircleX, LoaderCircle, TriangleAlert } from "lucide-react";
 import { DocTypeIcon } from "@/components/doc-type-icon";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { retryDocument } from "@/lib/retry";
 import {
+  canRetry,
   DOC_TYPE_LABELS,
   formatUploaded,
   isReadable,
@@ -52,7 +58,25 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-function DocumentRow({ doc }: { doc: DocumentSummary }) {
+function DocumentRow({
+  doc,
+  onRetried,
+}: {
+  doc: DocumentSummary;
+  onRetried?: (document: DocumentSummary) => void;
+}) {
+  const [retrying, setRetrying] = useState(false);
+  const [retryError, setRetryError] = useState<string | null>(null);
+
+  async function retry() {
+    setRetrying(true);
+    setRetryError(null);
+    const outcome = await retryDocument(doc.id);
+    setRetrying(false);
+    if (outcome.ok) onRetried?.(outcome.document);
+    else setRetryError(outcome.message);
+  }
+
   const uploaded = formatUploaded(doc.created_at);
   const typeLabel = DOC_TYPE_LABELS[doc.doc_type] ?? doc.doc_type;
   // Only a document that has clauses to show gets a link, anything else would open an empty page.
@@ -72,8 +96,25 @@ function DocumentRow({ doc }: { doc: DocumentSummary }) {
           {typeLabel}
           {uploaded && ` · Uploaded ${uploaded}`}
         </span>
+        {retryError && (
+          <span role="alert" className="mt-0.5 block text-xs text-destructive">
+            {retryError}
+          </span>
+        )}
       </span>
       <StatusBadge status={doc.status} />
+      {canRetry(doc) && (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={retrying}
+          aria-label={`Try reading ${doc.filename} again`}
+          onClick={retry}
+        >
+          {retrying ? "Starting..." : "Try again"}
+        </Button>
+      )}
       {readable && <ChevronRight aria-hidden className="size-4 shrink-0 text-muted-foreground" />}
     </>
   );
@@ -95,7 +136,13 @@ function DocumentRow({ doc }: { doc: DocumentSummary }) {
   );
 }
 
-export function DocumentList({ documents }: { documents: DocumentSummary[] }) {
+export function DocumentList({
+  documents,
+  onRetried,
+}: {
+  documents: DocumentSummary[];
+  onRetried?: (document: DocumentSummary) => void;
+}) {
   if (documents.length === 0) {
     return (
       <div className="rounded-lg border border-dashed border-border px-4 py-8 text-center">
@@ -113,7 +160,7 @@ export function DocumentList({ documents }: { documents: DocumentSummary[] }) {
       <ul className="flex flex-col gap-2">
         {documents.map((doc) => (
           <li key={doc.id}>
-            <DocumentRow doc={doc} />
+            <DocumentRow doc={doc} onRetried={onRetried} />
           </li>
         ))}
       </ul>

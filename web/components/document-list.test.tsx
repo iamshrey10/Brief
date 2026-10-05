@@ -1,9 +1,18 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
-import { cleanup, render, screen, within } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { DocumentSummary } from "@/lib/documents";
+import { retryDocument } from "@/lib/retry";
 import { DocumentList } from "./document-list";
+
+vi.mock("@/lib/retry", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/retry")>();
+  return { ...actual, retryDocument: vi.fn() };
+});
+
+const retryMock = vi.mocked(retryDocument);
 
 function doc(
   status: string,
@@ -14,7 +23,10 @@ function doc(
   return { id, filename, doc_type: "loan", status, ocr_confidence: null, ...extra };
 }
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.clearAllMocks();
+});
 
 describe("DocumentList", () => {
   it("explains what to do when there are no documents yet, instead of showing nothing", () => {
@@ -185,5 +197,93 @@ describe("DocumentList", () => {
 
     const spinning = container.querySelectorAll("svg.motion-safe\\:animate-spin");
     expect(spinning).toHaveLength(1);
+  });
+
+  describe("trying again", () => {
+    const minutesAgo = (m: number) => new Date(Date.now() - m * 60_000).toISOString();
+
+    it("offers Try again on a document that failed", () => {
+      render(<DocumentList documents={[doc("failed", "a", "broken.pdf")]} />);
+
+      expect(screen.getByRole("button", { name: "Try reading broken.pdf again" })).toHaveTextContent(
+        "Try again",
+      );
+    });
+
+    it("offers Try again on a document stuck being read for a long time", () => {
+      render(
+        <DocumentList documents={[doc("processing", "a", "stuck.pdf", { created_at: minutesAgo(60) })]} />,
+      );
+
+      expect(screen.getByRole("button", { name: "Try reading stuck.pdf again" })).toBeInTheDocument();
+    });
+
+    it.each(["ready", "needs_retake"])("does not offer it on a %s document", (status) => {
+      render(<DocumentList documents={[doc(status)]} />);
+
+      expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    });
+
+    it("does not offer it on a document that was only just uploaded", () => {
+      render(
+        <DocumentList documents={[doc("processing", "a", "new.pdf", { created_at: minutesAgo(1) })]} />,
+      );
+
+      expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    });
+
+    it("asks for that document to be read again and hands back the updated one", async () => {
+      const updated = doc("uploaded", "a", "broken.pdf");
+      retryMock.mockResolvedValue({ ok: true, document: updated });
+      const onRetried = vi.fn();
+      const user = userEvent.setup();
+      render(<DocumentList documents={[doc("failed", "a", "broken.pdf")]} onRetried={onRetried} />);
+
+      await user.click(screen.getByRole("button", { name: "Try reading broken.pdf again" }));
+
+      expect(retryMock).toHaveBeenCalledWith("a");
+      await waitFor(() => expect(onRetried).toHaveBeenCalledWith(updated));
+    });
+
+    it("shows progress and cannot be pressed twice while the request is running", async () => {
+      retryMock.mockReturnValue(new Promise(() => {}));
+      const user = userEvent.setup();
+      render(<DocumentList documents={[doc("failed", "a", "broken.pdf")]} />);
+
+      await user.click(screen.getByRole("button", { name: "Try reading broken.pdf again" }));
+
+      const button = screen.getByRole("button", { name: "Try reading broken.pdf again" });
+      expect(button).toHaveTextContent("Starting...");
+      expect(button).toBeDisabled();
+      expect(retryMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("says what went wrong on that row and lets it be tried again", async () => {
+      retryMock.mockResolvedValueOnce({ ok: false, message: "Couldn't start that just now." });
+      const user = userEvent.setup();
+      render(
+        <DocumentList documents={[doc("failed", "a", "one.pdf"), doc("failed", "b", "two.pdf")]} />,
+      );
+
+      await user.click(screen.getByRole("button", { name: "Try reading one.pdf again" }));
+
+      const [first, second] = screen.getAllByRole("listitem");
+      expect(await within(first).findByRole("alert")).toHaveTextContent("Couldn't start that just now.");
+      expect(within(second).queryByRole("alert")).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Try reading one.pdf again" })).toBeEnabled();
+    });
+
+    it("clears an earlier error when it is tried again", async () => {
+      retryMock.mockResolvedValueOnce({ ok: false, message: "Couldn't start that just now." });
+      retryMock.mockReturnValueOnce(new Promise(() => {}));
+      const user = userEvent.setup();
+      render(<DocumentList documents={[doc("failed", "a", "one.pdf")]} />);
+
+      await user.click(screen.getByRole("button", { name: "Try reading one.pdf again" }));
+      await screen.findByRole("alert");
+      await user.click(screen.getByRole("button", { name: "Try reading one.pdf again" }));
+
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    });
   });
 });
