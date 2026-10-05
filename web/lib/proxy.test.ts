@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@/lib/require-session", () => ({ requireSession: vi.fn() }));
 
 import { requireSession } from "@/lib/require-session";
-import { proxyGet } from "./proxy";
+import { proxyGet, proxyPost } from "./proxy";
 
 const sessionMock = vi.mocked(requireSession);
 const fetchMock = vi.fn();
@@ -83,5 +83,53 @@ describe("proxyGet", () => {
     const res = await proxyGet("/documents/d1/checklist");
 
     expect(res.status).toBe(502);
+  });
+});
+
+describe("proxyPost", () => {
+  it("sends a POST to the backend with the signed token", async () => {
+    fetchMock.mockResolvedValue(backendResponse({ status: "uploaded" }));
+
+    const res = await proxyPost("/documents/d1/retry");
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("http://localhost:8000/documents/d1/retry");
+    expect(init.method).toBe("POST");
+    expect(init.headers).toEqual({ Authorization: "Bearer signed-token" });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ status: "uploaded" });
+  });
+
+  it("is refused without calling the backend when the user is not allowed", async () => {
+    sessionMock.mockResolvedValue({
+      error: Response.json({ error: "too many requests" }, { status: 429 }),
+    });
+
+    const res = await proxyPost("/documents/d1/retry");
+
+    expect(res.status).toBe(429);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps the backend's refusal as it is", async () => {
+    fetchMock.mockResolvedValue(backendResponse({ detail: "no" }, 409));
+
+    expect((await proxyPost("/documents/d1/retry")).status).toBe(409);
+  });
+
+  it("answers with a clean 502 when the backend cannot be reached", async () => {
+    fetchMock.mockRejectedValue(new TypeError("fetch failed"));
+
+    expect((await proxyPost("/documents/d1/retry")).status).toBe(502);
+  });
+});
+
+describe("proxyGet uses GET", () => {
+  it("says GET explicitly", async () => {
+    fetchMock.mockResolvedValue(backendResponse({}));
+
+    await proxyGet("/documents/d1/key-terms");
+
+    expect(fetchMock.mock.calls[0][1].method).toBe("GET");
   });
 });

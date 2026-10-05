@@ -152,3 +152,26 @@ export function mergeFresh(local: DocumentSummary[], fresh: DocumentSummary[]): 
   const known = new Set(fresh.map((document) => document.id));
   return [...local.filter((document) => !known.has(document.id)), ...fresh];
 }
+
+/** Mirrors STUCK_AFTER in api/app/main.py: still being read this long after upload means stuck. */
+export const STUCK_AFTER_MS = 15 * 60 * 1000;
+
+/**
+ * Whether a document can be read again: it failed, or it has been stuck being read for a long
+ * time. Mirrors what the backend allows, which is the real rule. This only decides whether to
+ * show the button. A document with no upload time is never treated as stuck.
+ */
+export function canRetry(document: DocumentSummary, now: Date = new Date()): boolean {
+  if (document.status === "failed") return true;
+  if (!isInProgress(document.status) || !document.created_at) return false;
+  const uploaded = new Date(document.created_at).getTime();
+  return !Number.isNaN(uploaded) && now.getTime() - uploaded > STUCK_AFTER_MS;
+}
+
+/** Swaps in a newer version of a document, keeping its place in the list. */
+export function replaceDocument(
+  list: DocumentSummary[],
+  updated: DocumentSummary,
+): DocumentSummary[] {
+  return list.map((existing) => (existing.id === updated.id ? updated : existing));
+}

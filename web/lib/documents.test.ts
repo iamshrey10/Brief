@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  canRetry,
+  replaceDocument,
   contentTypeFor,
   formatFileSize,
   formatUploaded,
@@ -244,5 +246,66 @@ describe("putFirst and mergeFresh", () => {
 
     expect(local.map((d) => d.id)).toEqual(["a"]);
     expect(fresh.map((d) => d.id)).toEqual(["b"]);
+  });
+});
+
+
+describe("canRetry", () => {
+  const now = new Date(2026, 9, 5, 12, 0, 0);
+  const minutesAgo = (m: number) => new Date(now.getTime() - m * 60_000).toISOString();
+  const doc = (status: string, created_at?: string | null) => ({
+    id: "d",
+    filename: "d.pdf",
+    doc_type: "lease",
+    status,
+    ocr_confidence: null,
+    created_at,
+  });
+
+  it("offers a retry for a failed document, however recent", () => {
+    expect(canRetry(doc("failed", minutesAgo(1)), now)).toBe(true);
+    expect(canRetry(doc("failed"), now)).toBe(true);
+  });
+
+  it.each(["pending", "uploaded", "processing"])("offers a retry for a %s document stuck for over 15 minutes", (status) => {
+    expect(canRetry(doc(status, minutesAgo(16)), now)).toBe(true);
+  });
+
+  it.each(["pending", "uploaded", "processing"])("does not offer a retry for a %s document still within 15 minutes", (status) => {
+    expect(canRetry(doc(status, minutesAgo(2)), now)).toBe(false);
+    expect(canRetry(doc(status, minutesAgo(15)), now)).toBe(false);
+  });
+
+  it("does not guess that a document with no upload time is stuck", () => {
+    expect(canRetry(doc("processing"), now)).toBe(false);
+    expect(canRetry(doc("processing", null), now)).toBe(false);
+    expect(canRetry(doc("processing", "not a date"), now)).toBe(false);
+  });
+
+  it.each(["ready", "needs_retake"])("never offers a retry for a %s document", (status) => {
+    expect(canRetry(doc(status, minutesAgo(10_000)), now)).toBe(false);
+  });
+});
+
+describe("replaceDocument", () => {
+  const doc = (id: string, status: string) => ({
+    id,
+    filename: `${id}.pdf`,
+    doc_type: "lease",
+    status,
+    ocr_confidence: null,
+  });
+
+  it("swaps in the newer version and keeps its place", () => {
+    const result = replaceDocument([doc("a", "ready"), doc("b", "failed"), doc("c", "ready")], doc("b", "uploaded"));
+
+    expect(result.map((d) => d.id)).toEqual(["a", "b", "c"]);
+    expect(result[1].status).toBe("uploaded");
+  });
+
+  it("leaves the list alone when the document is not in it", () => {
+    const list = [doc("a", "ready")];
+
+    expect(replaceDocument(list, doc("z", "ready"))).toEqual(list);
   });
 });
