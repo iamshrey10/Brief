@@ -1,5 +1,4 @@
 import asyncio
-import re
 import uuid
 
 from google.genai import types
@@ -8,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.grounding import quote_appears_in
+from app.grounding import numbers_supported, quote_appears_in
 from app.ingestion import get_genai_client
 from app.key_term_fields import KeyTermField, fields_for
 from app.models import Clause, Extraction
@@ -101,12 +100,6 @@ def generate_key_terms(
     return parsed
 
 
-def _numbers_in(text: str) -> set[str]:
-    """Every figure in the text, with thousands separators removed so $2,054.00 matches
-    $2054.00."""
-    return {match.replace(",", "") for match in re.findall(r"\d+(?:[.,]\d+)*", text)}
-
-
 def verify_terms(
     fields: tuple[KeyTermField, ...],
     response: ExtractionResponse,
@@ -133,7 +126,7 @@ def verify_terms(
             and clause is not None
             and entry.value.strip() != ""
             and quote_appears_in(entry.quote, clause.text)
-            and _numbers_in(entry.value) <= _numbers_in(entry.quote)
+            and numbers_supported(entry.value, [entry.quote])
         )
         if verified:
             terms.append(
