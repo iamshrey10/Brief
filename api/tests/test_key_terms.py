@@ -1,7 +1,7 @@
 import pytest
 from sqlalchemy import select
 
-from app import key_terms
+from app import document_text, key_terms
 from app.key_term_fields import KeyTermField
 from app.key_terms import (
     KEY_TERMS_MODEL,
@@ -278,7 +278,7 @@ async def test_a_document_with_no_clauses_makes_no_model_call(db_session, test_u
 
 
 async def test_a_document_too_long_to_send_is_cut_and_flagged(db_session, test_user, monkeypatch):
-    monkeypatch.setattr(key_terms, "MAX_PROMPT_CHARS", len(RATE_TEXT) + 5)
+    monkeypatch.setattr(document_text, "MAX_PROMPT_CHARS", len(RATE_TEXT) + 5)
     document = await _document(db_session, test_user, [RATE_TEXT, LATE_TEXT])
     shown = _fake_model(monkeypatch, lambda clauses: ExtractionResponse(fields=[]))
 
@@ -399,7 +399,7 @@ async def test_the_model_is_called_once_then_the_saved_copy_is_reused(
 
 
 async def test_a_cut_off_document_is_returned_but_not_saved(db_session, test_user, monkeypatch):
-    monkeypatch.setattr(key_terms, "MAX_PROMPT_CHARS", len(RATE_TEXT) + 5)
+    monkeypatch.setattr(document_text, "MAX_PROMPT_CHARS", len(RATE_TEXT) + 5)
     document = await _document(db_session, test_user, [RATE_TEXT, LATE_TEXT])
     shown = _fake_model(monkeypatch, _rate_response)
 

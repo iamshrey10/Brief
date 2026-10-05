@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.document_text import load_prompt_clauses
 from app.grounding import numbers_supported, quote_appears_in
 from app.ingestion import get_genai_client
 from app.key_term_fields import KeyTermField, fields_for
@@ -16,12 +17,6 @@ from app.qa import ANSWER_MODEL
 # Same pinned model as question answering, so one evaluation covers both. Re-run
 # evals/key_terms_eval.py whenever this changes.
 KEY_TERMS_MODEL = ANSWER_MODEL
-
-# Key terms need the whole document, not a few retrieved clauses, because the model has to
-# notice what is absent as well as what is present. A typical contract is far below this.
-# Past it the document is cut and the result says so, never silently reporting "not
-# mentioned" for text the model never saw.
-MAX_PROMPT_CHARS = 300_000
 
 SYSTEM_INSTRUCTION = (
     "You pull key facts out of a contract using ONLY the numbered clauses you are given. "
@@ -151,32 +146,17 @@ async def extract_key_terms(
     """Pulls the key terms for this document type out of the whole document, each one tied
     to the clause and exact quote it came from."""
     fields = fields_for(doc_type)
-    result = await session.execute(
-        select(Clause).where(Clause.document_id == document_id).order_by(Clause.clause_index)
-    )
-    all_clauses = list(result.scalars())
+    loaded = await load_prompt_clauses(session, document_id)
 
-    sent: list[Clause] = []
-    used = 0
-    for clause in all_clauses:
-        if used + len(clause.text) > MAX_PROMPT_CHARS:
-            break
-        sent.append(clause)
-        used += len(clause.text)
-    truncated = len(sent) < len(all_clauses)
-
-    if not sent:
+    if not loaded.sent:
         return KeyTermsResult(
             terms=[KeyTerm(name=f.name, label=f.label, found=False) for f in fields],
-            truncated=truncated,
+            truncated=loaded.truncated,
         )
 
-    labeled = [(f"C{position}", clause.text) for position, clause in enumerate(sent, start=1)]
-    clause_by_label = {label: clause for (label, _text), clause in zip(labeled, sent, strict=True)}
-
-    generated = await asyncio.to_thread(generate_key_terms, fields, labeled)
+    generated = await asyncio.to_thread(generate_key_terms, fields, loaded.labeled)
     return KeyTermsResult(
-        terms=verify_terms(fields, generated, clause_by_label), truncated=truncated
+        terms=verify_terms(fields, generated, loaded.by_label), truncated=loaded.truncated
     )
 
 
