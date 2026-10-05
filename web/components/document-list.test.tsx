@@ -218,6 +218,22 @@ describe("DocumentList", () => {
       expect(screen.getByRole("button", { name: "Try reading stuck.pdf again" })).toBeInTheDocument();
     });
 
+    it("does not offer it on a document that was uploaded long ago but only just started being read again", () => {
+      render(
+        <DocumentList
+          documents={[
+            doc("processing", "a", "retried.pdf", {
+              created_at: minutesAgo(60 * 24),
+              status_changed_at: minutesAgo(1),
+            }),
+          ]}
+        />,
+      );
+
+      expect(screen.getByText("Processing")).toBeInTheDocument();
+      expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    });
+
     it.each(["ready", "needs_retake"])("does not offer it on a %s document", (status) => {
       render(<DocumentList documents={[doc(status)]} />);
 

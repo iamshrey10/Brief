@@ -253,13 +253,14 @@ describe("putFirst and mergeFresh", () => {
 describe("canRetry", () => {
   const now = new Date(2026, 9, 5, 12, 0, 0);
   const minutesAgo = (m: number) => new Date(now.getTime() - m * 60_000).toISOString();
-  const doc = (status: string, created_at?: string | null) => ({
+  const doc = (status: string, created_at?: string | null, status_changed_at?: string | null) => ({
     id: "d",
     filename: "d.pdf",
     doc_type: "lease",
     status,
     ocr_confidence: null,
     created_at,
+    status_changed_at,
   });
 
   it("offers a retry for a failed document, however recent", () => {
@@ -284,6 +285,26 @@ describe("canRetry", () => {
 
   it.each(["ready", "needs_retake"])("never offers a retry for a %s document", (status) => {
     expect(canRetry(doc(status, minutesAgo(10_000)), now)).toBe(false);
+  });
+
+  it("measures stuck from the last status change, not the upload: a document just retried is not stuck", () => {
+    // Uploaded a day ago, but it started being read again two minutes ago.
+    expect(canRetry(doc("processing", minutesAgo(1440), minutesAgo(2)), now)).toBe(false);
+    expect(canRetry(doc("uploaded", minutesAgo(1440), minutesAgo(2)), now)).toBe(false);
+  });
+
+  it("offers a retry once the last status change is itself old", () => {
+    expect(canRetry(doc("processing", minutesAgo(1440), minutesAgo(16)), now)).toBe(true);
+    expect(canRetry(doc("processing", minutesAgo(1440), minutesAgo(15)), now)).toBe(false);
+  });
+
+  it("falls back to the upload time for rows that have no status change recorded", () => {
+    expect(canRetry(doc("processing", minutesAgo(60), null), now)).toBe(true);
+    expect(canRetry(doc("processing", minutesAgo(5), null), now)).toBe(false);
+  });
+
+  it("uses the status change time even when the upload time is missing", () => {
+    expect(canRetry(doc("processing", null, minutesAgo(60)), now)).toBe(true);
   });
 });
 

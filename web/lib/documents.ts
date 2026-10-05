@@ -6,6 +6,9 @@ export type DocumentSummary = {
   ocr_confidence: number | null;
   // When it was uploaded, as an ISO timestamp. Absent on older responses.
   created_at?: string | null;
+  // When its status last changed. What "stuck" is measured from, so a document that was just
+  // retried is not stuck because it was uploaded long ago. Absent on older rows.
+  status_changed_at?: string | null;
 };
 
 export type ClauseData = {
@@ -158,14 +161,16 @@ export const STUCK_AFTER_MS = 15 * 60 * 1000;
 
 /**
  * Whether a document can be read again: it failed, or it has been stuck being read for a long
- * time. Mirrors what the backend allows, which is the real rule. This only decides whether to
- * show the button. A document with no upload time is never treated as stuck.
+ * time, measured from when its status last changed and, for older rows, from the upload. Mirrors
+ * what the backend allows, which is the real rule. This only decides whether to show the button.
+ * A document with no usable time at all is never treated as stuck.
  */
 export function canRetry(document: DocumentSummary, now: Date = new Date()): boolean {
   if (document.status === "failed") return true;
-  if (!isInProgress(document.status) || !document.created_at) return false;
-  const uploaded = new Date(document.created_at).getTime();
-  return !Number.isNaN(uploaded) && now.getTime() - uploaded > STUCK_AFTER_MS;
+  const since = document.status_changed_at ?? document.created_at;
+  if (!isInProgress(document.status) || !since) return false;
+  const started = new Date(since).getTime();
+  return !Number.isNaN(started) && now.getTime() - started > STUCK_AFTER_MS;
 }
 
 /** Swaps in a newer version of a document, keeping its place in the list. */
