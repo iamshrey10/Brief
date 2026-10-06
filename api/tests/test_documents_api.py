@@ -848,6 +848,7 @@ async def _document_with(
     status: str,
     age_minutes: int = 0,
     changed_minutes_ago: int | None = None,
+    failure_reason: str | None = None,
 ) -> Document:
     """A document uploaded `age_minutes` ago whose status last changed `changed_minutes_ago`
     minutes ago. Left out, the status is taken to have changed when it was uploaded."""
@@ -865,6 +866,7 @@ async def _document_with(
         status_changed_at=(
             None if changed_minutes_ago is None else now - timedelta(minutes=changed_minutes_ago)
         ),
+        failure_reason=failure_reason,
     )
     db_session.add(document)
     await db_session.commit()
@@ -1390,3 +1392,59 @@ async def test_edit_returns_404_for_a_malformed_id(client):
     response = await client.patch("/documents/not-a-uuid", json={"filename": "x"})
 
     assert response.status_code == 404
+
+
+# --- the reason a read failed ---
+
+
+async def test_the_document_list_says_why_a_failed_document_failed(client, db_session, test_user):
+    await _document_with(db_session, test_user, "failed", failure_reason="no_text")
+
+    (document,) = (await client.get("/documents")).json()
+
+    assert document["status"] == "failed"
+    assert document["failure_reason"] == "no_text"
+
+
+async def test_a_single_document_says_why_it_failed(client, db_session, test_user):
+    document = await _document_with(db_session, test_user, "failed", failure_reason="rate_limit")
+
+    body = (await client.get(f"/documents/{document.id}")).json()
+
+    assert body["failure_reason"] == "rate_limit"
+
+
+@pytest.mark.parametrize("status", ["ready", "needs_retake", "processing", "uploaded"])
+async def test_a_document_that_has_not_failed_has_no_reason(client, db_session, test_user, status):
+    await _document_with(db_session, test_user, status)
+
+    (document,) = (await client.get("/documents")).json()
+
+    assert document["failure_reason"] is None
+
+
+async def test_a_retry_clears_the_reason_so_the_old_failure_is_not_shown_while_it_reads(
+    client, db_session, test_user, monkeypatch
+):
+    _record_ingestion(monkeypatch)
+    document = await _document_with(db_session, test_user, "failed", failure_reason="rate_limit")
+
+    body = (await client.post(f"/documents/{document.id}/retry")).json()
+
+    assert body["status"] == "uploaded"
+    assert body["failure_reason"] is None
+    await db_session.refresh(document)
+    assert document.failure_reason is None
+
+
+async def test_a_retry_of_a_stuck_document_also_leaves_no_reason(
+    client, db_session, test_user, monkeypatch
+):
+    _record_ingestion(monkeypatch)
+    document = await _document_with(
+        db_session, test_user, "processing", age_minutes=60, changed_minutes_ago=60
+    )
+
+    body = (await client.post(f"/documents/{document.id}/retry")).json()
+
+    assert body["failure_reason"] is None

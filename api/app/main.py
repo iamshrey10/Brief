@@ -111,6 +111,8 @@ class DocumentSummary(BaseModel):
     created_at: datetime | None = None
     # When its status last changed, which is what decides whether a read has stalled.
     status_changed_at: datetime | None = None
+    # Why a read failed, a short code the page turns into plain words. Only set while failed.
+    failure_reason: str | None = None
 
     @classmethod
     def from_document(cls, document: Document) -> "DocumentSummary":
@@ -122,6 +124,7 @@ class DocumentSummary(BaseModel):
             ocr_confidence=document.ocr_confidence,
             created_at=document.created_at,
             status_changed_at=document.status_changed_at,
+            failure_reason=document.failure_reason,
         )
 
 
@@ -188,6 +191,7 @@ async def retry_document(
 
     document.status = "uploaded"
     document.status_changed_at = datetime.now(timezone.utc)
+    document.failure_reason = None
     await session.commit()
     await session.refresh(document)
 
