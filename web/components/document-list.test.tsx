@@ -207,6 +207,57 @@ describe("DocumentList", () => {
     expect(spinning).toHaveLength(1);
   });
 
+  describe("why a read failed", () => {
+    it("says why on a failed document, in plain words", () => {
+      render(<DocumentList documents={[doc("failed", "a", "scan.pdf", { failure_reason: "no_text" })]} />);
+
+      expect(screen.getByText(/No text could be found/)).toBeInTheDocument();
+      expect(screen.queryByText("no_text")).not.toBeInTheDocument();
+    });
+
+    it("shows a different message for a different reason", () => {
+      render(
+        <DocumentList
+          documents={[
+            doc("failed", "a", "one.pdf", { failure_reason: "daily_limit" }),
+            doc("failed", "b", "two.pdf", { failure_reason: "storage" }),
+          ]}
+        />,
+      );
+
+      expect(screen.getByText(/limit has been reached/)).toBeInTheDocument();
+      expect(screen.getByText(/could not be fetched/)).toBeInTheDocument();
+    });
+
+    it("still gives an honest message when the reason is missing", () => {
+      render(<DocumentList documents={[doc("failed", "a", "old.pdf")]} />);
+
+      expect(screen.getByText(/Something went wrong/)).toBeInTheDocument();
+    });
+
+    it("keeps Try again beside the message", () => {
+      render(<DocumentList documents={[doc("failed", "a", "scan.pdf", { failure_reason: "rate_limit" })]} />);
+
+      expect(screen.getByText(/busy right now/)).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Try reading scan.pdf again" })).toBeInTheDocument();
+    });
+
+    it("shows no message on documents that have not failed", () => {
+      render(
+        <DocumentList
+          documents={[
+            doc("ready", "a", "a.pdf", { failure_reason: "no_text" }),
+            doc("processing", "b", "b.pdf", { failure_reason: "no_text" }),
+            doc("needs_retake", "c", "c.pdf"),
+          ]}
+        />,
+      );
+
+      expect(screen.queryByText(/No text could be found/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Something went wrong/)).not.toBeInTheDocument();
+    });
+  });
+
   describe("trying again", () => {
     const minutesAgo = (m: number) => new Date(Date.now() - m * 60_000).toISOString();
 

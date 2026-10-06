@@ -19,6 +19,7 @@ import { retryDocument } from "@/lib/retry";
 import {
   canRetry,
   DOC_TYPE_LABELS,
+  failureMessage,
   formatUploaded,
   isReadable,
   statusLabel,
@@ -320,6 +321,7 @@ function DocumentRow({
   const typeLabel = DOC_TYPE_LABELS[doc.doc_type] ?? doc.doc_type;
   // Only a document that has clauses to show gets a link, anything else would open an empty page.
   const readable = isReadable(doc.status);
+  const failure = failureMessage(doc);
 
   const main = (
     <>
@@ -335,6 +337,7 @@ function DocumentRow({
           {typeLabel}
           {uploaded && ` · Uploaded ${uploaded}`}
         </span>
+        {failure && <span className="mt-0.5 block text-xs text-muted-foreground">{failure}</span>}
         {retryError && (
           <span role="alert" className="mt-0.5 block text-xs text-destructive">
             {retryError}
