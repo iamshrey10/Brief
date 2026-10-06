@@ -49,6 +49,7 @@ const FAILURE_MESSAGES: Record<string, string> = {
   no_text: "No text could be found in this file. A clearer scan or a text based PDF should work.",
   unreadable_file:
     "This file could not be opened. It may be damaged or password protected, so try another copy.",
+  too_long: "This document is longer than 100 pages, which is more than can be read. Try uploading just the pages you need.",
   storage: "The uploaded file could not be fetched. Please upload it again.",
   rate_limit: "The reading service is busy right now. Try again in a few minutes.",
   daily_limit: "Today's reading limit has been reached. Try again tomorrow.",

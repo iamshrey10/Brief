@@ -365,6 +365,7 @@ describe("failureMessage", () => {
   it.each([
     ["no_text", /No text/],
     ["unreadable_file", /damaged or password protected/],
+    ["too_long", /longer than 100 pages/],
     ["storage", /upload it again/],
     ["rate_limit", /busy/],
     ["daily_limit", /tomorrow/],
@@ -374,7 +375,15 @@ describe("failureMessage", () => {
   });
 
   it("gives each known reason its own message", () => {
-    const reasons = ["no_text", "unreadable_file", "storage", "rate_limit", "daily_limit", "service_error"];
+    const reasons = [
+      "no_text",
+      "unreadable_file",
+      "too_long",
+      "storage",
+      "rate_limit",
+      "daily_limit",
+      "service_error",
+    ];
     const messages = reasons.map((reason) => failureMessage(doc("failed", reason)));
     expect(new Set(messages).size).toBe(reasons.length);
   });
