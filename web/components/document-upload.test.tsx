@@ -5,8 +5,13 @@ import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vite
 import { MAX_POLL_DURATION_MS, POLL_INTERVAL_MS, type DocumentSummary } from "@/lib/documents";
 import { DocumentUpload } from "./document-upload";
 
-function doc(status: string, id = "d1", filename = "loan.pdf"): DocumentSummary {
-  return { id, filename, doc_type: "loan", status, ocr_confidence: null };
+function doc(
+  status: string,
+  id = "d1",
+  filename = "loan.pdf",
+  extra: Partial<DocumentSummary> = {},
+): DocumentSummary {
+  return { id, filename, doc_type: "loan", status, ocr_confidence: null, ...extra };
 }
 
 function ok(body: unknown): Response {
@@ -501,5 +506,175 @@ describe("DocumentUpload form", () => {
     await tick(POLL_INTERVAL_MS);
 
     expect(screen.getByRole("link", { name: /broken\.pdf/ })).toBeInTheDocument();
+  });
+});
+
+describe("DocumentUpload deleting and editing", () => {
+  const withTwo = () => [doc("processing", "p", "busy.pdf"), doc("ready", "r", "keep.pdf")];
+
+  function respond(handlers: Record<string, (init?: RequestInit) => Response | Promise<Response>>) {
+    fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+      const handler = handlers[`${init?.method ?? "GET"} ${url}`];
+      if (!handler) throw new Error(`unexpected request: ${init?.method ?? "GET"} ${url}`);
+      return handler(init);
+    });
+  }
+
+  const deleted = { ok: true, status: 204 } as Response;
+
+  /** Gone entirely: no row, and not even the "Delete keep.pdf?" question left behind. */
+  function expectCompletelyGone(name: string) {
+    const pattern = new RegExp(name.replace(".", "\\."));
+    expect(screen.queryByText(pattern)).not.toBeInTheDocument();
+    // The delete question is a group named "Delete <file>". The page's own form is a group too.
+    expect(screen.queryByRole("group", { name: new RegExp(`^Delete ${pattern.source}`) })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: pattern })).not.toBeInTheDocument();
+  }
+
+  async function confirmDelete(name: string) {
+    fireEvent.click(screen.getByRole("button", { name: `Delete ${name}` }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    await tick(0);
+  }
+
+  async function rename(from: string, to: string) {
+    fireEvent.click(screen.getByRole("button", { name: `Edit ${from}` }));
+    fireEvent.change(screen.getByLabelText("Name"), { target: { value: to } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await tick(0);
+  }
+
+  it("removes a deleted document from the list", async () => {
+    respond({ "DELETE /api/backend/documents/r": () => deleted });
+    render(<DocumentUpload initialDocuments={withTwo()} />);
+
+    await confirmDelete("keep.pdf");
+
+    expectCompletelyGone("keep.pdf");
+    expect(screen.getByText("busy.pdf")).toBeInTheDocument();
+  });
+
+  it("keeps a document deleted even when a refresh that began earlier still lists it", async () => {
+    let releaseRefresh: (r: Response) => void = () => {};
+    respond({
+      "DELETE /api/backend/documents/r": () => deleted,
+      "GET /api/backend/documents": () => new Promise<Response>((resolve) => (releaseRefresh = resolve)),
+    });
+    render(<DocumentUpload initialDocuments={withTwo()} />);
+    await tick(POLL_INTERVAL_MS); // a refresh starts and is left waiting
+
+    await confirmDelete("keep.pdf");
+    await act(async () => {
+      releaseRefresh(ok(withTwo())); // the old snapshot still has it
+    });
+    await tick(0);
+
+    expectCompletelyGone("keep.pdf");
+  });
+
+  it("keeps it gone on every later refresh too", async () => {
+    respond({
+      "DELETE /api/backend/documents/r": () => deleted,
+      "GET /api/backend/documents": () => ok(withTwo()),
+    });
+    render(<DocumentUpload initialDocuments={withTwo()} />);
+    await confirmDelete("keep.pdf");
+
+    await tick(POLL_INTERVAL_MS);
+    await tick(POLL_INTERVAL_MS);
+
+    expectCompletelyGone("keep.pdf");
+  });
+
+  it("leaves a document in the list when the delete fails", async () => {
+    respond({ "DELETE /api/backend/documents/r": () => ({ ok: false, status: 502 }) as Response });
+    render(<DocumentUpload initialDocuments={withTwo()} />);
+
+    await confirmDelete("keep.pdf");
+
+    expect(screen.getByText(/nothing was removed/i)).toBeInTheDocument();
+    // Still listed: the row is still asking, so the delete can be tried again.
+    expect(screen.getByRole("group", { name: "Delete keep.pdf" })).toBeInTheDocument();
+  });
+
+  it("shows the new name after a rename", async () => {
+    respond({
+      "PATCH /api/backend/documents/r": () => ok(doc("ready", "r", "Renamed.pdf")),
+    });
+    render(<DocumentUpload initialDocuments={withTwo()} />);
+
+    await rename("keep.pdf", "Renamed.pdf");
+
+    expect(screen.getByText("Renamed.pdf")).toBeInTheDocument();
+    expectCompletelyGone("keep.pdf");
+  });
+
+  it("sends only the name for a rename", async () => {
+    respond({ "PATCH /api/backend/documents/r": () => ok(doc("ready", "r", "Renamed.pdf")) });
+    render(<DocumentUpload initialDocuments={withTwo()} />);
+
+    await rename("keep.pdf", "Renamed.pdf");
+
+    const patch = fetchMock.mock.calls.find((c) => c[1]?.method === "PATCH");
+    expect(JSON.parse(patch?.[1].body)).toEqual({ filename: "Renamed.pdf" });
+  });
+
+  it("keeps the new name when a refresh that began earlier comes back with the old one", async () => {
+    let releaseRefresh: (r: Response) => void = () => {};
+    respond({
+      "PATCH /api/backend/documents/r": () => ok(doc("ready", "r", "Renamed.pdf")),
+      "GET /api/backend/documents": () => new Promise<Response>((resolve) => (releaseRefresh = resolve)),
+    });
+    render(<DocumentUpload initialDocuments={withTwo()} />);
+    await tick(POLL_INTERVAL_MS);
+
+    await rename("keep.pdf", "Renamed.pdf");
+    await act(async () => {
+      releaseRefresh(ok(withTwo())); // the old snapshot still has the old name
+    });
+    await tick(0);
+
+    expect(screen.getByText("Renamed.pdf")).toBeInTheDocument();
+    expectCompletelyGone("keep.pdf");
+  });
+
+  it("still takes a document's status from the server after a rename", async () => {
+    respond({
+      "PATCH /api/backend/documents/p": () => ok(doc("processing", "p", "Renamed busy.pdf")),
+      "GET /api/backend/documents": () => ok([doc("ready", "p", "busy.pdf"), doc("ready", "r", "keep.pdf")]),
+    });
+    render(<DocumentUpload initialDocuments={withTwo()} />);
+
+    await rename("busy.pdf", "Renamed busy.pdf");
+    await tick(POLL_INTERVAL_MS);
+
+    // The name is the one just chosen, but it finished reading, so it is now a link.
+    expect(screen.getByRole("link", { name: /Renamed busy\.pdf/ })).toBeInTheDocument();
+  });
+
+  it("stops holding on to a rename after a minute, so a change made elsewhere shows up", async () => {
+    respond({
+      "PATCH /api/backend/documents/r": () => ok(doc("ready", "r", "Renamed here.pdf")),
+      "GET /api/backend/documents": () =>
+        ok([doc("processing", "p", "busy.pdf"), doc("ready", "r", "Renamed elsewhere.pdf")]),
+    });
+    render(<DocumentUpload initialDocuments={withTwo()} />);
+
+    await rename("keep.pdf", "Renamed here.pdf");
+    await tick(61_000);
+
+    expect(screen.getByText("Renamed elsewhere.pdf")).toBeInTheDocument();
+  });
+
+  it("shows a changed kind on the row", async () => {
+    respond({ "PATCH /api/backend/documents/r": () => ok(doc("ready", "r", "keep.pdf", { doc_type: "lease" })) });
+    render(<DocumentUpload initialDocuments={withTwo()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit keep.pdf" }));
+    fireEvent.change(screen.getByLabelText("Kind"), { target: { value: "lease" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await tick(0);
+
+    expect(screen.getByRole("link", { name: /keep\.pdf/ })).toHaveTextContent("Lease");
   });
 });

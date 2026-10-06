@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type DragEvent, type FormEvent } from "react";
+import { useEffect, useRef, useState, type DragEvent, type FormEvent } from "react";
 import { CloudUpload, FileText } from "lucide-react";
 import { DocTypeIcon } from "@/components/doc-type-icon";
 import { DocumentList } from "@/components/document-list";
@@ -16,12 +16,19 @@ import {
   mergeFresh,
   POLL_INTERVAL_MS,
   putFirst,
+  removeDocument,
   replaceDocument,
   type DocumentSummary,
 } from "@/lib/documents";
 import { cn } from "@/lib/utils";
 
 const DOC_TYPES = Object.entries(DOC_TYPE_LABELS).map(([value, label]) => ({ value, label }));
+
+// How long a rename is held on to. It only has to outlast a refresh that was already on its way
+// when the rename was made, which arrives within seconds. After that the server is believed again.
+const RECENT_EDIT_MS = 60_000;
+
+type RecentEdit = { filename: string; doc_type: string; at: number };
 
 type Status = "idle" | "uploading" | "error";
 
@@ -32,6 +39,36 @@ export function DocumentUpload({ initialDocuments }: { initialDocuments: Documen
   const [errorMessage, setErrorMessage] = useState("");
   const [documents, setDocuments] = useState(initialDocuments);
   const [dragging, setDragging] = useState(false);
+  // A refresh that began before a delete or a rename can come back showing the old state. These
+  // remember what was just done here, so that cannot bring a deleted document back or undo a rename.
+  const deletedIds = useRef(new Set<string>());
+  const recentEdits = useRef(new Map<string, RecentEdit>());
+
+  function applyLocalChanges(list: DocumentSummary[]): DocumentSummary[] {
+    const now = Date.now();
+    return list
+      .filter((document) => !deletedIds.current.has(document.id))
+      .map((document) => {
+        const edit = recentEdits.current.get(document.id);
+        if (!edit || now - edit.at >= RECENT_EDIT_MS) return document;
+        return { ...document, filename: edit.filename, doc_type: edit.doc_type };
+      });
+  }
+
+  function handleUpdated(updated: DocumentSummary) {
+    recentEdits.current.set(updated.id, {
+      filename: updated.filename,
+      doc_type: updated.doc_type,
+      at: Date.now(),
+    });
+    setDocuments((previous) => replaceDocument(previous, updated));
+  }
+
+  function handleDeleted(id: string) {
+    deletedIds.current.add(id);
+    recentEdits.current.delete(id);
+    setDocuments((previous) => removeDocument(previous, id));
+  }
 
   const hasInProgress = documents.some((doc) => isInProgress(doc.status));
 
@@ -52,7 +89,7 @@ export function DocumentUpload({ initialDocuments }: { initialDocuments: Documen
         const res = await fetch("/api/backend/documents");
         if (res.ok) {
           const fresh: DocumentSummary[] = await res.json();
-          setDocuments((previous) => mergeFresh(previous, fresh));
+          setDocuments((previous) => applyLocalChanges(mergeFresh(previous, fresh)));
         }
       } catch {
         // Network blip, the next tick tries again.
@@ -232,6 +269,8 @@ export function DocumentUpload({ initialDocuments }: { initialDocuments: Documen
       <DocumentList
         documents={documents}
         onRetried={(updated) => setDocuments((previous) => replaceDocument(previous, updated))}
+        onUpdated={handleUpdated}
+        onDeleted={handleDeleted}
       />
     </div>
   );
