@@ -180,3 +180,8 @@ export function replaceDocument(
 ): DocumentSummary[] {
   return list.map((existing) => (existing.id === updated.id ? updated : existing));
 }
+
+/** Takes a document out of the list. */
+export function removeDocument(list: DocumentSummary[], id: string): DocumentSummary[] {
+  return list.filter((existing) => existing.id !== id);
+}

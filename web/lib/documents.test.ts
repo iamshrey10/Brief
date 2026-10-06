@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   canRetry,
+  removeDocument,
   replaceDocument,
   contentTypeFor,
   formatFileSize,
@@ -328,5 +329,28 @@ describe("replaceDocument", () => {
     const list = [doc("a", "ready")];
 
     expect(replaceDocument(list, doc("z", "ready"))).toEqual(list);
+  });
+});
+
+
+describe("removeDocument", () => {
+  const doc = (id: string) => ({ id, filename: `${id}.pdf`, doc_type: "lease", status: "ready", ocr_confidence: null });
+
+  it("takes out only that document and keeps the order of the rest", () => {
+    expect(removeDocument([doc("a"), doc("b"), doc("c")], "b").map((d) => d.id)).toEqual(["a", "c"]);
+  });
+
+  it("leaves the list alone when the document is not in it", () => {
+    const list = [doc("a")];
+
+    expect(removeDocument(list, "z")).toEqual(list);
+  });
+
+  it("does not change the list it was given", () => {
+    const list = [doc("a"), doc("b")];
+
+    removeDocument(list, "a");
+
+    expect(list.map((d) => d.id)).toEqual(["a", "b"]);
   });
 });
