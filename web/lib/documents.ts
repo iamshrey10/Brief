@@ -9,6 +9,8 @@ export type DocumentSummary = {
   // When its status last changed. What "stuck" is measured from, so a document that was just
   // retried is not stuck because it was uploaded long ago. Absent on older rows.
   status_changed_at?: string | null;
+  // Why a read failed, a short code from the API. Only present while the status is failed.
+  failure_reason?: string | null;
 };
 
 export type ClauseData = {
@@ -40,6 +42,29 @@ export function isReadable(status: string): boolean {
 /** Statuses a document passes through before it is either readable or has failed. */
 export function isInProgress(status: string): boolean {
   return status === "pending" || status === "uploaded" || status === "processing";
+}
+
+/** What to tell the reader about a failed read, and what they can do about it. */
+const FAILURE_MESSAGES: Record<string, string> = {
+  no_text: "No text could be found in this file. A clearer scan or a text based PDF should work.",
+  unreadable_file:
+    "This file could not be opened. It may be damaged or password protected, so try another copy.",
+  storage: "The uploaded file could not be fetched. Please upload it again.",
+  rate_limit: "The reading service is busy right now. Try again in a few minutes.",
+  daily_limit: "Today's reading limit has been reached. Try again tomorrow.",
+  service_error: "The reading service had a problem. Try again in a few minutes.",
+};
+
+const UNKNOWN_FAILURE_MESSAGE = "Something went wrong while reading this file. You can try again.";
+
+/**
+ * A plain-language reason a read failed, or null when the document has not failed. An older
+ * row, or a code this page does not know yet, still gets an honest generic message.
+ */
+export function failureMessage(document: DocumentSummary): string | null {
+  if (document.status !== "failed") return null;
+  const reason = document.failure_reason;
+  return (reason && FAILURE_MESSAGES[reason]) || UNKNOWN_FAILURE_MESSAGE;
 }
 
 /** Plain-language labels, so the raw database status never reaches the reader. */

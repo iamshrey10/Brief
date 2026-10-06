@@ -4,6 +4,7 @@ import {
   removeDocument,
   replaceDocument,
   contentTypeFor,
+  failureMessage,
   formatFileSize,
   formatUploaded,
   groupByPage,
@@ -13,6 +14,7 @@ import {
   putFirst,
   statusLabel,
   type ClauseData,
+  type DocumentSummary,
 } from "./documents";
 
 function clause(id: string, page: number, index: number): ClauseData {
@@ -352,5 +354,51 @@ describe("removeDocument", () => {
     removeDocument(list, "a");
 
     expect(list.map((d) => d.id)).toEqual(["a", "b"]);
+  });
+});
+
+describe("failureMessage", () => {
+  function doc(status: string, failure_reason?: string | null): DocumentSummary {
+    return { id: "d", filename: "a.pdf", doc_type: "lease", status, ocr_confidence: null, failure_reason };
+  }
+
+  it.each([
+    ["no_text", /No text/],
+    ["unreadable_file", /damaged or password protected/],
+    ["storage", /upload it again/],
+    ["rate_limit", /busy/],
+    ["daily_limit", /tomorrow/],
+    ["service_error", /had a problem/],
+  ])("explains %s in plain words", (reason, expected) => {
+    expect(failureMessage(doc("failed", reason))).toMatch(expected);
+  });
+
+  it("gives each known reason its own message", () => {
+    const reasons = ["no_text", "unreadable_file", "storage", "rate_limit", "daily_limit", "service_error"];
+    const messages = reasons.map((reason) => failureMessage(doc("failed", reason)));
+    expect(new Set(messages).size).toBe(reasons.length);
+  });
+
+  it("falls back to a generic message for unknown, missing or empty reasons", () => {
+    const generic = failureMessage(doc("failed", "unknown"));
+    expect(generic).toMatch(/Something went wrong/);
+    expect(failureMessage(doc("failed", "a_code_from_the_future"))).toBe(generic);
+    expect(failureMessage(doc("failed", null))).toBe(generic);
+    expect(failureMessage(doc("failed", ""))).toBe(generic);
+    expect(failureMessage(doc("failed"))).toBe(generic);
+  });
+
+  it("says nothing for a document that has not failed, even with a stale reason", () => {
+    for (const status of ["ready", "needs_retake", "processing", "uploaded", "pending"]) {
+      expect(failureMessage(doc(status, "no_text"))).toBeNull();
+    }
+  });
+
+  it("never uses an em dash or leaks the raw code", () => {
+    for (const reason of ["no_text", "unreadable_file", "storage", "rate_limit", "daily_limit", "service_error", "unknown"]) {
+      const message = failureMessage(doc("failed", reason)) as string;
+      expect(message).not.toContain("\u2014");
+      expect(message).not.toContain(reason.includes("_") ? reason : "\u0000");
+    }
   });
 });
