@@ -59,6 +59,9 @@ class Document(Base):
     status_changed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # Why a document failed to read, as a short code the page turns into plain words. Only set while
+    # the status is "failed", and cleared on a retry and on success.
+    failure_reason: Mapped[str | None] = mapped_column(String(50), nullable=True)
 
     user: Mapped["User"] = relationship(back_populates="documents")
     clauses: Mapped[list["Clause"]] = relationship(
