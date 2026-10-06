@@ -47,11 +47,21 @@ class UnreadableFileError(Exception):
     says it is, or protected with a password."""
 
 
+# The longest document that will be read. Every page costs a reading call on a metered service, so
+# a limit keeps one huge file from running up the bill. Generous enough for a real lease or loan.
+MAX_PAGES = 100
+
+
+class TooLongError(Exception):
+    """The document has more pages than will be read."""
+
+
 # The reasons a read can fail, as short codes stored on the document. The page turns each into
 # plain words, so a reader is told what to do about it instead of just "Couldn't read".
 FAILURE_REASONS = (
     "no_text",
     "unreadable_file",
+    "too_long",
     "storage",
     "rate_limit",
     "daily_limit",
@@ -64,6 +74,8 @@ def classify_failure(error: BaseException) -> str:
     """Which of the failure reasons an exception from reading a document belongs to."""
     if isinstance(error, UnreadableFileError):
         return "unreadable_file"
+    if isinstance(error, TooLongError):
+        return "too_long"
     if isinstance(error, (ClientError, BotoCoreError)):
         return "storage"
     if isinstance(error, genai_errors.APIError):
@@ -106,6 +118,8 @@ def extract_pages(file_bytes: bytes, content_type: str) -> tuple[list[str], floa
     try:
         if doc.needs_pass:
             raise UnreadableFileError("the PDF is protected with a password")
+        if len(doc) > MAX_PAGES:
+            raise TooLongError(f"the document has {len(doc)} pages and the limit is {MAX_PAGES}")
         return [page_text(page) for page in doc], None
     finally:
         doc.close()

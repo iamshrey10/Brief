@@ -19,6 +19,7 @@ from app.ingestion import (
     FAILURE_REASONS,
     MAX_RATE_LIMIT_RETRIES,
     MAX_RETRY_WAIT_SECONDS,
+    TooLongError,
     UnreadableFileError,
     _normalize,
     classify_failure,
@@ -513,6 +514,7 @@ async def test_a_document_is_stamped_when_it_starts_being_read_not_only_when_it_
 def test_every_failure_reason_the_code_can_produce_is_a_known_one():
     produced = {
         classify_failure(UnreadableFileError("x")),
+        classify_failure(TooLongError("x")),
         classify_failure(BotoClientError({"Error": {"Code": "500"}}, "GetObject")),
         classify_failure(_rate_limited()),
         classify_failure(_api_error(429, "Quota exceeded, quotaId: EmbedContentRequestsPerDay")),
@@ -520,13 +522,14 @@ def test_every_failure_reason_the_code_can_produce_is_a_known_one():
         classify_failure(RuntimeError("anything else")),
     }
     assert produced <= set(FAILURE_REASONS)
-    assert len(produced) == 6  # and each of these ways has its own reason
+    assert len(produced) == 7  # and each of these ways has its own reason
 
 
 @pytest.mark.parametrize(
     ("error", "reason"),
     [
         (UnreadableFileError("damaged"), "unreadable_file"),
+        (TooLongError("a hundred and one pages"), "too_long"),
         (BotoClientError({"Error": {"Code": "NoSuchKey"}}, "GetObject"), "storage"),
         (_rate_limited(), "rate_limit"),
         (_api_error(429, "Please retry in 3s"), "rate_limit"),
@@ -665,3 +668,51 @@ async def test_a_reason_is_only_ever_kept_while_the_document_is_failed(db_sessio
 
     _set_status(document, "processing", "no_text")  # a reason passed with another status is dropped
     assert document.failure_reason is None
+
+
+# --- a cap on how long one document can be, so a huge file cannot run up the reading bill ---
+
+
+def test_a_pdf_with_more_pages_than_the_limit_is_refused(monkeypatch):
+    monkeypatch.setattr(ingestion_module, "MAX_PAGES", 3)
+
+    with pytest.raises(TooLongError, match="3"):
+        extract_pages(_make_pdf_bytes(["a", "b", "c", "d"]), "application/pdf")
+
+
+def test_a_pdf_with_exactly_the_limit_is_read(monkeypatch):
+    monkeypatch.setattr(ingestion_module, "MAX_PAGES", 3)
+
+    pages, _ = extract_pages(_make_pdf_bytes(["a", "b", "c"]), "application/pdf")
+
+    assert len(pages) == 3
+
+
+def test_a_too_long_pdf_is_refused_before_any_page_is_read(monkeypatch):
+    monkeypatch.setattr(ingestion_module, "MAX_PAGES", 2)
+    read = []
+    monkeypatch.setattr(ingestion_module, "page_text", lambda page: read.append(page) or "x")
+
+    with pytest.raises(TooLongError):
+        extract_pages(_make_pdf_bytes(["a", "b", "c"]), "application/pdf")
+
+    assert read == []
+
+
+def test_the_page_limit_is_big_enough_for_a_real_lease_and_not_unlimited():
+    assert 60 <= ingestion_module.MAX_PAGES <= 300
+
+
+async def test_a_too_long_document_fails_with_the_reason_too_long(db_session, test_user, monkeypatch):
+    monkeypatch.setattr(ingestion_module, "MAX_PAGES", 2)
+    embedded = []
+    document = await _failed_read(
+        db_session,
+        test_user,
+        monkeypatch,
+        pdf=_make_pdf_bytes(["a page", "another page", "a third page"]),
+        embed=lambda texts: embedded.append(texts) or [[0.1] * EMBEDDING_DIM for _ in texts],
+    )
+
+    assert (document.status, document.failure_reason) == ("failed", "too_long")
+    assert embedded == []  # nothing was sent to the paid service
