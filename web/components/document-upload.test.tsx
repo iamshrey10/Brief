@@ -388,6 +388,24 @@ describe("DocumentUpload form", () => {
     expect(screen.getByRole("button", { name: "Upload" })).toBeEnabled();
   });
 
+  it("shows the server's own sentence when the document limit is reached", async () => {
+    const detail = "You can keep up to 25 documents. Delete one you no longer need to upload another.";
+    fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url === "/api/backend/documents" && init?.method === "POST") {
+        return { ok: false, status: 409, json: async () => ({ detail }) } as Response;
+      }
+      throw new Error(`unexpected request: ${url}`);
+    });
+    render(<DocumentUpload initialDocuments={[]} />);
+
+    chooseFile(pdf("one-too-many.pdf"));
+    fireEvent.click(screen.getByRole("button", { name: "Upload" }));
+    await tick(0);
+
+    expect(screen.getByRole("alert")).toHaveTextContent(detail);
+    expect(screen.getByText("one-too-many.pdf")).toBeInTheDocument();
+  });
+
   it("locks the form while uploading, so nothing can change under a request in flight", async () => {
     fetchMock.mockImplementation(() => new Promise(() => {}));
     render(<DocumentUpload initialDocuments={[]} />);

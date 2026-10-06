@@ -21,6 +21,7 @@ import {
   type DocumentSummary,
 } from "@/lib/documents";
 import { cn } from "@/lib/utils";
+import { startFailureMessage } from "@/lib/upload";
 
 const DOC_TYPES = Object.entries(DOC_TYPE_LABELS).map(([value, label]) => ({ value, label }));
 
@@ -150,7 +151,7 @@ export function DocumentUpload({ initialDocuments }: { initialDocuments: Documen
           file_size_bytes: file.size,
         }),
       });
-      if (!createRes.ok) throw new Error("could not start the upload");
+      if (!createRes.ok) throw new Error(await startFailureMessage(createRes));
       const { document_id, upload_url } = await createRes.json();
 
       const uploadRes = await fetch(upload_url, {
