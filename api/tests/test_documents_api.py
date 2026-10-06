@@ -1,5 +1,6 @@
 import uuid
 
+import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
@@ -1057,3 +1058,335 @@ async def test_the_document_list_carries_when_each_status_changed(client, db_ses
     (document,) = (await client.get("/documents")).json()
 
     assert document["status_changed_at"] is not None
+
+
+# --- DELETE /documents/{id} and PATCH /documents/{id} ---
+
+
+async def _document_with_everything(db_session, test_user, filename="doc.pdf", key="fake/doc.pdf"):
+    """A document with the things a finished read leaves behind: a piece with its embedding, a saved
+    key term, and a saved checklist answer."""
+    from app.models import ChecklistAnswerRow, Extraction
+
+    document = Document(
+        user_id=test_user.id,
+        filename=filename,
+        doc_type="lease",
+        status="ready",
+        storage_key=key,
+        file_size_bytes=1024,
+    )
+    db_session.add(document)
+    await db_session.flush()
+    clause = Clause(
+        document_id=document.id, clause_index=0, page_number=1, char_start=0, char_end=9, text="Rent is $5"
+    )
+    db_session.add(clause)
+    await db_session.flush()
+    db_session.add(Embedding(clause_id=clause.id, vector=[0.1] * EMBEDDING_DIM))
+    db_session.add(
+        Extraction(
+            document_id=document.id, clause_id=clause.id, field_name="monthly_rent", value="$5", quote="Rent is $5"
+        )
+    )
+    db_session.add(
+        ChecklistAnswerRow(
+            document_id=document.id,
+            question_id="late_fee",
+            answer="None",
+            evidence=[{"clause_id": str(clause.id), "page_number": 1, "quote": "Rent is $5"}],
+        )
+    )
+    await db_session.commit()
+    await db_session.refresh(document)
+    return document
+
+
+async def _counts(db_session, document_id) -> dict:
+    from sqlalchemy import func, select
+
+    from app.models import ChecklistAnswerRow, Extraction
+
+    async def count(model, column):
+        return await db_session.scalar(select(func.count()).select_from(model).where(column == document_id))
+
+    clauses = await count(Clause, Clause.document_id)
+    embeddings = await db_session.scalar(
+        select(func.count()).select_from(Embedding).join(Clause).where(Clause.document_id == document_id)
+    )
+    return {
+        "document": await db_session.scalar(
+            select(func.count()).select_from(Document).where(Document.id == document_id)
+        ),
+        "clauses": clauses,
+        "embeddings": embeddings,
+        "key_terms": await count(Extraction, Extraction.document_id),
+        "checklist": await count(ChecklistAnswerRow, ChecklistAnswerRow.document_id),
+    }
+
+
+def _record_file_deletes(monkeypatch) -> list[str]:
+    removed: list[str] = []
+    monkeypatch.setattr(main_module, "delete_file", lambda key: removed.append(key))
+    return removed
+
+
+async def test_delete_removes_the_document_its_file_and_everything_read_from_it(
+    client, db_session, test_user, monkeypatch
+):
+    removed = _record_file_deletes(monkeypatch)
+    document = await _document_with_everything(db_session, test_user, key="fake/mine.pdf")
+    document_id = document.id
+    assert await _counts(db_session, document_id) == {
+        "document": 1, "clauses": 1, "embeddings": 1, "key_terms": 1, "checklist": 1,
+    }
+
+    response = await client.delete(f"/documents/{document_id}")
+
+    assert response.status_code == 204
+    assert response.content == b""
+    assert removed == ["fake/mine.pdf"]
+    db_session.expire_all()
+    assert await _counts(db_session, document_id) == {
+        "document": 0, "clauses": 0, "embeddings": 0, "key_terms": 0, "checklist": 0,
+    }
+
+
+async def test_delete_leaves_every_other_document_untouched(client, db_session, test_user, monkeypatch):
+    _record_file_deletes(monkeypatch)
+    doomed = await _document_with_everything(db_session, test_user, "doomed.pdf", "fake/doomed.pdf")
+    doomed_id = doomed.id  # read now: creating the next document commits, which expires this object
+    kept = await _document_with_everything(db_session, test_user, "kept.pdf", "fake/kept.pdf")
+    kept_id = kept.id
+
+    await client.delete(f"/documents/{doomed_id}")
+
+    db_session.expire_all()
+    assert await _counts(db_session, kept_id) == {
+        "document": 1, "clauses": 1, "embeddings": 1, "key_terms": 1, "checklist": 1,
+    }
+    await db_session.refresh(test_user)  # expire_all above also expired the signed-in user
+    listed = [d["filename"] for d in (await client.get("/documents")).json()]
+    assert listed == ["kept.pdf"]
+
+
+async def test_delete_works_for_a_document_that_never_finished_reading(
+    client, db_session, test_user, monkeypatch
+):
+    removed = _record_file_deletes(monkeypatch)
+    document = await _document_with(db_session, test_user, "failed")
+
+    response = await client.delete(f"/documents/{document.id}")
+
+    assert response.status_code == 204
+    assert removed == ["fake/doc.pdf"]
+
+
+async def test_delete_keeps_the_document_when_the_file_cannot_be_removed(
+    client, db_session, test_user, monkeypatch
+):
+    def failing(key):
+        raise RuntimeError("storage is down")
+
+    monkeypatch.setattr(main_module, "delete_file", failing)
+    document = await _document_with_everything(db_session, test_user)
+    document_id = document.id
+
+    response = await client.delete(f"/documents/{document_id}")
+
+    assert response.status_code == 502
+    assert "nothing was deleted" in response.json()["detail"]
+    db_session.expire_all()
+    # Everything is still there, so the delete can simply be tried again.
+    assert await _counts(db_session, document_id) == {
+        "document": 1, "clauses": 1, "embeddings": 1, "key_terms": 1, "checklist": 1,
+    }
+
+
+async def test_delete_can_be_retried_after_a_storage_failure(client, db_session, test_user, monkeypatch):
+    attempts = {"count": 0}
+
+    def flaky(key):
+        attempts["count"] += 1
+        if attempts["count"] == 1:
+            raise RuntimeError("storage hiccup")
+
+    monkeypatch.setattr(main_module, "delete_file", flaky)
+    document = await _document_with_everything(db_session, test_user)
+
+    first = await client.delete(f"/documents/{document.id}")
+    second = await client.delete(f"/documents/{document.id}")
+
+    assert (first.status_code, second.status_code) == (502, 204)
+
+
+async def test_deleting_the_same_document_twice_is_a_404_the_second_time(
+    client, db_session, test_user, monkeypatch
+):
+    _record_file_deletes(monkeypatch)
+    document = await _document_with(db_session, test_user, "ready")
+
+    first = await client.delete(f"/documents/{document.id}")
+    second = await client.delete(f"/documents/{document.id}")
+
+    assert (first.status_code, second.status_code) == (204, 404)
+
+
+async def test_delete_rejects_another_users_document_and_leaves_its_file_alone(
+    client, db_session, monkeypatch
+):
+    removed = _record_file_deletes(monkeypatch)
+    other_user = User(email=f"{uuid.uuid4()}@example.com")
+    db_session.add(other_user)
+    await db_session.flush()
+    document = await _document_with_everything(db_session, other_user)
+    document_id = document.id
+
+    response = await client.delete(f"/documents/{document_id}")
+
+    assert response.status_code == 404
+    assert removed == []
+    db_session.expire_all()
+    assert (await _counts(db_session, document_id))["document"] == 1
+
+
+async def test_delete_returns_404_for_a_malformed_id(client, monkeypatch):
+    removed = _record_file_deletes(monkeypatch)
+
+    response = await client.delete("/documents/not-a-uuid")
+
+    assert response.status_code == 404
+    assert removed == []
+
+
+# --- PATCH ---
+
+
+async def test_edit_renames_a_document_and_trims_the_name(client, db_session, test_user):
+    document = await _document_with(db_session, test_user, "ready")
+
+    response = await client.patch(f"/documents/{document.id}", json={"filename": "  My Lease 2026.pdf  "})
+
+    assert response.status_code == 200
+    assert response.json()["filename"] == "My Lease 2026.pdf"
+    listed = (await client.get("/documents")).json()
+    assert listed[0]["filename"] == "My Lease 2026.pdf"
+
+
+async def test_edit_changes_the_kind_of_document(client, db_session, test_user):
+    document = await _document_with(db_session, test_user, "ready")
+
+    response = await client.patch(f"/documents/{document.id}", json={"doc_type": "loan"})
+
+    assert response.status_code == 200
+    assert response.json()["doc_type"] == "loan"
+
+
+async def test_changing_the_kind_clears_the_saved_key_terms_and_checklist_so_they_are_redone(
+    client, db_session, test_user
+):
+    document = await _document_with_everything(db_session, test_user)
+    other = await _document_with_everything(db_session, test_user, "other.pdf", "fake/other.pdf")
+    document_id, other_id = document.id, other.id
+
+    await client.patch(f"/documents/{document_id}", json={"doc_type": "loan"})
+
+    db_session.expire_all()
+    mine = await _counts(db_session, document_id)
+    assert (mine["key_terms"], mine["checklist"]) == (0, 0)
+    # What was read from the file itself is untouched: only what depends on the kind is cleared.
+    assert (mine["clauses"], mine["embeddings"]) == (1, 1)
+    theirs = await _counts(db_session, other_id)
+    assert (theirs["key_terms"], theirs["checklist"]) == (1, 1)
+
+
+async def test_renaming_keeps_the_saved_key_terms_and_checklist(client, db_session, test_user):
+    document = await _document_with_everything(db_session, test_user)
+    document_id = document.id
+
+    await client.patch(f"/documents/{document_id}", json={"filename": "Renamed.pdf"})
+
+    db_session.expire_all()
+    counts = await _counts(db_session, document_id)
+    assert (counts["key_terms"], counts["checklist"]) == (1, 1)
+
+
+async def test_picking_the_kind_it_already_is_keeps_the_saved_key_terms_and_checklist(
+    client, db_session, test_user
+):
+    document = await _document_with_everything(db_session, test_user)  # it is a lease
+    document_id = document.id
+
+    await client.patch(f"/documents/{document_id}", json={"doc_type": "lease"})
+
+    db_session.expire_all()
+    counts = await _counts(db_session, document_id)
+    assert (counts["key_terms"], counts["checklist"]) == (1, 1)
+
+
+async def test_edit_changes_nothing_about_the_file_or_its_status(client, db_session, test_user):
+    document = await _document_with(db_session, test_user, "ready")
+
+    body = (await client.patch(f"/documents/{document.id}", json={"filename": "x.pdf", "doc_type": "offer"})).json()
+
+    assert body["status"] == "ready"
+    await db_session.refresh(document)
+    assert document.storage_key == "fake/doc.pdf"
+    assert document.file_size_bytes == 1024
+
+
+async def test_edit_accepts_a_name_of_exactly_200_characters_and_unicode(client, db_session, test_user):
+    document = await _document_with(db_session, test_user, "ready")
+    name = "é" * 200
+
+    response = await client.patch(f"/documents/{document.id}", json={"filename": name})
+
+    assert response.status_code == 200
+    assert response.json()["filename"] == name
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {},
+        {"filename": None, "doc_type": None},
+        {"filename": ""},
+        {"filename": "   "},
+        {"filename": "x" * 201},
+        {"filename": "line one\nline two"},
+        {"filename": "bell\x07name"},
+        {"doc_type": "mortgage"},
+        {"doc_type": ""},
+        {"filename": 123},
+    ],
+)
+async def test_edit_refuses_a_change_that_is_not_allowed_and_changes_nothing(
+    client, db_session, test_user, changes
+):
+    document = await _document_with(db_session, test_user, "ready")
+
+    response = await client.patch(f"/documents/{document.id}", json=changes)
+
+    assert response.status_code == 422
+    await db_session.refresh(document)
+    assert (document.filename, document.doc_type) == ("doc.pdf", "lease")
+
+
+async def test_edit_rejects_another_users_document(client, db_session):
+    other_user = User(email=f"{uuid.uuid4()}@example.com")
+    db_session.add(other_user)
+    await db_session.flush()
+    document = await _document_with_everything(db_session, other_user)
+    document_id = document.id
+
+    response = await client.patch(f"/documents/{document_id}", json={"filename": "stolen.pdf"})
+
+    assert response.status_code == 404
+    db_session.expire_all()
+    assert (await db_session.get(Document, document_id)).filename == "doc.pdf"
+
+
+async def test_edit_returns_404_for_a_malformed_id(client):
+    response = await client.patch("/documents/not-a-uuid", json={"filename": "x"})
+
+    assert response.status_code == 404

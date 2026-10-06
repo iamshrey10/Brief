@@ -51,3 +51,9 @@ def create_presigned_upload_url(storage_key: str, content_type: str) -> str:
 def download_file(storage_key: str) -> bytes:
     response = get_client().get_object(Bucket=settings.r2_bucket_name, Key=storage_key)
     return response["Body"].read()
+
+
+def delete_file(storage_key: str) -> None:
+    """Removes a file from storage. Deleting a key that is already gone succeeds, so a delete that
+    is tried again after a failure is safe."""
+    get_client().delete_object(Bucket=settings.r2_bucket_name, Key=storage_key)

@@ -1,10 +1,13 @@
+import asyncio
+import logging
+import re
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Response
 from google.genai import errors as genai_errors
-from pydantic import BaseModel, Field
-from sqlalchemy import func, select, text
+from pydantic import BaseModel, Field, field_validator, model_validator
+from sqlalchemy import delete, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import get_current_user
@@ -12,7 +15,7 @@ from app.checklist import ChecklistGenerationError, ChecklistResult, get_checkli
 from app.db import get_session
 from app.ingestion import ingest_document
 from app.key_terms import KeyTermsGenerationError, KeyTermsResult, get_key_terms
-from app.models import Clause, Document, User
+from app.models import ChecklistAnswerRow, Clause, Document, Extraction, User
 from app.qa import AnswerGenerationError, AnswerResult, answer_question
 from app.retrieval import hybrid_search, reranked_search
 from app.storage import (
@@ -20,7 +23,10 @@ from app.storage import (
     MAX_FILE_SIZE_BYTES,
     build_storage_key,
     create_presigned_upload_url,
+    delete_file,
 )
+
+logger = logging.getLogger(__name__)
 
 SEARCHABLE_STATUSES = {"ready", "needs_retake"}
 
@@ -187,6 +193,96 @@ async def retry_document(
 
     background_tasks.add_task(ingest_document, document.id)
     return DocumentSummary.from_document(document)
+
+
+MAX_FILENAME_LENGTH = 200
+
+
+class UpdateDocumentRequest(BaseModel):
+    filename: str | None = None
+    doc_type: str | None = None
+
+    @field_validator("filename")
+    @classmethod
+    def _valid_filename(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        name = value.strip()
+        if not name:
+            raise ValueError("a name cannot be empty")
+        if len(name) > MAX_FILENAME_LENGTH:
+            raise ValueError(f"a name can be at most {MAX_FILENAME_LENGTH} characters")
+        if re.search(r"[\x00-\x1f\x7f]", name):
+            raise ValueError("a name cannot contain control characters")
+        return name
+
+    @field_validator("doc_type")
+    @classmethod
+    def _valid_doc_type(cls, value: str | None) -> str | None:
+        if value is not None and value not in DOC_TYPES:
+            raise ValueError("unknown kind of document")
+        return value
+
+    @model_validator(mode="after")
+    def _something_to_change(self) -> "UpdateDocumentRequest":
+        if self.filename is None and self.doc_type is None:
+            raise ValueError("nothing to change")
+        return self
+
+
+@app.patch("/documents/{document_id}")
+async def update_document(
+    document_id: str,
+    body: UpdateDocumentRequest,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> DocumentSummary:
+    """Renames a document and/or changes what kind of document it is. Only the display name and
+    the kind change: the file, its status, and what was read from it are left alone, except that
+    key terms and checklist answers depend on the kind, so changing it clears the saved ones and
+    they are worked out again, for the new kind, next time they are asked for."""
+    document = await _get_owned_document(document_id, user, session)
+
+    if body.filename is not None:
+        document.filename = body.filename
+
+    if body.doc_type is not None and body.doc_type != document.doc_type:
+        document.doc_type = body.doc_type
+        await session.execute(delete(Extraction).where(Extraction.document_id == document.id))
+        await session.execute(
+            delete(ChecklistAnswerRow).where(ChecklistAnswerRow.document_id == document.id)
+        )
+
+    await session.commit()
+    await session.refresh(document)
+    return DocumentSummary.from_document(document)
+
+
+@app.delete("/documents/{document_id}", status_code=204)
+async def delete_document(
+    document_id: str,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> Response:
+    """Deletes a document: its file, and everything read from it (pieces, embeddings, key terms,
+    and checklist answers).
+
+    The file goes first. If storage fails, the document is kept, so the delete can simply be tried
+    again and nothing is left behind where nobody can see it. Deleting a file that is already gone
+    succeeds, so a retry after a half finished delete is safe."""
+    document = await _get_owned_document(document_id, user, session)
+
+    try:
+        await asyncio.to_thread(delete_file, document.storage_key)
+    except Exception as exc:
+        logger.exception("could not remove the file for document %s", document.id)
+        raise HTTPException(
+            status_code=502, detail="could not remove the file, nothing was deleted"
+        ) from exc
+
+    await session.delete(document)
+    await session.commit()
+    return Response(status_code=204)
 
 
 @app.get("/documents")
