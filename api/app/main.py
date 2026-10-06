@@ -30,6 +30,10 @@ logger = logging.getLogger(__name__)
 
 SEARCHABLE_STATUSES = {"ready", "needs_retake"}
 
+# How many documents one person can keep at a time. Every document costs storage and a read on
+# a metered service, so this keeps one account from running up the bill. Deleting frees a slot.
+MAX_DOCUMENTS_PER_USER = 25
+
 # A document still being read this long after it was uploaded is stuck. Reading a long one can
 # legitimately take several minutes while it waits out the embedding rate limit, so this leaves
 # plenty of room before anyone can start a second read.
@@ -80,6 +84,18 @@ async def create_upload(
         raise HTTPException(status_code=400, detail="unsupported file type")
     if body.file_size_bytes <= 0 or body.file_size_bytes > MAX_FILE_SIZE_BYTES:
         raise HTTPException(status_code=400, detail="file is too large, 50MB max")
+
+    kept = await session.scalar(
+        select(func.count()).select_from(Document).where(Document.user_id == user.id)
+    )
+    if kept >= MAX_DOCUMENTS_PER_USER:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"You can keep up to {MAX_DOCUMENTS_PER_USER} documents. "
+                "Delete one you no longer need to upload another."
+            ),
+        )
 
     storage_key = build_storage_key(str(user.id), body.filename)
 

@@ -1448,3 +1448,101 @@ async def test_a_retry_of_a_stuck_document_also_leaves_no_reason(
     body = (await client.post(f"/documents/{document.id}/retry")).json()
 
     assert body["failure_reason"] is None
+
+
+# --- how many documents one person can keep ---
+
+
+def _upload_body(filename: str = "lease.pdf") -> dict:
+    return {
+        "filename": filename,
+        "doc_type": "lease",
+        "content_type": "application/pdf",
+        "file_size_bytes": 1024,
+    }
+
+
+async def _fill_to(db_session, test_user, count: int) -> None:
+    for number in range(count):
+        await _document_with(db_session, test_user, "ready")
+
+
+async def test_an_upload_is_refused_once_the_person_has_reached_the_document_limit(
+    client, db_session, test_user, monkeypatch
+):
+    monkeypatch.setattr(main_module, "MAX_DOCUMENTS_PER_USER", 3)
+    await _fill_to(db_session, test_user, 3)
+
+    response = await client.post("/documents", json=_upload_body())
+
+    assert response.status_code == 409
+    assert "3 documents" in response.json()["detail"]
+    assert "delete" in response.json()["detail"].lower()
+    assert len((await client.get("/documents")).json()) == 3
+
+
+async def test_an_upload_just_under_the_limit_is_allowed(client, db_session, test_user, monkeypatch):
+    monkeypatch.setattr(main_module, "MAX_DOCUMENTS_PER_USER", 3)
+    await _fill_to(db_session, test_user, 2)
+
+    response = await client.post("/documents", json=_upload_body())
+
+    assert response.status_code == 200
+    assert len((await client.get("/documents")).json()) == 3
+
+
+async def test_deleting_a_document_makes_room_under_the_limit(
+    client, db_session, test_user, monkeypatch
+):
+    monkeypatch.setattr(main_module, "MAX_DOCUMENTS_PER_USER", 2)
+    monkeypatch.setattr(main_module, "delete_file", lambda storage_key: None)
+    await _fill_to(db_session, test_user, 2)
+    (first, *_rest) = (await client.get("/documents")).json()
+    assert (await client.post("/documents", json=_upload_body())).status_code == 409
+
+    assert (await client.delete(f"/documents/{first['id']}")).status_code == 204
+
+    assert (await client.post("/documents", json=_upload_body())).status_code == 200
+
+
+async def test_another_persons_documents_do_not_count_against_the_limit(
+    client, db_session, test_user, monkeypatch
+):
+    monkeypatch.setattr(main_module, "MAX_DOCUMENTS_PER_USER", 2)
+    other = User(email="someone-else@example.com")
+    db_session.add(other)
+    await db_session.commit()
+    for number in range(5):
+        db_session.add(
+            Document(
+                user_id=other.id,
+                filename=f"theirs-{number}.pdf",
+                doc_type="lease",
+                status="ready",
+                storage_key=f"other/{number}",
+                file_size_bytes=1,
+                content_type="application/pdf",
+            )
+        )
+    await db_session.commit()
+
+    assert (await client.post("/documents", json=_upload_body())).status_code == 200
+
+
+async def test_a_refused_upload_creates_no_record_and_no_upload_link(
+    client, db_session, test_user, monkeypatch
+):
+    monkeypatch.setattr(main_module, "MAX_DOCUMENTS_PER_USER", 1)
+    await _fill_to(db_session, test_user, 1)
+    links = []
+    monkeypatch.setattr(
+        main_module, "create_presigned_upload_url", lambda *args: links.append(args) or "url"
+    )
+
+    await client.post("/documents", json=_upload_body())
+
+    assert links == []
+
+
+def test_the_default_limit_is_a_sensible_number():
+    assert 10 <= main_module.MAX_DOCUMENTS_PER_USER <= 100
