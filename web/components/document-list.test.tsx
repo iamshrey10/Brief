@@ -1,11 +1,17 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { DocumentSummary } from "@/lib/documents";
+import { deleteDocument, updateDocument } from "@/lib/document-actions";
 import { retryDocument } from "@/lib/retry";
 import { DocumentList } from "./document-list";
+
+vi.mock("@/lib/document-actions", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/document-actions")>();
+  return { ...actual, deleteDocument: vi.fn(), updateDocument: vi.fn() };
+});
 
 vi.mock("@/lib/retry", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/retry")>();
@@ -13,6 +19,8 @@ vi.mock("@/lib/retry", async (importOriginal) => {
 });
 
 const retryMock = vi.mocked(retryDocument);
+const deleteMock = vi.mocked(deleteDocument);
+const updateMock = vi.mocked(updateDocument);
 
 function doc(
   status: string,
@@ -231,13 +239,13 @@ describe("DocumentList", () => {
       );
 
       expect(screen.getByText("Processing")).toBeInTheDocument();
-      expect(screen.queryByRole("button")).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /try reading/i })).not.toBeInTheDocument();
     });
 
     it.each(["ready", "needs_retake"])("does not offer it on a %s document", (status) => {
       render(<DocumentList documents={[doc(status)]} />);
 
-      expect(screen.queryByRole("button")).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /try reading/i })).not.toBeInTheDocument();
     });
 
     it("does not offer it on a document that was only just uploaded", () => {
@@ -245,7 +253,7 @@ describe("DocumentList", () => {
         <DocumentList documents={[doc("processing", "a", "new.pdf", { created_at: minutesAgo(1) })]} />,
       );
 
-      expect(screen.queryByRole("button")).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /try reading/i })).not.toBeInTheDocument();
     });
 
     it("asks for that document to be read again and hands back the updated one", async () => {
@@ -300,6 +308,338 @@ describe("DocumentList", () => {
       await user.click(screen.getByRole("button", { name: "Try reading one.pdf again" }));
 
       expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("edit and delete buttons", () => {
+    it("puts an Edit and a Delete button on every row, named for its file", () => {
+      render(<DocumentList documents={[doc("ready", "a", "one.pdf"), doc("failed", "b", "two.pdf")]} />);
+
+      for (const name of ["one.pdf", "two.pdf"]) {
+        expect(screen.getByRole("button", { name: `Edit ${name}` })).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: `Delete ${name}` })).toBeInTheDocument();
+      }
+    });
+
+    it("keeps the buttons outside the link, so pressing one never opens the document", () => {
+      render(<DocumentList documents={[doc("ready", "a", "one.pdf")]} />);
+
+      const link = screen.getByRole("link");
+      expect(link).not.toContainElement(screen.getByRole("button", { name: "Edit one.pdf" }));
+      expect(link).not.toContainElement(screen.getByRole("button", { name: "Delete one.pdf" }));
+      expect(link).toHaveAttribute("href", "/dashboard/documents/a");
+    });
+  });
+
+  describe("editing", () => {
+    async function openEdit(documents = [doc("ready", "a", "Lease.pdf", { doc_type: "lease" })]) {
+      const user = userEvent.setup();
+      const onUpdated = vi.fn();
+      render(<DocumentList documents={documents} onUpdated={onUpdated} />);
+      await user.click(screen.getByRole("button", { name: `Edit ${documents[0].filename}` }));
+      return { user, onUpdated };
+    }
+
+    it("puts the keyboard in the name field as soon as the form opens", async () => {
+      await openEdit();
+
+      expect(screen.getByLabelText("Name")).toHaveFocus();
+    });
+
+    it("puts focus back on the Edit button when the form is closed", async () => {
+      const { user } = await openEdit();
+
+      await user.keyboard("{Escape}");
+
+      expect(screen.getByRole("button", { name: "Edit Lease.pdf" })).toHaveFocus();
+    });
+
+    it("puts focus back on the Edit button after saving", async () => {
+      updateMock.mockResolvedValue({ ok: true, result: doc("ready", "a", "Lease.pdf", { doc_type: "loan" }) });
+      const { user } = await openEdit();
+      await user.selectOptions(screen.getByLabelText("Kind"), "loan");
+
+      await user.click(screen.getByRole("button", { name: "Save" }));
+
+      await waitFor(() => expect(screen.getByRole("button", { name: "Edit Lease.pdf" })).toHaveFocus());
+    });
+
+    it("opens a form with the current name and kind, and Save waits for a change", async () => {
+      await openEdit();
+
+      expect(screen.getByLabelText("Name")).toHaveValue("Lease.pdf");
+      expect(screen.getByLabelText("Kind")).toHaveValue("lease");
+      expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+    });
+
+    it("saves a new name, sending only the name, and hands back the updated document", async () => {
+      const updated = doc("ready", "a", "Renamed.pdf", { doc_type: "lease" });
+      updateMock.mockResolvedValue({ ok: true, result: updated });
+      const { user, onUpdated } = await openEdit();
+
+      await user.clear(screen.getByLabelText("Name"));
+      await user.type(screen.getByLabelText("Name"), "Renamed.pdf");
+      await user.click(screen.getByRole("button", { name: "Save" }));
+
+      expect(updateMock).toHaveBeenCalledWith("a", { filename: "Renamed.pdf" });
+      await waitFor(() => expect(onUpdated).toHaveBeenCalledWith(updated));
+      expect(screen.queryByLabelText("Name")).not.toBeInTheDocument();
+    });
+
+    it("saves a new kind, sending only the kind", async () => {
+      updateMock.mockResolvedValue({ ok: true, result: doc("ready", "a", "Lease.pdf", { doc_type: "loan" }) });
+      const { user } = await openEdit();
+
+      await user.selectOptions(screen.getByLabelText("Kind"), "loan");
+      await user.click(screen.getByRole("button", { name: "Save" }));
+
+      expect(updateMock).toHaveBeenCalledWith("a", { doc_type: "loan" });
+    });
+
+    it("sends both when both changed", async () => {
+      updateMock.mockResolvedValue({ ok: true, result: doc("ready", "a") });
+      const { user } = await openEdit();
+
+      await user.clear(screen.getByLabelText("Name"));
+      await user.type(screen.getByLabelText("Name"), "New.pdf");
+      await user.selectOptions(screen.getByLabelText("Kind"), "offer");
+      await user.click(screen.getByRole("button", { name: "Save" }));
+
+      expect(updateMock).toHaveBeenCalledWith("a", { filename: "New.pdf", doc_type: "offer" });
+    });
+
+    it("warns that changing the kind clears the saved key terms and questions, but not for a rename", async () => {
+      const { user } = await openEdit();
+
+      await user.type(screen.getByLabelText("Name"), " v2");
+      expect(screen.queryByText(/clears this document's saved key terms/i)).not.toBeInTheDocument();
+
+      await user.selectOptions(screen.getByLabelText("Kind"), "loan");
+      expect(screen.getByText(/clears this document's saved key terms/i)).toBeInTheDocument();
+
+      await user.selectOptions(screen.getByLabelText("Kind"), "lease");
+      expect(screen.queryByText(/clears this document's saved key terms/i)).not.toBeInTheDocument();
+    });
+
+    it("trims the name before sending it", async () => {
+      updateMock.mockResolvedValue({ ok: true, result: doc("ready", "a") });
+      const { user } = await openEdit();
+
+      await user.clear(screen.getByLabelText("Name"));
+      await user.type(screen.getByLabelText("Name"), "   Spaced out.pdf   ");
+      await user.click(screen.getByRole("button", { name: "Save" }));
+
+      expect(updateMock).toHaveBeenCalledWith("a", { filename: "Spaced out.pdf" });
+    });
+
+    it("will not save an empty or blank name, and says why", async () => {
+      const { user } = await openEdit();
+
+      await user.clear(screen.getByLabelText("Name"));
+      expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+      expect(screen.getByText("A name can't be empty.")).toBeInTheDocument();
+
+      await user.type(screen.getByLabelText("Name"), "   ");
+      expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+    });
+
+    it("treats a change that is only spaces around the same name as no change", async () => {
+      const { user } = await openEdit();
+
+      await user.type(screen.getByLabelText("Name"), "   ");
+
+      expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+    });
+
+    it("limits the name to 200 characters", async () => {
+      await openEdit();
+
+      expect(screen.getByLabelText("Name")).toHaveAttribute("maxlength", "200");
+    });
+
+    it("goes back without saving when Cancel is pressed", async () => {
+      const { user } = await openEdit();
+      await user.type(screen.getByLabelText("Name"), " changed");
+
+      await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+      expect(updateMock).not.toHaveBeenCalled();
+      expect(screen.getByText("Lease.pdf")).toBeInTheDocument();
+      expect(screen.queryByLabelText("Name")).not.toBeInTheDocument();
+    });
+
+    it("goes back without saving when Escape is pressed", async () => {
+      const { user } = await openEdit();
+
+      await user.keyboard("{Escape}");
+
+      expect(updateMock).not.toHaveBeenCalled();
+      expect(screen.queryByLabelText("Name")).not.toBeInTheDocument();
+    });
+
+    it("saves with Enter", async () => {
+      updateMock.mockResolvedValue({ ok: true, result: doc("ready", "a", "Via Enter.pdf") });
+      const { user } = await openEdit();
+
+      await user.clear(screen.getByLabelText("Name"));
+      await user.type(screen.getByLabelText("Name"), "Via Enter.pdf{Enter}");
+
+      expect(updateMock).toHaveBeenCalledWith("a", { filename: "Via Enter.pdf" });
+    });
+
+    it("locks the form while saving, and ignores Escape until it is done", async () => {
+      updateMock.mockReturnValue(new Promise(() => {}));
+      const { user } = await openEdit();
+      await user.type(screen.getByLabelText("Name"), " v2");
+
+      await user.click(screen.getByRole("button", { name: "Save" }));
+
+      expect(screen.getByRole("button", { name: "Saving..." })).toBeDisabled();
+      expect(screen.getByLabelText("Name")).toBeDisabled();
+      expect(screen.getByLabelText("Kind")).toBeDisabled();
+      expect(screen.getByRole("button", { name: "Cancel" })).toBeDisabled();
+      // Sent straight to the form: focus leaves a button that has just been disabled, so a key
+      // pressed with nothing focused would never reach it and this check would pass for free.
+      fireEvent.keyDown(screen.getByLabelText("Name"), { key: "Escape" });
+      expect(screen.getByLabelText("Name")).toBeInTheDocument();
+      expect(updateMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("says what went wrong, keeps what was typed, and can be tried again", async () => {
+      updateMock.mockResolvedValueOnce({ ok: false, message: "Couldn't save that just now." });
+      updateMock.mockResolvedValueOnce({ ok: true, result: doc("ready", "a", "Typed.pdf") });
+      const { user, onUpdated } = await openEdit();
+      await user.clear(screen.getByLabelText("Name"));
+      await user.type(screen.getByLabelText("Name"), "Typed.pdf");
+
+      await user.click(screen.getByRole("button", { name: "Save" }));
+
+      expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't save that just now.");
+      expect(screen.getByLabelText("Name")).toHaveValue("Typed.pdf");
+      expect(onUpdated).not.toHaveBeenCalled();
+
+      await user.click(screen.getByRole("button", { name: "Save" }));
+
+      await waitFor(() => expect(onUpdated).toHaveBeenCalled());
+    });
+
+    it("includes a kind it no longer offers, so the form can still be opened", async () => {
+      await openEdit([doc("ready", "a", "Old.pdf", { doc_type: "mortgage" })]);
+
+      expect(screen.getByLabelText("Kind")).toHaveValue("mortgage");
+    });
+
+    it("opens only the row that was asked for", async () => {
+      const user = userEvent.setup();
+      render(<DocumentList documents={[doc("ready", "a", "one.pdf"), doc("ready", "b", "two.pdf")]} />);
+
+      await user.click(screen.getByRole("button", { name: "Edit two.pdf" }));
+
+      expect(screen.getAllByLabelText("Name")).toHaveLength(1);
+      expect(screen.getByText("one.pdf")).toBeInTheDocument();
+    });
+  });
+
+  describe("deleting", () => {
+    async function openDelete(documents = [doc("ready", "a", "Lease.pdf")]) {
+      const user = userEvent.setup();
+      const onDeleted = vi.fn();
+      render(<DocumentList documents={documents} onDeleted={onDeleted} />);
+      await user.click(screen.getByRole("button", { name: `Delete ${documents[0].filename}` }));
+      return { user, onDeleted };
+    }
+
+    it("asks first, naming the file and saying what is lost and that it cannot be undone", async () => {
+      await openDelete();
+
+      const question = screen.getByRole("group", { name: "Delete Lease.pdf" });
+      expect(question).toHaveTextContent("Delete “Lease.pdf”?");
+      expect(question).toHaveTextContent("removes the file and everything Brief read from it");
+      expect(question).toHaveTextContent("can't be undone");
+      expect(deleteMock).not.toHaveBeenCalled();
+    });
+
+    it("starts on Cancel, so pressing Enter by accident cannot delete anything", async () => {
+      await openDelete();
+
+      expect(screen.getByRole("button", { name: "Cancel" })).toHaveFocus();
+    });
+
+    it("goes back without deleting when Cancel is pressed", async () => {
+      const { user } = await openDelete();
+
+      await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+      expect(deleteMock).not.toHaveBeenCalled();
+      expect(screen.getByText("Lease.pdf")).toBeInTheDocument();
+      expect(screen.queryByRole("group")).not.toBeInTheDocument();
+    });
+
+    it("puts focus back on the Delete button when the question is cancelled", async () => {
+      const { user } = await openDelete();
+
+      await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+      expect(screen.getByRole("button", { name: "Delete Lease.pdf" })).toHaveFocus();
+    });
+
+    it("goes back without deleting when Escape is pressed", async () => {
+      const { user } = await openDelete();
+
+      await user.keyboard("{Escape}");
+
+      expect(deleteMock).not.toHaveBeenCalled();
+      expect(screen.queryByRole("group")).not.toBeInTheDocument();
+    });
+
+    it("deletes that document when confirmed and tells the page which one", async () => {
+      deleteMock.mockResolvedValue({ ok: true, result: null });
+      const { user, onDeleted } = await openDelete();
+
+      await user.click(screen.getByRole("button", { name: "Delete" }));
+
+      expect(deleteMock).toHaveBeenCalledWith("a");
+      await waitFor(() => expect(onDeleted).toHaveBeenCalledWith("a"));
+    });
+
+    it("shows progress, locks both buttons, and ignores Escape while deleting", async () => {
+      deleteMock.mockReturnValue(new Promise(() => {}));
+      const { user } = await openDelete();
+
+      await user.click(screen.getByRole("button", { name: "Delete" }));
+
+      expect(screen.getByRole("button", { name: "Deleting..." })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "Cancel" })).toBeDisabled();
+      fireEvent.keyDown(screen.getByRole("group"), { key: "Escape" });
+      expect(screen.getByRole("group")).toBeInTheDocument();
+      expect(deleteMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("says what went wrong, does not report it deleted, and can be tried again", async () => {
+      deleteMock.mockResolvedValueOnce({ ok: false, message: "Couldn't delete that just now. Nothing was removed." });
+      deleteMock.mockResolvedValueOnce({ ok: true, result: null });
+      const { user, onDeleted } = await openDelete();
+
+      await user.click(screen.getByRole("button", { name: "Delete" }));
+
+      expect(await screen.findByRole("alert")).toHaveTextContent("Nothing was removed");
+      expect(onDeleted).not.toHaveBeenCalled();
+      expect(screen.getByRole("button", { name: "Delete" })).toBeEnabled();
+
+      await user.click(screen.getByRole("button", { name: "Delete" }));
+
+      await waitFor(() => expect(onDeleted).toHaveBeenCalledWith("a"));
+    });
+
+    it("asks about only the row that was chosen", async () => {
+      const user = userEvent.setup();
+      render(<DocumentList documents={[doc("ready", "a", "one.pdf"), doc("ready", "b", "two.pdf")]} />);
+
+      await user.click(screen.getByRole("button", { name: "Delete two.pdf" }));
+
+      expect(screen.getAllByRole("group")).toHaveLength(1);
+      expect(screen.getByRole("group", { name: "Delete two.pdf" })).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: /one\.pdf/ })).toBeInTheDocument();
     });
   });
 });
