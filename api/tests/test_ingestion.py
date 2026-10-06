@@ -8,6 +8,7 @@ from types import SimpleNamespace
 
 import pymupdf
 import pytest
+from botocore.exceptions import ClientError as BotoClientError
 from google.genai import errors as genai_errors
 from PIL import Image, ImageDraw, ImageFont
 from sqlalchemy import select
@@ -15,10 +16,14 @@ from sqlalchemy import select
 from app import ingestion as ingestion_module
 from app.ingestion import (
     DEFAULT_RETRY_WAIT_SECONDS,
+    FAILURE_REASONS,
     MAX_RATE_LIMIT_RETRIES,
     MAX_RETRY_WAIT_SECONDS,
+    UnreadableFileError,
     _normalize,
+    classify_failure,
     embed_texts,
+    extract_pages,
     ingest_document,
 )
 from app.models import EMBEDDING_DIM, Clause, Document, Embedding, User
@@ -427,8 +432,8 @@ def _record_stamps(monkeypatch) -> list[tuple[str, bool]]:
     stamped: list[tuple[str, bool]] = []
     real_set_status = ingestion_module._set_status
 
-    def spying_set_status(doc, status):
-        real_set_status(doc, status)
+    def spying_set_status(doc, status, failure_reason=None):
+        real_set_status(doc, status, failure_reason)
         stamped.append((status, _is_just_now(doc.status_changed_at)))
 
     monkeypatch.setattr("app.ingestion._set_status", spying_set_status)
@@ -500,3 +505,163 @@ async def test_a_document_is_stamped_when_it_starts_being_read_not_only_when_it_
     # A read that waits minutes on the rate limit is "processing" for all that time, and the moment
     # it started is what a stalled read is measured from.
     assert stamped == [("processing", True), ("ready", True)]
+
+
+# --- why a read failed: each way is told apart, so the page can say what to do ---
+
+
+def test_every_failure_reason_the_code_can_produce_is_a_known_one():
+    produced = {
+        classify_failure(UnreadableFileError("x")),
+        classify_failure(BotoClientError({"Error": {"Code": "500"}}, "GetObject")),
+        classify_failure(_rate_limited()),
+        classify_failure(_api_error(429, "Quota exceeded, quotaId: EmbedContentRequestsPerDay")),
+        classify_failure(_api_error(503, "overloaded")),
+        classify_failure(RuntimeError("anything else")),
+    }
+    assert produced <= set(FAILURE_REASONS)
+    assert len(produced) == 6  # and each of these ways has its own reason
+
+
+@pytest.mark.parametrize(
+    ("error", "reason"),
+    [
+        (UnreadableFileError("damaged"), "unreadable_file"),
+        (BotoClientError({"Error": {"Code": "NoSuchKey"}}, "GetObject"), "storage"),
+        (_rate_limited(), "rate_limit"),
+        (_api_error(429, "Please retry in 3s"), "rate_limit"),
+        (_api_error(429, "quotaId: GenerateRequestsPerDayPerProjectPerModel"), "daily_limit"),
+        (_api_error(500, "internal"), "service_error"),
+        (_api_error(400, "bad request"), "service_error"),
+        (RuntimeError("something nobody planned for"), "unknown"),
+        (ValueError("also unplanned"), "unknown"),
+    ],
+)
+def test_classify_failure_names_the_reason(error, reason):
+    assert classify_failure(error) == reason
+
+
+def test_a_damaged_pdf_is_reported_as_unreadable_not_as_a_crash():
+    with pytest.raises(UnreadableFileError):
+        extract_pages(b"this is not a pdf at all " * 20, "application/pdf")
+
+
+def test_an_empty_file_is_reported_as_unreadable():
+    with pytest.raises(UnreadableFileError):
+        extract_pages(b"", "application/pdf")
+
+
+def test_a_password_protected_pdf_is_reported_as_unreadable():
+    document = pymupdf.open()
+    document.new_page().insert_text((72, 72), "secret text")
+    locked = document.tobytes(encryption=pymupdf.PDF_ENCRYPT_AES_256, user_pw="pw", owner_pw="pw")
+
+    with pytest.raises(UnreadableFileError, match="password"):
+        extract_pages(locked, "application/pdf")
+
+
+def test_bytes_that_are_not_an_image_are_reported_as_unreadable():
+    with pytest.raises(UnreadableFileError):
+        extract_pages(b"definitely not an image", "image/png")
+
+
+async def _failed_read(db_session, test_user, monkeypatch, *, download=None, embed=None, pdf=None):
+    document = _make_document(test_user, failure_reason=None)
+    db_session.add(document)
+    await db_session.commit()
+    await db_session.refresh(document)
+
+    pdf_bytes = pdf if pdf is not None else _make_pdf_bytes(["Some real page text."])
+    monkeypatch.setattr("app.ingestion.download_file", download or (lambda key: pdf_bytes))
+    monkeypatch.setattr(
+        "app.ingestion.embed_texts",
+        embed or (lambda texts: [[0.1] * EMBEDDING_DIM for _ in texts]),
+    )
+
+    await ingest_document(document.id)
+    await db_session.refresh(document)
+    return document
+
+
+async def test_a_pdf_with_no_text_fails_with_the_reason_no_text(db_session, test_user, monkeypatch):
+    blank = pymupdf.open()
+    blank.new_page()
+
+    document = await _failed_read(db_session, test_user, monkeypatch, pdf=blank.tobytes())
+
+    assert (document.status, document.failure_reason) == ("failed", "no_text")
+
+
+async def test_a_damaged_pdf_fails_with_the_reason_unreadable_file(db_session, test_user, monkeypatch):
+    document = await _failed_read(db_session, test_user, monkeypatch, pdf=b"garbage " * 50)
+
+    assert (document.status, document.failure_reason) == ("failed", "unreadable_file")
+
+
+async def test_a_file_that_cannot_be_fetched_fails_with_the_reason_storage(
+    db_session, test_user, monkeypatch
+):
+    def failing_download(key):
+        raise BotoClientError({"Error": {"Code": "InternalError"}}, "GetObject")
+
+    document = await _failed_read(db_session, test_user, monkeypatch, download=failing_download)
+
+    assert (document.status, document.failure_reason) == ("failed", "storage")
+
+
+async def test_a_rate_limit_that_never_clears_fails_with_the_reason_rate_limit(
+    db_session, test_user, monkeypatch
+):
+    def always_limited(texts):
+        raise _rate_limited()
+
+    document = await _failed_read(db_session, test_user, monkeypatch, embed=always_limited)
+
+    assert (document.status, document.failure_reason) == ("failed", "rate_limit")
+
+
+async def test_a_daily_quota_fails_with_the_reason_daily_limit(db_session, test_user, monkeypatch):
+    def daily(texts):
+        raise _api_error(429, "quotaId: EmbedContentRequestsPerDay")
+
+    document = await _failed_read(db_session, test_user, monkeypatch, embed=daily)
+
+    assert (document.status, document.failure_reason) == ("failed", "daily_limit")
+
+
+async def test_an_unexpected_error_fails_with_the_reason_unknown(db_session, test_user, monkeypatch):
+    def broken(texts):
+        raise RuntimeError("something nobody planned for")
+
+    document = await _failed_read(db_session, test_user, monkeypatch, embed=broken)
+
+    assert (document.status, document.failure_reason) == ("failed", "unknown")
+
+
+async def test_a_successful_read_clears_a_reason_left_from_an_earlier_failure(
+    db_session, test_user, monkeypatch
+):
+    document = _make_document(test_user, status="uploaded", failure_reason="rate_limit")
+    db_session.add(document)
+    await db_session.commit()
+    await db_session.refresh(document)
+    pdf_bytes = _make_pdf_bytes(["Some real page text."])
+    monkeypatch.setattr("app.ingestion.download_file", lambda key: pdf_bytes)
+    monkeypatch.setattr("app.ingestion.embed_texts", lambda texts: [[0.1] * EMBEDDING_DIM for _ in texts])
+
+    await ingest_document(document.id)
+
+    await db_session.refresh(document)
+    assert (document.status, document.failure_reason) == ("ready", None)
+
+
+async def test_a_reason_is_only_ever_kept_while_the_document_is_failed(db_session, test_user):
+    from app.ingestion import _set_status
+
+    document = _make_document(test_user)
+
+    _set_status(document, "failed", "no_text")
+    assert document.failure_reason == "no_text"
+
+    _set_status(document, "processing", "no_text")  # a reason passed with another status is dropped
+    assert document.failure_reason is None

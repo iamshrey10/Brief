@@ -6,6 +6,7 @@ import uuid
 from datetime import datetime, timezone
 
 import pymupdf
+from botocore.exceptions import BotoCoreError, ClientError
 from google import genai
 from google.genai import errors as genai_errors
 from google.genai import types
@@ -41,11 +42,44 @@ _sleep = time.sleep
 _client: genai.Client | None = None
 
 
-def _set_status(document: Document, status: str) -> None:
+class UnreadableFileError(Exception):
+    """The file is not something that can be opened at all: damaged, not really the kind of file it
+    says it is, or protected with a password."""
+
+
+# The reasons a read can fail, as short codes stored on the document. The page turns each into
+# plain words, so a reader is told what to do about it instead of just "Couldn't read".
+FAILURE_REASONS = (
+    "no_text",
+    "unreadable_file",
+    "storage",
+    "rate_limit",
+    "daily_limit",
+    "service_error",
+    "unknown",
+)
+
+
+def classify_failure(error: BaseException) -> str:
+    """Which of the failure reasons an exception from reading a document belongs to."""
+    if isinstance(error, UnreadableFileError):
+        return "unreadable_file"
+    if isinstance(error, (ClientError, BotoCoreError)):
+        return "storage"
+    if isinstance(error, genai_errors.APIError):
+        if error.code == 429:
+            return "daily_limit" if "PerDay" in str(error) else "rate_limit"
+        return "service_error"
+    return "unknown"
+
+
+def _set_status(document: Document, status: str, failure_reason: str | None = None) -> None:
     """Changes a document's status and remembers when, so a read that stalls can be told apart
-    from one that is simply long."""
+    from one that is simply long. The reason is only kept while the status is failed, so a document
+    that is read again, or succeeds, never carries an old reason."""
     document.status = status
     document.status_changed_at = datetime.now(timezone.utc)
+    document.failure_reason = failure_reason if status == "failed" else None
 
 
 def get_genai_client() -> genai.Client:
@@ -59,11 +93,19 @@ def extract_pages(file_bytes: bytes, content_type: str) -> tuple[list[str], floa
     """Returns (page_texts, ocr_confidence). Confidence is None for born-digital PDFs,
     which don't go through OCR at all."""
     if content_type.startswith("image/"):
-        text, confidence = ocr_image(file_bytes)
+        try:
+            text, confidence = ocr_image(file_bytes)
+        except OSError as error:  # PIL's UnidentifiedImageError is an OSError
+            raise UnreadableFileError("the image could not be opened") from error
         return [text], confidence
 
-    doc = pymupdf.open(stream=file_bytes, filetype="pdf")
     try:
+        doc = pymupdf.open(stream=file_bytes, filetype="pdf")
+    except (pymupdf.EmptyFileError, pymupdf.FileDataError) as error:
+        raise UnreadableFileError("the PDF could not be opened") from error
+    try:
+        if doc.needs_pass:
+            raise UnreadableFileError("the PDF is protected with a password")
         return [page_text(page) for page in doc], None
     finally:
         doc.close()
@@ -145,7 +187,7 @@ async def ingest_document(document_id: uuid.UUID) -> None:
                     chunk_records.append((page_number, char_start, char_end, chunk_text))
 
             if not chunk_records:
-                _set_status(document, "failed")
+                _set_status(document, "failed", "no_text")
                 await session.commit()
                 logger.error("no extractable text found in document %s", document_id)
                 return
@@ -174,10 +216,10 @@ async def ingest_document(document_id: uuid.UUID) -> None:
             else:
                 _set_status(document, "ready")
             await session.commit()
-        except Exception:
+        except Exception as error:
             logger.exception("ingestion failed for document %s", document_id)
             await session.rollback()
             document = await session.get(Document, document_id)
             if document is not None:
-                _set_status(document, "failed")
+                _set_status(document, "failed", classify_failure(error))
                 await session.commit()
