@@ -849,6 +849,7 @@ async def _document_with(
     age_minutes: int = 0,
     changed_minutes_ago: int | None = None,
     failure_reason: str | None = None,
+    progress: tuple[int, int] | None = None,
 ) -> Document:
     """A document uploaded `age_minutes` ago whose status last changed `changed_minutes_ago`
     minutes ago. Left out, the status is taken to have changed when it was uploaded."""
@@ -867,6 +868,8 @@ async def _document_with(
             None if changed_minutes_ago is None else now - timedelta(minutes=changed_minutes_ago)
         ),
         failure_reason=failure_reason,
+        progress_done=None if progress is None else progress[0],
+        progress_total=None if progress is None else progress[1],
     )
     db_session.add(document)
     await db_session.commit()
@@ -1560,3 +1563,40 @@ async def test_a_document_remembers_how_far_its_read_has_got(db_session, test_us
     await db_session.refresh(document)
 
     assert (document.progress_done, document.progress_total) == (120, 286)
+
+
+async def test_the_list_shows_how_far_a_read_has_got(client, db_session, test_user):
+    await _document_with(db_session, test_user, "processing", progress=(120, 286))
+
+    (document,) = (await client.get("/documents")).json()
+
+    assert (document["progress_done"], document["progress_total"]) == (120, 286)
+
+
+async def test_a_single_document_shows_how_far_its_read_has_got(client, db_session, test_user):
+    document = await _document_with(db_session, test_user, "processing", progress=(5, 40))
+
+    body = (await client.get(f"/documents/{document.id}")).json()
+
+    assert (body["progress_done"], body["progress_total"]) == (5, 40)
+
+
+async def test_a_document_with_no_progress_says_so(client, db_session, test_user):
+    await _document_with(db_session, test_user, "ready")
+
+    (document,) = (await client.get("/documents")).json()
+
+    assert (document["progress_done"], document["progress_total"]) == (None, None)
+
+
+async def test_a_retry_clears_any_old_progress(client, db_session, test_user, monkeypatch):
+    _record_ingestion(monkeypatch)
+    document = await _document_with(
+        db_session, test_user, "processing", age_minutes=60, changed_minutes_ago=60, progress=(10, 90)
+    )
+
+    body = (await client.post(f"/documents/{document.id}/retry")).json()
+
+    assert (body["progress_done"], body["progress_total"]) == (None, None)
+    await db_session.refresh(document)
+    assert (document.progress_done, document.progress_total) == (None, None)
