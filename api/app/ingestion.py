@@ -11,6 +11,8 @@ from botocore.exceptions import BotoCoreError, ClientError
 from google import genai
 from google.genai import errors as genai_errors
 from google.genai import types
+from sqlalchemy import update
+from sqlalchemy.orm.attributes import flag_modified
 
 from app.clause_segmentation import segment_page_into_clauses
 from app.config import settings
@@ -93,6 +95,26 @@ def _set_status(document: Document, status: str, failure_reason: str | None = No
     document.status = status
     document.status_changed_at = datetime.now(timezone.utc)
     document.failure_reason = failure_reason if status == "failed" else None
+    # Progress only means something while a read is under way.
+    if status != "processing":
+        document.progress_done = None
+        document.progress_total = None
+        # Progress is saved by a different session, so this one still believes it is empty and
+        # would see "no change" and skip clearing it. Mark it changed so the clear is written.
+        flag_modified(document, "progress_done")
+        flag_modified(document, "progress_total")
+
+
+async def _save_progress(document_id: uuid.UUID, done: int, total: int) -> None:
+    """Records how many pieces of a document are embedded, in its own short transaction so a person
+    polling the page sees it while the read is still going."""
+    async with async_session() as session:
+        await session.execute(
+            update(Document)
+            .where(Document.id == document_id)
+            .values(progress_done=done, progress_total=total)
+        )
+        await session.commit()
 
 
 def get_genai_client() -> genai.Client:
@@ -214,7 +236,17 @@ async def ingest_document(document_id: uuid.UUID) -> None:
 
             # Off the event loop: a long document can wait minutes for the rate limit, and
             # blocking here would freeze every other request the server is handling.
-            vectors = await asyncio.to_thread(embed_texts, [text for *_rest, text in chunk_records])
+            texts = [text for *_rest, text in chunk_records]
+            loop = asyncio.get_running_loop()
+            await _save_progress(document.id, 0, len(texts))
+
+            def report(done: int, total: int) -> None:
+                # Called from the worker thread, so hand the save back to the event loop and wait.
+                asyncio.run_coroutine_threadsafe(
+                    _save_progress(document_id, done, total), loop
+                ).result()
+
+            vectors = await asyncio.to_thread(embed_texts, texts, report)
 
             for index, ((page_number, char_start, char_end, chunk_text), vector) in enumerate(
                 zip(chunk_records, vectors, strict=True)

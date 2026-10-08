@@ -90,7 +90,7 @@ async def test_ingest_document_creates_matching_clauses_and_embeddings(
     monkeypatch.setattr("app.ingestion.download_file", lambda storage_key: pdf_bytes)
     monkeypatch.setattr(
         "app.ingestion.embed_texts",
-        lambda texts: [[0.1] * EMBEDDING_DIM for _ in texts],
+        lambda texts, on_progress=None: [[0.1] * EMBEDDING_DIM for _ in texts],
     )
 
     await ingest_document(document.id)
@@ -131,7 +131,7 @@ async def test_ingest_document_segments_numbered_text_into_real_clauses(
     monkeypatch.setattr("app.ingestion.download_file", lambda storage_key: pdf_bytes)
     monkeypatch.setattr(
         "app.ingestion.embed_texts",
-        lambda texts: [[0.1] * EMBEDDING_DIM for _ in texts],
+        lambda texts, on_progress=None: [[0.1] * EMBEDDING_DIM for _ in texts],
     )
 
     await ingest_document(document.id)
@@ -163,7 +163,7 @@ async def test_ingest_document_marks_failed_when_embedding_call_errors(
 
     pdf_bytes = _make_pdf_bytes(["Some real page text."])
 
-    def _raise(texts: list[str]):
+    def _raise(texts: list[str], on_progress=None):
         raise RuntimeError("embedding api unavailable")
 
     monkeypatch.setattr("app.ingestion.download_file", lambda storage_key: pdf_bytes)
@@ -222,7 +222,7 @@ async def test_ingest_document_processes_a_real_photographed_page_via_ocr(
     monkeypatch.setattr("app.ingestion.download_file", lambda storage_key: image_bytes)
     monkeypatch.setattr(
         "app.ingestion.embed_texts",
-        lambda texts: [[0.1] * EMBEDDING_DIM for _ in texts],
+        lambda texts, on_progress=None: [[0.1] * EMBEDDING_DIM for _ in texts],
     )
 
     await ingest_document(document.id)
@@ -255,7 +255,7 @@ async def test_ingest_document_marks_needs_retake_for_low_confidence_ocr(
     )
     monkeypatch.setattr(
         "app.ingestion.embed_texts",
-        lambda texts: [[0.1] * EMBEDDING_DIM for _ in texts],
+        lambda texts, on_progress=None: [[0.1] * EMBEDDING_DIM for _ in texts],
     )
 
     await ingest_document(document.id)
@@ -413,7 +413,7 @@ async def test_ingestion_does_not_freeze_the_server_while_waiting_on_the_rate_li
     db_session.add(document)
     await db_session.commit()
 
-    def slow_embed(texts):
+    def slow_embed(texts, on_progress=None):
         time.sleep(0.3)  # stands in for waiting out a rate limit
         return [[1.0] + [0.0] * (EMBEDDING_DIM - 1) for _ in texts]
 
@@ -471,7 +471,7 @@ async def test_a_document_that_reads_successfully_records_when_it_became_ready(
     document = await _document_long_ago(db_session, test_user)
     pdf_bytes = _make_pdf_bytes(["Some real page text."])
     monkeypatch.setattr("app.ingestion.download_file", lambda storage_key: pdf_bytes)
-    monkeypatch.setattr("app.ingestion.embed_texts", lambda texts: [[0.1] * EMBEDDING_DIM for _ in texts])
+    monkeypatch.setattr("app.ingestion.embed_texts", lambda texts, on_progress=None: [[0.1] * EMBEDDING_DIM for _ in texts])
     stamped = _record_stamps(monkeypatch)
 
     await ingest_document(document.id)
@@ -486,7 +486,7 @@ async def test_a_document_that_fails_records_when_it_failed(db_session, test_use
     document = await _document_long_ago(db_session, test_user)
     pdf_bytes = _make_pdf_bytes(["Some real page text."])
 
-    def _raise(texts):
+    def _raise(texts, on_progress=None):
         raise RuntimeError("embedding api unavailable")
 
     monkeypatch.setattr("app.ingestion.download_file", lambda storage_key: pdf_bytes)
@@ -522,7 +522,7 @@ async def test_a_document_is_stamped_when_it_starts_being_read_not_only_when_it_
     document = await _document_long_ago(db_session, test_user)
     pdf_bytes = _make_pdf_bytes(["Some real page text."])
     monkeypatch.setattr("app.ingestion.download_file", lambda storage_key: pdf_bytes)
-    monkeypatch.setattr("app.ingestion.embed_texts", lambda texts: [[0.1] * EMBEDDING_DIM for _ in texts])
+    monkeypatch.setattr("app.ingestion.embed_texts", lambda texts, on_progress=None: [[0.1] * EMBEDDING_DIM for _ in texts])
     stamped = _record_stamps(monkeypatch)
 
     await ingest_document(document.id)
@@ -602,7 +602,7 @@ async def _failed_read(db_session, test_user, monkeypatch, *, download=None, emb
     monkeypatch.setattr("app.ingestion.download_file", download or (lambda key: pdf_bytes))
     monkeypatch.setattr(
         "app.ingestion.embed_texts",
-        embed or (lambda texts: [[0.1] * EMBEDDING_DIM for _ in texts]),
+        embed or (lambda texts, on_progress=None: [[0.1] * EMBEDDING_DIM for _ in texts]),
     )
 
     await ingest_document(document.id)
@@ -639,7 +639,7 @@ async def test_a_file_that_cannot_be_fetched_fails_with_the_reason_storage(
 async def test_a_rate_limit_that_never_clears_fails_with_the_reason_rate_limit(
     db_session, test_user, monkeypatch
 ):
-    def always_limited(texts):
+    def always_limited(texts, on_progress=None):
         raise _rate_limited()
 
     document = await _failed_read(db_session, test_user, monkeypatch, embed=always_limited)
@@ -648,7 +648,7 @@ async def test_a_rate_limit_that_never_clears_fails_with_the_reason_rate_limit(
 
 
 async def test_a_daily_quota_fails_with_the_reason_daily_limit(db_session, test_user, monkeypatch):
-    def daily(texts):
+    def daily(texts, on_progress=None):
         raise _api_error(429, "quotaId: EmbedContentRequestsPerDay")
 
     document = await _failed_read(db_session, test_user, monkeypatch, embed=daily)
@@ -657,7 +657,7 @@ async def test_a_daily_quota_fails_with_the_reason_daily_limit(db_session, test_
 
 
 async def test_an_unexpected_error_fails_with_the_reason_unknown(db_session, test_user, monkeypatch):
-    def broken(texts):
+    def broken(texts, on_progress=None):
         raise RuntimeError("something nobody planned for")
 
     document = await _failed_read(db_session, test_user, monkeypatch, embed=broken)
@@ -674,7 +674,7 @@ async def test_a_successful_read_clears_a_reason_left_from_an_earlier_failure(
     await db_session.refresh(document)
     pdf_bytes = _make_pdf_bytes(["Some real page text."])
     monkeypatch.setattr("app.ingestion.download_file", lambda key: pdf_bytes)
-    monkeypatch.setattr("app.ingestion.embed_texts", lambda texts: [[0.1] * EMBEDDING_DIM for _ in texts])
+    monkeypatch.setattr("app.ingestion.embed_texts", lambda texts, on_progress=None: [[0.1] * EMBEDDING_DIM for _ in texts])
 
     await ingest_document(document.id)
 
@@ -735,8 +735,73 @@ async def test_a_too_long_document_fails_with_the_reason_too_long(db_session, te
         test_user,
         monkeypatch,
         pdf=_make_pdf_bytes(["a page", "another page", "a third page"]),
-        embed=lambda texts: embedded.append(texts) or [[0.1] * EMBEDDING_DIM for _ in texts],
+        embed=lambda texts, on_progress=None: embedded.append(texts) or [[0.1] * EMBEDDING_DIM for _ in texts],
     )
 
     assert (document.status, document.failure_reason) == ("failed", "too_long")
     assert embedded == []  # nothing was sent to the paid service
+
+
+# --- the saved progress of a read ---
+
+
+async def _read_with_progress_spy(db_session, test_user, monkeypatch, *, pieces, fail_at=None):
+    """Reads a document whose embedding reports progress, and records what the database held
+    right after each save, so the test sees the progress a person's page would have seen."""
+    from app.db import async_session
+
+    seen: list[tuple[int | None, int | None]] = []
+    real_save = ingestion_module._save_progress
+
+    async def spying_save(document_id, done, total):
+        await real_save(document_id, done, total)
+        async with async_session() as session:
+            row = await session.get(Document, document_id)
+            seen.append((row.progress_done, row.progress_total))
+
+    monkeypatch.setattr(ingestion_module, "_save_progress", spying_save)
+
+    def embed(texts, on_progress=None):
+        for done in range(1, len(texts) + 1):
+            if on_progress is not None and done in pieces:
+                on_progress(done, len(texts))
+            if done == fail_at:
+                raise RuntimeError("broke part way")
+        return [[0.1] * EMBEDDING_DIM for _ in texts]
+
+    document = await _failed_read(
+        db_session,
+        test_user,
+        monkeypatch,
+        pdf=_make_pdf_bytes([f"Clause number {n}. It says something." for n in range(4)]),
+        embed=embed,
+    )
+    return document, seen
+
+
+async def test_progress_is_saved_as_zero_then_as_pieces_finish(db_session, test_user, monkeypatch):
+    document, seen = await _read_with_progress_spy(
+        db_session, test_user, monkeypatch, pieces={2}
+    )
+
+    total = seen[0][1]
+    assert total and total >= 2
+    assert seen[0] == (0, total)  # counted before any piece is embedded
+    assert seen[1] == (2, total)
+
+
+async def test_progress_is_cleared_when_the_read_finishes(db_session, test_user, monkeypatch):
+    document, _ = await _read_with_progress_spy(db_session, test_user, monkeypatch, pieces={1})
+
+    assert document.status == "ready"
+    assert (document.progress_done, document.progress_total) == (None, None)
+
+
+async def test_progress_is_cleared_when_the_read_fails_part_way(db_session, test_user, monkeypatch):
+    document, seen = await _read_with_progress_spy(
+        db_session, test_user, monkeypatch, pieces={1}, fail_at=2
+    )
+
+    assert document.status == "failed"
+    assert seen  # some progress was saved before it broke
+    assert (document.progress_done, document.progress_total) == (None, None)
