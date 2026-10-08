@@ -59,6 +59,17 @@ the ingestion pipeline (text extraction, or cleanup and OCR for photos, then spl
 and embedding them), hybrid search, grounded answers, and key-term extraction, all backed by
 Postgres.
 
+## Limits and what a failed read says
+
+Every page costs a reading call on a metered service, so there are limits: 50 MB a file, 25
+documents a person (delete one to make room), and 100 pages a document. A refused file is turned away
+before any page is read.
+
+When a read fails, the document says why and what to do about it: no text found, a file that cannot
+be opened (damaged or password protected), too many pages, a file that could not be fetched, the
+reading service being busy, or the day's reading limit being reached. While a long document is being
+read, its row shows how many parts are done so far.
+
 ## Running locally
 
 You will need Docker, Python 3.12, Node 22 with pnpm, and Tesseract for reading photos of pages
