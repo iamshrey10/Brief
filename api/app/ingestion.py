@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import re
+import threading
 import time
 import uuid
 from collections.abc import Callable
@@ -43,6 +44,10 @@ MAX_RETRY_WAIT_SECONDS = 70.0
 _sleep = time.sleep
 
 _client: genai.Client | None = None
+# Several threads can ask for the client at the same moment, for example when a document is read
+# more than once at a time. Without the lock each would build its own, and the extra ones, once
+# thrown away, close the connection the others are using.
+_client_lock = threading.Lock()
 
 
 class UnreadableFileError(Exception):
@@ -119,9 +124,10 @@ async def _save_progress(document_id: uuid.UUID, done: int, total: int) -> None:
 
 def get_genai_client() -> genai.Client:
     global _client
-    if _client is None:
-        _client = genai.Client(api_key=settings.gemini_api_key)
-    return _client
+    with _client_lock:
+        if _client is None:
+            _client = genai.Client(api_key=settings.gemini_api_key)
+        return _client
 
 
 def extract_pages(file_bytes: bytes, content_type: str) -> tuple[list[str], float | None]:

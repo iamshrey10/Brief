@@ -805,3 +805,35 @@ async def test_progress_is_cleared_when_the_read_fails_part_way(db_session, test
     assert document.status == "failed"
     assert seen  # some progress was saved before it broke
     assert (document.progress_done, document.progress_total) == (None, None)
+
+
+# --- one shared model client, even when several threads ask for it at once ---
+
+
+def test_the_model_client_is_created_once_even_when_threads_ask_at_the_same_moment(monkeypatch):
+    import threading
+
+    created: list[object] = []
+
+    class SlowToBuild:
+        def __init__(self, api_key=None):
+            time.sleep(0.05)  # long enough for every thread to be inside the "is it built yet" check
+            created.append(self)
+
+    monkeypatch.setattr(ingestion_module, "_client", None)
+    monkeypatch.setattr(ingestion_module.genai, "Client", SlowToBuild)
+    got: list[object] = []
+    barrier = threading.Barrier(8)
+
+    def ask():
+        barrier.wait()
+        got.append(ingestion_module.get_genai_client())
+
+    threads = [threading.Thread(target=ask) for _ in range(8)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert len(created) == 1
+    assert len({id(client) for client in got}) == 1
