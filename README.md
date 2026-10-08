@@ -28,6 +28,16 @@ The text of an uploaded contract is treated as text to read, never as instructio
 terms such as the interest rate or the late fee go through the same checks, and every number in a
 term must also appear in its quote.
 
+The key terms and the "Before you sign" questions are each read three times with fixed seeds and
+kept by vote: a term or answer stays only if most of the reads found it, and the second check on the
+questions is also a vote of three. The same contract read twice by a model can come out differently,
+and this makes the result steadier. On one real 36 clause lease, four reads of the key terms changed
+four fields between runs before and none after, and six reads of the questions gave the same answers
+every time. Steadier is not the same as more accurate: the second check judges its items together, and
+shown on its own the lease's deposit is confirmed every time, while in the group it is often not, so
+that deposit is now steadily left out. The cost is time, a document takes several times longer to
+read, because each one now makes about eleven model calls.
+
 Search and answers are measured, not assumed. The reports in [evals/](evals/) show the scores and
 where they fall short.
 
