@@ -485,7 +485,7 @@ async def test_the_judge_is_shown_only_the_answers_that_passed_the_first_checks(
 
     await answer_checklist(db_session, document.id, "loan")
 
-    assert shown == [["prepayment"]] * CHECKLIST_RUNS
+    assert shown == [["prepayment"]] * 2
 
 
 async def test_when_nothing_is_answered_the_judge_is_not_called(db_session, test_user, monkeypatch):
@@ -737,7 +737,7 @@ async def test_the_judge_is_asked_once_per_seed_and_only_about_the_answers_that_
 
     await answer_checklist(db_session, document.id, "loan")
 
-    assert judged == [["prepayment"]] * CHECKLIST_RUNS  # the same question, once per seed
+    assert judged == [["prepayment"]] * 2  # judged alone, with the first two seeds
 
 
 async def test_the_judge_is_not_asked_when_no_answer_won_the_vote(db_session, test_user, monkeypatch):
@@ -792,41 +792,108 @@ async def test_if_one_checklist_run_fails_the_whole_request_fails(db_session, te
 # --- the second check is also run once per seed and kept by vote ---
 
 
-async def test_the_judge_is_run_with_each_seed(db_session, test_user, monkeypatch):
-    document = await _document(db_session, test_user, [PREPAY_TEXT])
-    _, judged = _scripted(monkeypatch, [PREPAY_YES()] * CHECKLIST_RUNS)
+TWO_ANSWERS = lambda: ChecklistResponse(  # noqa: E731
+    answers=[
+        _entry("prepayment", "Yes, free.", [("C1", "without penalty")]),
+        _entry("late_payment", "A $25.00 late charge.", [("C2", "late charge of $25.00")]),
+    ]
+)
+
+
+def _by_seed(verdicts: dict[int, bool]):
+    """A judge whose verdict depends only on the seed it is called with."""
+    return lambda items, seed=None: {q.id for q, _ in items} if verdicts[seed] else set()
+
+
+async def test_each_answer_is_judged_on_its_own_not_in_a_group(db_session, test_user, monkeypatch):
+    document = await _document(db_session, test_user, [PREPAY_TEXT, LATE_TEXT])
+    _, judged = _scripted(monkeypatch, [TWO_ANSWERS()] * CHECKLIST_RUNS)
 
     await answer_checklist(db_session, document.id, "loan")
 
-    assert sorted(judged.seeds) == sorted(CHECKLIST_SEEDS)
+    assert all(len(ids) == 1 for ids in judged)
+    assert sorted(ids[0] for ids in judged) == ["late_payment", "late_payment", "prepayment", "prepayment"]
 
 
-async def test_an_answer_most_judge_runs_confirm_is_shown(db_session, test_user, monkeypatch):
+async def test_the_first_two_seeds_are_used_and_a_third_only_when_they_disagree(
+    db_session, test_user, monkeypatch
+):
     document = await _document(db_session, test_user, [PREPAY_TEXT])
-    verdicts = iter([True, False, True])
-    _scripted(
+    _, agreeing = _scripted(monkeypatch, [PREPAY_YES()] * CHECKLIST_RUNS)
+    await answer_checklist(db_session, document.id, "loan")
+    assert sorted(agreeing.seeds) == sorted(CHECKLIST_SEEDS[:2])
+
+    _, split = _scripted(
         monkeypatch,
         [PREPAY_YES()] * CHECKLIST_RUNS,
-        judge=lambda items, seed=None: {q.id for q, _ in items} if next(verdicts) else set(),
+        judge=_by_seed({CHECKLIST_SEEDS[0]: True, CHECKLIST_SEEDS[1]: False, CHECKLIST_SEEDS[2]: True}),
     )
-
-    result = await answer_checklist(db_session, document.id, "loan")
-
-    assert next(a for a in result.answers if a.id == "prepayment").status == "answered"
+    await answer_checklist(db_session, document.id, "loan")
+    assert sorted(split.seeds) == sorted(CHECKLIST_SEEDS)
 
 
-async def test_an_answer_only_one_judge_run_confirms_is_withheld(db_session, test_user, monkeypatch):
+async def test_when_the_first_two_verdicts_disagree_the_third_decides(db_session, test_user, monkeypatch):
     document = await _document(db_session, test_user, [PREPAY_TEXT])
-    verdicts = iter([False, True, False])
+    first, second, third = CHECKLIST_SEEDS
+
     _scripted(
         monkeypatch,
         [PREPAY_YES()] * CHECKLIST_RUNS,
-        judge=lambda items, seed=None: {q.id for q, _ in items} if next(verdicts) else set(),
+        judge=_by_seed({first: True, second: False, third: True}),
+    )
+    kept = await answer_checklist(db_session, document.id, "loan")
+    assert next(a for a in kept.answers if a.id == "prepayment").status == "answered"
+
+    _scripted(
+        monkeypatch,
+        [PREPAY_YES()] * CHECKLIST_RUNS,
+        judge=_by_seed({first: True, second: False, third: False}),
+    )
+    withheld = await answer_checklist(db_session, document.id, "loan")
+    assert next(a for a in withheld.answers if a.id == "prepayment").status == "not_mentioned"
+
+
+async def test_two_matching_verdicts_decide_without_a_third(db_session, test_user, monkeypatch):
+    document = await _document(db_session, test_user, [PREPAY_TEXT])
+    first, second, third = CHECKLIST_SEEDS
+    _, judged = _scripted(
+        monkeypatch,
+        [PREPAY_YES()] * CHECKLIST_RUNS,
+        judge=_by_seed({first: False, second: False, third: True}),
     )
 
     result = await answer_checklist(db_session, document.id, "loan")
 
     assert next(a for a in result.answers if a.id == "prepayment").status == "not_mentioned"
+    assert third not in judged.seeds
+
+
+async def test_one_answer_can_be_confirmed_while_another_is_withheld(db_session, test_user, monkeypatch):
+    document = await _document(db_session, test_user, [PREPAY_TEXT, LATE_TEXT])
+    _scripted(
+        monkeypatch,
+        [TWO_ANSWERS()] * CHECKLIST_RUNS,
+        judge=lambda items, seed=None: {q.id for q, _ in items} if items[0][0].id == "prepayment" else set(),
+    )
+
+    result = await answer_checklist(db_session, document.id, "loan")
+
+    statuses = {a.id: a.status for a in result.answers}
+    assert statuses["prepayment"] == "answered" and statuses["late_payment"] == "not_mentioned"
+
+
+async def test_if_any_single_judge_call_fails_the_whole_checklist_fails(db_session, test_user, monkeypatch):
+    document = await _document(db_session, test_user, [PREPAY_TEXT, LATE_TEXT])
+
+    def flaky(items, seed=None):
+        if items[0][0].id == "late_payment":
+            raise ChecklistGenerationError("bad verdict")
+        return {q.id for q, _ in items}
+
+    _scripted(monkeypatch, [TWO_ANSWERS()] * CHECKLIST_RUNS, judge=flaky)
+
+    with pytest.raises(ChecklistGenerationError):
+        await answer_checklist(db_session, document.id, "loan")
 
 
 def test_judge_answers_passes_the_seed_it_is_given(monkeypatch):

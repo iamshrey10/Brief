@@ -246,6 +246,19 @@ def verify_answers(
     return results
 
 
+async def _confirmed_alone(question: ChecklistQuestion, answer: ChecklistAnswer) -> bool:
+    """Whether the judge confirms this one answer, shown by itself. Two seeded looks are taken, and a
+    third only if they disagree, so the verdict is steady without always paying for three calls."""
+    first, second, third = CHECKLIST_SEEDS[:3]
+    looks = await asyncio.gather(
+        *(asyncio.to_thread(judge_answers, [(question, answer)], seed) for seed in (first, second))
+    )
+    confirmed = [answer.id in look for look in looks]
+    if confirmed[0] == confirmed[1]:
+        return confirmed[0]
+    return answer.id in await asyncio.to_thread(judge_answers, [(question, answer)], third)
+
+
 def _share_evidence(a: ChecklistAnswer, b: ChecklistAnswer) -> bool:
     """Two answers agree when they rest on at least one of the same quotes in the same clause."""
     return bool({(e.clause_id, e.quote) for e in a.evidence} & {(e.clause_id, e.quote) for e in b.evidence})
@@ -278,18 +291,13 @@ async def answer_checklist(
     # The quote and number checks prove the evidence is real, not that it answers the question.
     # A second, independent look decides that. An answer it does not confirm is withheld, and
     # if the check itself fails the whole request fails rather than show answers unchecked.
-    # The judge is a model call too, and was seen to give different verdicts on the same input, so it
-    # is asked once per seed and an answer is confirmed only if most of those verdicts confirm it.
+    # The judge is a model call too. Shown several answers together, its verdict on one depended on
+    # which others were in the group, so each answer is judged alone. It is asked with two seeds, and
+    # with a third only when those two disagree, so most answers cost two calls.
     to_judge = [(q, a) for q, a in zip(questions, verified, strict=True) if a.status == "answered"]
     if to_judge:
-        verdicts = await asyncio.gather(
-            *(asyncio.to_thread(judge_answers, to_judge, seed) for seed in CHECKLIST_SEEDS)
-        )
-        confirmed = {
-            answer_id
-            for answer_id in {a.id for _q, a in to_judge}
-            if sum(answer_id in verdict for verdict in verdicts) * 2 > len(verdicts)
-        }
+        verdicts = await asyncio.gather(*(_confirmed_alone(q, a) for q, a in to_judge))
+        confirmed = {a.id for (_q, a), ok in zip(to_judge, verdicts, strict=True) if ok}
         verified = [
             _not_mentioned(q) if a.status == "answered" and a.id not in confirmed else a
             for q, a in zip(questions, verified, strict=True)
