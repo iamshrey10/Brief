@@ -113,8 +113,8 @@ def install_recording_model() -> list[ChecklistResponse]:
     real_generate = _with_retries(checklist_module.generate_checklist)
     raw_responses: list[ChecklistResponse] = []
 
-    def recording_generate(questions, clauses):
-        response = real_generate(questions, clauses)
+    def recording_generate(questions, clauses, seed=None):
+        response = real_generate(questions, clauses, seed)
         raw_responses.append(response)
         return response
 
@@ -256,9 +256,16 @@ async def main() -> None:
                     result = await answer_checklist(session, document.id, doc_type)
                     seconds.append(time.monotonic() - started)
 
-                    raw_found: dict[str, bool] = {}
-                    for entry in raw_responses[-1].answers:
-                        raw_found.setdefault(entry.id, entry.found)
+                    # Each run reads the document once per seed. The raw model "found" an answer
+                    # when most of those raw reads did, before our checks ran.
+                    votes: dict[str, int] = {}
+                    for raw in raw_responses:
+                        seen_ids: set[str] = set()
+                        for entry in raw.answers:
+                            if entry.id not in seen_ids:
+                                seen_ids.add(entry.id)
+                                votes[entry.id] = votes.get(entry.id, 0) + int(entry.found)
+                    raw_found = {name: n * 2 > len(raw_responses) for name, n in votes.items()}
 
                     for item in result.answers:
                         expected = spec["expected"][item.id]

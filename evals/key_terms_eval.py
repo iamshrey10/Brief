@@ -80,10 +80,10 @@ def install_recording_model() -> list[ExtractionResponse]:
     real_generate = key_terms_module.generate_key_terms
     raw_responses: list[ExtractionResponse] = []
 
-    def recording_generate(fields, clauses):
+    def recording_generate(fields, clauses, seed=None):
         for attempt in range(1, MAX_ATTEMPTS + 1):
             try:
-                response = real_generate(fields, clauses)
+                response = real_generate(fields, clauses, seed)
                 raw_responses.append(response)
                 return response
             except genai_errors.APIError as error:
@@ -123,7 +123,7 @@ def render_report(outcomes: list[FieldOutcome], seconds: list[float]) -> str:
         f"Model under test: `{MODEL}`.",
         "",
         f"A loan document (9 clauses) and a lease document (8 clauses) built from the "
-        f"retrieval fixture, each extracted {REPEATS} times with real Gemini and the real quote "
+        f"retrieval fixture, each extracted {REPEATS} times (each extraction is itself the vote of {key_terms_module.KEY_TERMS_RUNS} seeded reads) with real Gemini and the real quote "
         "and number checks. Ground truth was written before any results were seen and not "
         "tuned afterward. Most fields are not stated in the fixture on purpose, so inventing a "
         "value is a measurable failure.",
@@ -206,9 +206,16 @@ async def main() -> None:
                     result = await extract_key_terms(session, document.id, doc_type)
                     seconds.append(time.monotonic() - started)
 
-                    raw_found = {}
-                    for entry in raw_responses[-1].fields:
-                        raw_found.setdefault(entry.name, entry.found)
+                    # Each extraction reads the document once per seed. The raw model "found" a
+                    # term when most of those raw reads did, before our checks ran.
+                    votes: dict[str, int] = {}
+                    for raw in raw_responses:
+                        seen_names: set[str] = set()
+                        for entry in raw.fields:
+                            if entry.name not in seen_names:
+                                seen_names.add(entry.name)
+                                votes[entry.name] = votes.get(entry.name, 0) + int(entry.found)
+                    raw_found = {name: n * 2 > len(raw_responses) for name, n in votes.items()}
 
                     for field in fields_for(doc_type):
                         if field.name in spec["ambiguous"]:
