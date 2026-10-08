@@ -9,6 +9,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.checklist_questions import ChecklistQuestion, questions_for
+from app.consensus import majority_of_runs
 from app.document_text import load_prompt_clauses
 from app.grounding import numbers_supported, quote_appears_in
 from app.ingestion import get_genai_client
@@ -18,6 +19,12 @@ from app.qa import ANSWER_MODEL
 # Same pinned model as question answering and key terms, so one set of evaluations covers all
 # three. Re-run evals/checklist_eval.py whenever this changes.
 CHECKLIST_MODEL = ANSWER_MODEL
+
+# The same document answered twice can come out differently, so the questions are answered several
+# times and each answer is kept by vote. The seeds are arbitrary and were NOT chosen because they
+# gave good results on any document: a seed only makes a run repeatable, it does not make it right.
+CHECKLIST_SEEDS = (1, 2, 3)
+CHECKLIST_RUNS = len(CHECKLIST_SEEDS)
 
 # An answer can rest on several separate passages (two different fees, say), but three is
 # plenty for a short answer and keeps the highlighting readable.
@@ -99,13 +106,16 @@ def build_prompt(questions: tuple[ChecklistQuestion, ...], clauses: list[tuple[s
 
 
 def generate_checklist(
-    questions: tuple[ChecklistQuestion, ...], clauses: list[tuple[str, str]]
+    questions: tuple[ChecklistQuestion, ...],
+    clauses: list[tuple[str, str]],
+    seed: int | None = None,
 ) -> ChecklistResponse:
     """Asks the model every question in one call, as structured JSON. Blocking network call,
     run it through asyncio.to_thread from async code."""
     config = types.GenerateContentConfig(
         system_instruction=SYSTEM_INSTRUCTION,
         temperature=0.0,
+        seed=seed,
         response_mime_type="application/json",
         response_schema=ChecklistResponse,
     )
@@ -233,6 +243,11 @@ def verify_answers(
     return results
 
 
+def _share_evidence(a: ChecklistAnswer, b: ChecklistAnswer) -> bool:
+    """Two answers agree when they rest on at least one of the same quotes in the same clause."""
+    return bool({(e.clause_id, e.quote) for e in a.evidence} & {(e.clause_id, e.quote) for e in b.evidence})
+
+
 async def answer_checklist(
     session: AsyncSession, document_id: uuid.UUID, doc_type: str
 ) -> ChecklistResult:
@@ -246,8 +261,16 @@ async def answer_checklist(
             answers=[_not_mentioned(q) for q in questions], truncated=loaded.truncated
         )
 
-    generated = await asyncio.to_thread(generate_checklist, questions, loaded.labeled)
-    verified = verify_answers(questions, generated, loaded.by_label)
+    # Every run is checked on its own first, so only evidence that is really in the document can
+    # count towards a vote. If any run fails, the whole request fails rather than vote on less.
+    generated = await asyncio.gather(
+        *(
+            asyncio.to_thread(generate_checklist, questions, loaded.labeled, seed)
+            for seed in CHECKLIST_SEEDS
+        )
+    )
+    runs = [verify_answers(questions, response, loaded.by_label) for response in generated]
+    verified = majority_of_runs(runs, lambda answer: answer.status == "answered", _share_evidence)
 
     # The quote and number checks prove the evidence is real, not that it answers the question.
     # A second, independent look decides that. An answer it does not confirm is withheld, and

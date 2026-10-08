@@ -17,6 +17,8 @@ from app.checklist import (
     answer_checklist,
     build_judge_prompt,
     build_prompt,
+    CHECKLIST_RUNS,
+    CHECKLIST_SEEDS,
     generate_checklist,
     get_checklist,
     judge_answers,
@@ -297,7 +299,7 @@ def _fake_model(monkeypatch, build_response, judge=None):
     and receives the (question, answer) pairs it was shown."""
     seen: list[tuple] = []
 
-    def fake_generate(questions, clauses):
+    def fake_generate(questions, clauses, seed=None):
         seen.append((questions, clauses))
         return build_response(clauses)
 
@@ -361,6 +363,17 @@ async def test_a_document_too_long_to_send_is_cut_and_flagged(db_session, test_u
 
     assert [label for label, _ in seen[0][1]] == ["C1"]
     assert result.truncated is True
+
+
+def test_generate_checklist_passes_the_seed_it_is_given(monkeypatch):
+    client = _FakeClient(ChecklistResponse(answers=[]))
+    monkeypatch.setattr("app.checklist.get_genai_client", lambda: client)
+
+    generate_checklist(QUESTIONS, [("C1", PREPAY_TEXT)], seed=7)
+    generate_checklist(QUESTIONS, [("C1", PREPAY_TEXT)])
+
+    assert client.models.calls[0]["config"].seed == 7
+    assert client.models.calls[1]["config"].seed is None
 
 
 # --- the second check: does the quoted text actually answer the question? ---
@@ -603,7 +616,7 @@ async def test_the_model_is_called_once_then_the_saved_copy_is_reused(
     first = await get_checklist(db_session, document.id, "loan")
     second = await get_checklist(db_session, document.id, "loan")
 
-    assert len(seen) == 1
+    assert len(seen) == CHECKLIST_RUNS  # every run happened once, then the saved copy was reused
     assert second == first
 
 
@@ -617,7 +630,7 @@ async def test_a_cut_off_document_is_returned_but_not_saved(db_session, test_use
 
     assert first.truncated is True
     assert await _saved_rows(db_session, document) == []
-    assert len(seen) == 2  # not cached, so it asks again
+    assert len(seen) == 2 * CHECKLIST_RUNS  # not cached, so it reads again, every run
 
 
 async def test_improved_ask_them_wording_reaches_a_document_that_was_already_checked(
@@ -640,3 +653,128 @@ async def test_improved_ask_them_wording_reaches_a_document_that_was_already_che
 
     unanswered = next(a for a in loaded.answers if a.status == "not_mentioned")
     assert unanswered.ask_them == "NEW WORDING"
+
+
+# --- several seeded runs, kept by vote, then judged once ---
+
+
+def _scripted(monkeypatch, responses, judge=None):
+    """A model that plays one scripted response per call and records each call's seed, plus a judge
+    that records what it was shown."""
+    seeds: list[int | None] = []
+    judged: list[list[str]] = []
+    queue = list(responses)
+
+    def fake_generate(questions, clauses, seed=None):
+        seeds.append(seed)
+        outcome = queue.pop(0)
+        if isinstance(outcome, Exception):
+            raise outcome
+        return outcome
+
+    def fake_judge(items):
+        judged.append([a.id for _q, a in items])
+        return judge(items) if judge else {q.id for q, _ in items}
+
+    monkeypatch.setattr("app.checklist.generate_checklist", fake_generate)
+    monkeypatch.setattr("app.checklist.judge_answers", fake_judge)
+    return seeds, judged
+
+
+PREPAY_YES = lambda quote="without penalty": ChecklistResponse(  # noqa: E731
+    answers=[_entry("prepayment", "Yes, free.", [("C1", quote)])]
+)
+PREPAY_MISSED = ChecklistResponse(answers=[])
+
+
+def test_the_number_of_checklist_runs_is_odd_and_each_has_its_own_seed():
+    assert CHECKLIST_RUNS % 2 == 1 and CHECKLIST_RUNS >= 3
+    assert len(CHECKLIST_SEEDS) == CHECKLIST_RUNS == len(set(CHECKLIST_SEEDS))
+
+
+async def test_the_checklist_is_read_once_per_seed(db_session, test_user, monkeypatch):
+    document = await _document(db_session, test_user, [PREPAY_TEXT])
+    seeds, _ = _scripted(monkeypatch, [PREPAY_YES()] * CHECKLIST_RUNS)
+
+    await answer_checklist(db_session, document.id, "loan")
+
+    assert sorted(seeds) == sorted(CHECKLIST_SEEDS)
+
+
+async def test_an_answer_most_runs_gave_is_kept(db_session, test_user, monkeypatch):
+    document = await _document(db_session, test_user, [PREPAY_TEXT])
+    _scripted(monkeypatch, [PREPAY_YES(), PREPAY_MISSED, PREPAY_YES()])
+
+    result = await answer_checklist(db_session, document.id, "loan")
+
+    assert next(a for a in result.answers if a.id == "prepayment").status == "answered"
+
+
+async def test_an_answer_only_one_run_gave_becomes_a_gap(db_session, test_user, monkeypatch):
+    document = await _document(db_session, test_user, [PREPAY_TEXT])
+    _scripted(monkeypatch, [PREPAY_MISSED, PREPAY_YES(), PREPAY_MISSED])
+
+    result = await answer_checklist(db_session, document.id, "loan")
+
+    prepay = next(a for a in result.answers if a.id == "prepayment")
+    assert prepay.status == "not_mentioned" and prepay.gap is True
+
+
+async def test_the_judge_is_asked_once_and_only_about_the_answers_that_won_the_vote(
+    db_session, test_user, monkeypatch
+):
+    document = await _document(db_session, test_user, [PREPAY_TEXT])
+    _, judged = _scripted(monkeypatch, [PREPAY_YES(), PREPAY_MISSED, PREPAY_YES()])
+
+    await answer_checklist(db_session, document.id, "loan")
+
+    assert judged == [["prepayment"]]
+
+
+async def test_the_judge_is_not_asked_when_no_answer_won_the_vote(db_session, test_user, monkeypatch):
+    document = await _document(db_session, test_user, [PREPAY_TEXT])
+    _, judged = _scripted(monkeypatch, [PREPAY_MISSED, PREPAY_YES(), PREPAY_MISSED])
+
+    await answer_checklist(db_session, document.id, "loan")
+
+    assert judged == []
+
+
+async def test_a_withheld_answer_stays_withheld_after_the_vote(db_session, test_user, monkeypatch):
+    document = await _document(db_session, test_user, [PREPAY_TEXT])
+    _scripted(monkeypatch, [PREPAY_YES()] * CHECKLIST_RUNS, judge=lambda items: set())
+
+    result = await answer_checklist(db_session, document.id, "loan")
+
+    assert next(a for a in result.answers if a.id == "prepayment").status == "not_mentioned"
+
+
+async def test_the_answer_whose_quotes_most_runs_share_is_chosen(db_session, test_user, monkeypatch):
+    document = await _document(db_session, test_user, [PREPAY_TEXT])
+    other = ChecklistResponse(answers=[_entry("prepayment", "Free.", [("C1", "at any time")])])
+    _scripted(monkeypatch, [other, PREPAY_YES(), PREPAY_YES()])
+
+    result = await answer_checklist(db_session, document.id, "loan")
+
+    prepay = next(a for a in result.answers if a.id == "prepayment")
+    assert prepay.evidence[0].quote == "without penalty"
+
+
+async def test_a_run_whose_quotes_fail_the_check_does_not_count_as_an_answer(
+    db_session, test_user, monkeypatch
+):
+    document = await _document(db_session, test_user, [PREPAY_TEXT])
+    invented = PREPAY_YES("a quote that is not in the document")
+    _scripted(monkeypatch, [invented, invented, PREPAY_YES()])
+
+    result = await answer_checklist(db_session, document.id, "loan")
+
+    assert next(a for a in result.answers if a.id == "prepayment").status == "not_mentioned"
+
+
+async def test_if_one_checklist_run_fails_the_whole_request_fails(db_session, test_user, monkeypatch):
+    document = await _document(db_session, test_user, [PREPAY_TEXT])
+    _scripted(monkeypatch, [PREPAY_YES(), ChecklistGenerationError("bad"), PREPAY_YES()])
+
+    with pytest.raises(ChecklistGenerationError):
+        await answer_checklist(db_session, document.id, "loan")

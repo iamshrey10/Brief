@@ -6,7 +6,13 @@ from httpx import ASGITransport, AsyncClient
 
 import app.main as main_module
 from app.auth import get_current_user
-from app.checklist import ChecklistEntry, ChecklistGenerationError, ChecklistResponse, Evidence
+from app.checklist import (
+    CHECKLIST_RUNS,
+    ChecklistEntry,
+    ChecklistGenerationError,
+    ChecklistResponse,
+    Evidence,
+)
 from app.key_terms import (
     KEY_TERMS_RUNS,
     ExtractedField,
@@ -724,7 +730,7 @@ DEPOSIT_TEXT = "The security deposit is $500.00, refundable within 30 days after
 
 
 def _fake_checklist_model(monkeypatch, calls: list):
-    def fake_generate(questions, clauses):
+    def fake_generate(questions, clauses, seed=None):
         calls.append(clauses)
         return ChecklistResponse(
             answers=[
@@ -777,7 +783,7 @@ async def test_checklist_returns_answers_gaps_and_how_to_ask_and_reuses_them(
     assert renewal["status"] == "not_mentioned"
     assert renewal["gap"] is True and renewal["ask_them"]
     assert second.json() == body
-    assert len(calls) == 1  # the second request used the saved copy
+    assert len(calls) == CHECKLIST_RUNS  # the second request used the saved copy
 
 
 async def test_checklist_rejects_a_document_that_is_not_ready(client, db_session, test_user):
