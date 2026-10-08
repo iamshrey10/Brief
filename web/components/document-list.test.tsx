@@ -258,6 +258,41 @@ describe("DocumentList", () => {
     });
   });
 
+  describe("how far a read has got", () => {
+    it("shows how many parts of a long document are read so far", () => {
+      render(
+        <DocumentList
+          documents={[doc("processing", "a", "long.pdf", { progress_done: 120, progress_total: 286 })]}
+        />,
+      );
+
+      expect(screen.getByText("Reading part 120 of 286")).toBeInTheDocument();
+    });
+
+    it("shows nothing extra before the parts are counted", () => {
+      render(<DocumentList documents={[doc("processing", "a", "new.pdf")]} />);
+
+      expect(screen.queryByText(/Reading part/)).not.toBeInTheDocument();
+      expect(screen.getByText("Processing")).toBeInTheDocument();
+    });
+
+    it("shows progress for each document being read, and for none that is not", () => {
+      render(
+        <DocumentList
+          documents={[
+            doc("processing", "a", "one.pdf", { progress_done: 1, progress_total: 4 }),
+            doc("processing", "b", "two.pdf", { progress_done: 3, progress_total: 9 }),
+            doc("ready", "c", "done.pdf", { progress_done: 5, progress_total: 5 }),
+          ]}
+        />,
+      );
+
+      expect(screen.getByText("Reading part 1 of 4")).toBeInTheDocument();
+      expect(screen.getByText("Reading part 3 of 9")).toBeInTheDocument();
+      expect(screen.queryByText("Reading part 5 of 5")).not.toBeInTheDocument();
+    });
+  });
+
   describe("trying again", () => {
     const minutesAgo = (m: number) => new Date(Date.now() - m * 60_000).toISOString();
 

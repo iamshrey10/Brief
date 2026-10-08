@@ -22,6 +22,7 @@ import {
   failureMessage,
   formatUploaded,
   isReadable,
+  progressLabel,
   statusLabel,
   type DocumentSummary,
 } from "@/lib/documents";
@@ -322,6 +323,7 @@ function DocumentRow({
   // Only a document that has clauses to show gets a link, anything else would open an empty page.
   const readable = isReadable(doc.status);
   const failure = failureMessage(doc);
+  const progress = progressLabel(doc);
 
   const main = (
     <>
@@ -337,6 +339,7 @@ function DocumentRow({
           {typeLabel}
           {uploaded && ` · Uploaded ${uploaded}`}
         </span>
+        {progress && <span className="mt-0.5 block text-xs text-muted-foreground">{progress}</span>}
         {failure && <span className="mt-0.5 block text-xs text-muted-foreground">{failure}</span>}
         {retryError && (
           <span role="alert" className="mt-0.5 block text-xs text-destructive">
