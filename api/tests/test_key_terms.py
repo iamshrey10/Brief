@@ -5,6 +5,8 @@ from app import document_text, key_terms
 from app.key_term_fields import KeyTermField
 from app.key_terms import (
     KEY_TERMS_MODEL,
+    KEY_TERMS_RUNS,
+    KEY_TERMS_SEEDS,
     ExtractedField,
     ExtractionResponse,
     KeyTermsGenerationError,
@@ -89,6 +91,17 @@ def test_generate_key_terms_rejects_an_unparseable_response(monkeypatch):
 
     with pytest.raises(KeyTermsGenerationError):
         generate_key_terms(FIELDS, [("C1", RATE_TEXT)])
+
+
+def test_generate_key_terms_passes_the_seed_it_is_given(monkeypatch):
+    client = _FakeClient(ExtractionResponse(fields=[]))
+    monkeypatch.setattr("app.key_terms.get_genai_client", lambda: client)
+
+    generate_key_terms(FIELDS, [("C1", RATE_TEXT)], seed=42)
+    generate_key_terms(FIELDS, [("C1", RATE_TEXT)])
+
+    assert client.models.calls[0]["config"].seed == 42
+    assert client.models.calls[1]["config"].seed is None
 
 
 # --- verify_terms: the model's evidence is checked before anyone sees it ---
@@ -223,7 +236,7 @@ async def _document(db_session, test_user, texts: list[str], doc_type: str = "lo
 def _fake_model(monkeypatch, build_response):
     shown: list[list[tuple[str, str]]] = []
 
-    def fake_generate(fields, clauses):
+    def fake_generate(fields, clauses, seed=None):
         shown.append(clauses)
         return build_response(clauses)
 
@@ -244,7 +257,7 @@ async def test_extract_key_terms_sends_every_clause_in_order_and_returns_verifie
 
     result = await extract_key_terms(db_session, document.id, "loan")
 
-    assert [label for label, _ in shown[0]] == ["C1", "C2"]
+    assert all([label for label, _ in sent] == ["C1", "C2"] for sent in shown)
     assert shown[0][0][1] == RATE_TEXT
     rate = next(t for t in result.terms if t.name == "interest_rate")
     assert rate.found is True
@@ -394,7 +407,7 @@ async def test_the_model_is_called_once_then_the_saved_copy_is_reused(
     first = await get_key_terms(db_session, document.id, "loan")
     second = await get_key_terms(db_session, document.id, "loan")
 
-    assert len(shown) == 1
+    assert len(shown) == KEY_TERMS_RUNS  # every run happened once, then the saved copy was reused
     assert second == first
 
 
@@ -408,4 +421,107 @@ async def test_a_cut_off_document_is_returned_but_not_saved(db_session, test_use
 
     assert first.truncated is True
     assert await _saved_rows(db_session, document) == []
-    assert len(shown) == 2  # not cached, so it asks again
+    assert len(shown) == 2 * KEY_TERMS_RUNS  # not cached, so it reads again, every run
+
+
+# --- several seeded runs, kept by vote ---
+
+
+def _scripted_model(monkeypatch, responses):
+    """A model that plays one scripted response per call, and records each call's seed."""
+    seeds: list[int | None] = []
+    queue = list(responses)
+
+    def fake_generate(fields, clauses, seed=None):
+        seeds.append(seed)
+        outcome = queue.pop(0)
+        if isinstance(outcome, Exception):
+            raise outcome
+        return outcome
+
+    monkeypatch.setattr("app.key_terms.generate_key_terms", fake_generate)
+    return seeds
+
+
+RATE_FOUND = lambda value="6.5% fixed": ExtractionResponse(  # noqa: E731
+    fields=[_entry("interest_rate", value, "C1", "fixed interest rate of 6.5%")]
+)
+RATE_MISSED = ExtractionResponse(fields=[])
+
+
+def test_the_number_of_runs_is_odd_and_each_has_its_own_seed():
+    assert KEY_TERMS_RUNS % 2 == 1 and KEY_TERMS_RUNS >= 3
+    assert len(KEY_TERMS_SEEDS) == KEY_TERMS_RUNS == len(set(KEY_TERMS_SEEDS))
+
+
+async def test_it_reads_the_document_once_per_seed(db_session, test_user, monkeypatch):
+    document = await _document(db_session, test_user, [RATE_TEXT])
+    seeds = _scripted_model(monkeypatch, [RATE_FOUND()] * KEY_TERMS_RUNS)
+
+    await extract_key_terms(db_session, document.id, "loan")
+
+    assert sorted(seeds) == sorted(KEY_TERMS_SEEDS)
+
+
+async def test_a_term_most_runs_found_is_kept(db_session, test_user, monkeypatch):
+    document = await _document(db_session, test_user, [RATE_TEXT])
+    _scripted_model(monkeypatch, [RATE_FOUND(), RATE_MISSED, RATE_FOUND()])
+
+    result = await extract_key_terms(db_session, document.id, "loan")
+
+    rate = next(t for t in result.terms if t.name == "interest_rate")
+    assert rate.found is True and rate.value == "6.5% fixed"
+
+
+async def test_a_term_only_one_run_found_is_left_out(db_session, test_user, monkeypatch):
+    document = await _document(db_session, test_user, [RATE_TEXT])
+    _scripted_model(monkeypatch, [RATE_MISSED, RATE_FOUND(), RATE_MISSED])
+
+    result = await extract_key_terms(db_session, document.id, "loan")
+
+    assert next(t for t in result.terms if t.name == "interest_rate").found is False
+
+
+async def test_the_value_most_runs_agree_on_is_used(db_session, test_user, monkeypatch):
+    document = await _document(db_session, test_user, [RATE_TEXT])
+    _scripted_model(
+        monkeypatch, [RATE_FOUND("6.5% a year"), RATE_FOUND("6.5% fixed"), RATE_FOUND("6.5%  FIXED.")]
+    )
+
+    result = await extract_key_terms(db_session, document.id, "loan")
+
+    assert next(t for t in result.terms if t.name == "interest_rate").value in {"6.5% fixed", "6.5%  FIXED."}
+
+
+async def test_two_finds_that_word_the_value_differently_still_beat_an_earlier_miss(
+    db_session, test_user, monkeypatch
+):
+    document = await _document(db_session, test_user, [RATE_TEXT])
+    _scripted_model(monkeypatch, [RATE_MISSED, RATE_FOUND("6.5% a year"), RATE_FOUND("6.5% fixed")])
+
+    result = await extract_key_terms(db_session, document.id, "loan")
+
+    rate = next(t for t in result.terms if t.name == "interest_rate")
+    assert rate.found is True and rate.value == "6.5% a year"
+
+
+async def test_a_run_whose_evidence_fails_the_check_does_not_count_as_a_find(
+    db_session, test_user, monkeypatch
+):
+    document = await _document(db_session, test_user, [RATE_TEXT])
+    invented = ExtractionResponse(fields=[_entry("interest_rate", "9%", "C1", "an interest rate of 9%")])
+    _scripted_model(monkeypatch, [invented, invented, RATE_FOUND()])
+
+    result = await extract_key_terms(db_session, document.id, "loan")
+
+    assert next(t for t in result.terms if t.name == "interest_rate").found is False
+
+
+async def test_if_one_run_fails_the_whole_request_fails_instead_of_voting_on_less(
+    db_session, test_user, monkeypatch
+):
+    document = await _document(db_session, test_user, [RATE_TEXT])
+    _scripted_model(monkeypatch, [RATE_FOUND(), KeyTermsGenerationError("bad"), RATE_FOUND()])
+
+    with pytest.raises(KeyTermsGenerationError):
+        await extract_key_terms(db_session, document.id, "loan")

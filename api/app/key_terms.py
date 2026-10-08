@@ -1,4 +1,5 @@
 import asyncio
+import re
 import uuid
 
 from google.genai import types
@@ -7,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.consensus import majority_of_runs
 from app.document_text import load_prompt_clauses
 from app.grounding import numbers_supported, quote_appears_in
 from app.ingestion import get_genai_client
@@ -17,6 +19,12 @@ from app.qa import ANSWER_MODEL
 # Same pinned model as question answering, so one evaluation covers both. Re-run
 # evals/key_terms_eval.py whenever this changes.
 KEY_TERMS_MODEL = ANSWER_MODEL
+
+# The same document read twice can come out differently, so it is read several times and each term
+# is kept by vote. The seeds are arbitrary and were NOT chosen because they gave good results on
+# any document: a seed only makes a run repeatable, it does not make it right.
+KEY_TERMS_SEEDS = (1, 2, 3)
+KEY_TERMS_RUNS = len(KEY_TERMS_SEEDS)
 
 SYSTEM_INSTRUCTION = (
     "You pull key facts out of a contract using ONLY the numbered clauses you are given. "
@@ -75,13 +83,14 @@ def build_prompt(fields: tuple[KeyTermField, ...], clauses: list[tuple[str, str]
 
 
 def generate_key_terms(
-    fields: tuple[KeyTermField, ...], clauses: list[tuple[str, str]]
+    fields: tuple[KeyTermField, ...], clauses: list[tuple[str, str]], seed: int | None = None
 ) -> ExtractionResponse:
     """Asks the model for every field in one call, as structured JSON. Blocking network
     call, run it through asyncio.to_thread from async code."""
     config = types.GenerateContentConfig(
         system_instruction=SYSTEM_INSTRUCTION,
         temperature=0.0,
+        seed=seed,
         response_mime_type="application/json",
         response_schema=ExtractionResponse,
     )
@@ -140,6 +149,15 @@ def verify_terms(
     return terms
 
 
+def _same_value(a: KeyTerm, b: KeyTerm) -> bool:
+    """Two finds agree when their values are the same words, ignoring case, spacing and a final dot."""
+
+    def clean(term: KeyTerm) -> str:
+        return re.sub(r"\s+", " ", (term.value or "").strip().lower()).rstrip(".")
+
+    return clean(a) == clean(b)
+
+
 async def extract_key_terms(
     session: AsyncSession, document_id: uuid.UUID, doc_type: str
 ) -> KeyTermsResult:
@@ -154,10 +172,17 @@ async def extract_key_terms(
             truncated=loaded.truncated,
         )
 
-    generated = await asyncio.to_thread(generate_key_terms, fields, loaded.labeled)
-    return KeyTermsResult(
-        terms=verify_terms(fields, generated, loaded.by_label), truncated=loaded.truncated
+    # Every run is checked on its own first, so only evidence that is really in the document can
+    # count towards a vote. If any run fails, the whole request fails rather than vote on less.
+    generated = await asyncio.gather(
+        *(
+            asyncio.to_thread(generate_key_terms, fields, loaded.labeled, seed)
+            for seed in KEY_TERMS_SEEDS
+        )
     )
+    runs = [verify_terms(fields, response, loaded.by_label) for response in generated]
+    terms = majority_of_runs(runs, lambda term: term.found, _same_value)
+    return KeyTermsResult(terms=terms, truncated=loaded.truncated)
 
 
 async def load_key_terms(

@@ -7,7 +7,12 @@ from httpx import ASGITransport, AsyncClient
 import app.main as main_module
 from app.auth import get_current_user
 from app.checklist import ChecklistEntry, ChecklistGenerationError, ChecklistResponse, Evidence
-from app.key_terms import ExtractedField, ExtractionResponse, KeyTermsGenerationError
+from app.key_terms import (
+    KEY_TERMS_RUNS,
+    ExtractedField,
+    ExtractionResponse,
+    KeyTermsGenerationError,
+)
 from app.main import app
 from app.models import EMBEDDING_DIM, Clause, Document, Embedding, User
 from app.qa import AnswerGenerationError, AnswerResult, CitedClause
@@ -607,7 +612,7 @@ LEASE_RENT_TEXT = "Monthly rent is $2,054.00, due on the first day of each month
 
 
 def _fake_key_term_model(monkeypatch, calls: list):
-    def fake_generate(fields, clauses):
+    def fake_generate(fields, clauses, seed=None):
         calls.append(clauses)
         return ExtractionResponse(
             fields=[
@@ -652,7 +657,7 @@ async def test_key_terms_returns_verified_terms_and_reuses_them(
     deposit = next(t for t in body["terms"] if t["name"] == "security_deposit")
     assert deposit["found"] is False and deposit["value"] is None
     assert second.json() == body
-    assert len(calls) == 1  # the second request used the saved copy
+    assert len(calls) == KEY_TERMS_RUNS  # the second request used the saved copy
 
 
 async def test_key_terms_rejects_a_document_that_is_not_ready(client, db_session, test_user):
