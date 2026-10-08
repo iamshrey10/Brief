@@ -11,6 +11,7 @@ import {
   isInProgress,
   isReadable,
   mergeFresh,
+  progressLabel,
   putFirst,
   statusLabel,
   type ClauseData,
@@ -409,5 +410,45 @@ describe("failureMessage", () => {
       expect(message).not.toContain("\u2014");
       expect(message).not.toContain(reason.includes("_") ? reason : "\u0000");
     }
+  });
+});
+
+describe("progressLabel", () => {
+  function reading(done?: number | null, total?: number | null, status = "processing"): DocumentSummary {
+    return {
+      id: "d",
+      filename: "a.pdf",
+      doc_type: "lease",
+      status,
+      ocr_confidence: null,
+      progress_done: done,
+      progress_total: total,
+    };
+  }
+
+  it("says how far a read has got", () => {
+    expect(progressLabel(reading(120, 286))).toBe("Reading part 120 of 286");
+    expect(progressLabel(reading(0, 41))).toBe("Reading part 0 of 41");
+  });
+
+  it("says nothing before the parts have been counted", () => {
+    expect(progressLabel(reading(null, null))).toBeNull();
+    expect(progressLabel(reading(undefined, undefined))).toBeNull();
+    expect(progressLabel(reading(0, 0))).toBeNull();
+    expect(progressLabel(reading(3, -5))).toBeNull();
+  });
+
+  it("says nothing unless the document is being read, even with leftover numbers", () => {
+    for (const status of ["ready", "failed", "uploaded", "pending", "needs_retake"]) {
+      expect(progressLabel(reading(10, 20, status))).toBeNull();
+    }
+  });
+
+  it("never says something impossible", () => {
+    expect(progressLabel(reading(500, 286))).toBe("Reading part 286 of 286");
+    expect(progressLabel(reading(-4, 286))).toBe("Reading part 0 of 286");
+    expect(progressLabel(reading(null, 286))).toBe("Reading part 0 of 286");
+    expect(progressLabel(reading(12.7, 286))).toBe("Reading part 12 of 286");
+    expect(progressLabel(reading(5, Number.NaN))).toBeNull();
   });
 });

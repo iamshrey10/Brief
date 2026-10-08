@@ -11,6 +11,9 @@ export type DocumentSummary = {
   status_changed_at?: string | null;
   // Why a read failed, a short code from the API. Only present while the status is failed.
   failure_reason?: string | null;
+  // How far a read has got while it is processing: parts done out of the total. Otherwise empty.
+  progress_done?: number | null;
+  progress_total?: number | null;
 };
 
 export type ClauseData = {
@@ -42,6 +45,19 @@ export function isReadable(status: string): boolean {
 /** Statuses a document passes through before it is either readable or has failed. */
 export function isInProgress(status: string): boolean {
   return status === "pending" || status === "uploaded" || status === "processing";
+}
+
+/**
+ * How far a read has got, in words, or null when there is nothing honest to say: it is not being
+ * read, or the parts have not been counted yet. A done count past the total or below zero is
+ * clamped so the sentence never says something impossible.
+ */
+export function progressLabel(document: DocumentSummary): string | null {
+  if (document.status !== "processing") return null;
+  const total = document.progress_total;
+  if (typeof total !== "number" || !Number.isFinite(total) || total <= 0) return null;
+  const done = Math.min(Math.max(Math.floor(document.progress_done ?? 0), 0), total);
+  return `Reading part ${done} of ${total}`;
 }
 
 /** What to tell the reader about a failed read, and what they can do about it. */
