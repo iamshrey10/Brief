@@ -64,7 +64,7 @@ heavier on polish and proof than the first.
 | Piece | Estimate | Status |
 |---|---|---|
 | Key terms, must-ask questions, the Overview screen, the dashboard, delete and edit, limits | done | Finished Oct 5 to 8 |
-| Steadier results: finish the voted reads, and fix the second check that judges its items together | 1 day | Started, key terms are steady, the second check is not yet |
+| Steadier results | done on one real lease | Voted reads and a second check that judges each answer alone, to be re-measured on more documents |
 | An agent step that retries a weak search or checks a term against typical terms | 2 to 3 days | Not started |
 | A larger test set, with a build that fails if quality drops | 2 days | Not started |
 | An automatic click-through test of the screens in a real browser | 1 day | Not started |
@@ -72,7 +72,7 @@ heavier on polish and proof than the first.
 | Putting the backend online | 2 days | Not started |
 | Hardening: the rest of the error handling and a security pass | 1 day | Partly done (limits, delete) |
 | README, diagrams, and a short demo | 2 days | Not started |
-| **Core total still to go** | **about 12 and a half days** (range 10 to 16) | |
+| **Core total still to go** | **about 11 and a half days** (range 10 to 16) | |
 | Word (.docx) files | 1 day | Last |
 | Several files in one upload | 2 days | Last |
 | Sharper handling of low quality photos | 1 day | Last |
@@ -80,7 +80,7 @@ heavier on polish and proof than the first.
 
 ## How long, in calendar time
 
-At five working days a week, 12 and a half days from October 9 would end around October 27. I add a
+At five working days a week, 11 and a half days from October 9 would end around October 26. I add a
 quarter on top for the things that always go wrong, which lands around October 30, so call it **about
 October 30**. A fast
 run at six days a week could finish near October 19, and a slow one at four days a week would reach
@@ -99,21 +99,16 @@ These are estimates, not promises. I will say so in the update log if they move.
   must-ask answers can, so a fact spread over two lines can show as not mentioned. I have not yet
   confirmed which terms a real lease genuinely lacks, because that needs me to read the whole lease.
 - **Steadier is not the same as more accurate.** On one real 36 clause lease, four unseeded reads of the
-  key terms changed four fields between runs and four voted reads changed none. Six voted reads of the
-  must-ask questions gave the same answers every time. But the second check judges its answers
-  together: shown on its own, the lease's deposit is confirmed every time, and in the group it often is
-  not, so that deposit is now steadily left out. The fix is to judge each answer alone, and I have not
-  built it yet. Voting also costs time, a document now takes up to nine model calls.
-- **The must-ask answers needed a second check.** On the same lease, the model twice treated a
-  clause that only named a fee as if it answered the question, which would have hidden a real gap. The
-  second check removed that, but it is a model too: on the lease it wrongly withheld a good answer
-  about 1 time in 8, and it once changed its verdict on identical input. A withheld answer shows as
-  "not mentioned" with wording to ask the other side, which I chose over showing a wrong answer.
+  key terms changed four fields between runs and four voted reads changed none. Six runs of the
+  must-ask questions gave the same two answers every time, after I changed the second check to judge
+  each answer alone: judged in a group, it had steadily left out the lease's deposit, which it
+  confirms every time on its own. That is one lease, not a general claim. Voting costs time: a document
+  now makes ten or more model calls and can take from a few seconds to about a minute on the free tier.
 - **Keyword search is weak.** It scored 4% on its own, so search is really relying on meaning-based
   matching for now. My test set has no exact-term questions, so I cannot yet say how it does on those.
 - **Reranking made things worse** (67% against 96%), so it is switched off by default.
 - **Free quotas.** The free Gemini tier caps some models at 20 requests a day, and the model I use at
-  15 requests a minute. Reading one document now takes up to nine calls, so a few people at once
+  15 requests a minute. Reading one document now takes ten or more calls, so a few people at once
   would hit that. Putting this online for other people will probably need a paid plan.
 - **The slowest answer took 41 seconds.** I have not looked into why.
 - **Phone layout and dark mode** were checked on the Overview and the dashboard on October 5, not yet on
