@@ -62,6 +62,10 @@ class Document(Base):
     # Why a document failed to read, as a short code the page turns into plain words. Only set while
     # the status is "failed", and cleared on a retry and on success.
     failure_reason: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    # How far a read has got while it is processing: embedded pieces so far, out of the total. Both
+    # are empty before the pieces are counted and once the read has finished.
+    progress_done: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    progress_total: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     user: Mapped["User"] = relationship(back_populates="documents")
     clauses: Mapped[list["Clause"]] = relationship(

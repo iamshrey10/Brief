@@ -1546,3 +1546,17 @@ async def test_a_refused_upload_creates_no_record_and_no_upload_link(
 
 def test_the_default_limit_is_a_sensible_number():
     assert 10 <= main_module.MAX_DOCUMENTS_PER_USER <= 100
+
+
+# --- how far a read has got ---
+
+
+async def test_a_document_remembers_how_far_its_read_has_got(db_session, test_user):
+    document = await _document_with(db_session, test_user, "processing")
+    assert (document.progress_done, document.progress_total) == (None, None)
+
+    document.progress_done, document.progress_total = 120, 286
+    await db_session.commit()
+    await db_session.refresh(document)
+
+    assert (document.progress_done, document.progress_total) == (120, 286)
