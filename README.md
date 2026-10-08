@@ -36,7 +36,8 @@ four fields between runs before and none after, and six reads of the questions g
 every time. Steadier is not the same as more accurate: the second check judges its items together, and
 shown on its own the lease's deposit is confirmed every time, while in the group it is often not, so
 that deposit is now steadily left out. The cost is time, a document takes several times longer to
-read, because each one now makes about eleven model calls.
+read, because each one now makes up to nine model calls: three for the key terms, three for the
+questions, and three for the second check.
 
 Search and answers are measured, not assumed. The reports in [evals/](evals/) show the scores and
 where they fall short.
