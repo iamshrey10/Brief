@@ -330,6 +330,30 @@ def test_embed_texts_keeps_every_vector_in_order_across_retries(monkeypatch):
     assert all(abs(sum(c * c for c in v) ** 0.5 - 1.0) < 1e-9 for v in vectors)  # still normalized
 
 
+def test_embed_texts_reports_progress_after_each_finished_batch(monkeypatch):
+    _install(monkeypatch, ["ok", "ok", "ok"])
+    reported: list[tuple[int, int]] = []
+
+    embed_texts([f"text {i}" for i in range(250)], on_progress=lambda done, total: reported.append((done, total)))
+
+    assert reported == [(100, 250), (200, 250), (250, 250)]
+
+
+def test_embed_texts_does_not_report_a_batch_that_was_refused(monkeypatch):
+    _install(monkeypatch, ["ok", _rate_limited(), "ok"])
+    reported: list[tuple[int, int]] = []
+
+    embed_texts([f"text {i}" for i in range(150)], on_progress=lambda done, total: reported.append((done, total)))
+
+    assert reported == [(100, 150), (150, 150)]  # the retry is not counted twice
+
+
+def test_embed_texts_works_without_a_progress_callback(monkeypatch):
+    _install(monkeypatch, ["ok"])
+
+    assert len(embed_texts(["one"])) == 1
+
+
 def test_embed_texts_gives_up_after_the_retry_limit(monkeypatch):
     errors = [_rate_limited() for _ in range(MAX_RATE_LIMIT_RETRIES + 1)]
     client, waits = _install(monkeypatch, errors)

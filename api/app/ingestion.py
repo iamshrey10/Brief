@@ -3,6 +3,7 @@ import logging
 import re
 import time
 import uuid
+from collections.abc import Callable
 from datetime import datetime, timezone
 
 import pymupdf
@@ -146,10 +147,13 @@ def _rate_limit_wait(error: genai_errors.APIError) -> float | None:
     return min(wait, MAX_RETRY_WAIT_SECONDS)
 
 
-def embed_texts(texts: list[str]) -> list[list[float]]:
+def embed_texts(
+    texts: list[str], on_progress: Callable[[int, int], None] | None = None
+) -> list[list[float]]:
     """Embeds every text, a batch at a time. When Gemini says to slow down it waits as long as
     it is told and tries that same batch again, so batches already done are never repeated.
-    Blocking, and it can wait for minutes, so async code must call it through to_thread."""
+    Blocking, and it can wait for minutes, so async code must call it through to_thread. After each
+    finished batch it reports (pieces done, pieces in total) so a long read can show how far it is."""
     client = get_genai_client()
     config = types.EmbedContentConfig(output_dimensionality=EMBEDDING_DIM)
     vectors: list[list[float]] = []
@@ -176,6 +180,8 @@ def embed_texts(texts: list[str]) -> list[list[float]]:
                 _sleep(wait)
 
         vectors.extend(_normalize(embedding.values) for embedding in response.embeddings)
+        if on_progress is not None:
+            on_progress(len(vectors), len(texts))
 
     return vectors
 
