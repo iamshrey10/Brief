@@ -8,6 +8,7 @@ import {
   CircleX,
   LoaderCircle,
   Pencil,
+  RotateCw,
   Trash2,
   TriangleAlert,
 } from "lucide-react";
@@ -16,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { deleteDocument, MAX_FILENAME_LENGTH, updateDocument } from "@/lib/document-actions";
 import { retryDocument } from "@/lib/retry";
+import { rereadDocument } from "@/lib/reread";
 import {
   canRetry,
   DOC_TYPE_LABELS,
@@ -69,7 +71,7 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-type Mode = "view" | "edit" | "delete";
+type Mode = "view" | "edit" | "delete" | "reread";
 
 /** Runs `onCancel` when Escape is pressed, so a form or a question can always be backed out of. */
 function cancelOnEscape(event: KeyboardEvent, onCancel: () => void, busy: boolean) {
@@ -255,6 +257,72 @@ function ConfirmDelete({
   );
 }
 
+function ConfirmReread({
+  doc,
+  onCancel,
+  onStarted,
+}: {
+  doc: DocumentSummary;
+  onCancel: () => void;
+  onStarted: (document: DocumentSummary) => void;
+}) {
+  const [starting, setStarting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const cancelButton = useRef<HTMLButtonElement>(null);
+
+  // Focus starts on Cancel, so a stray Enter cannot start a fresh read by accident.
+  useEffect(() => {
+    cancelButton.current?.focus();
+  }, []);
+
+  async function confirm() {
+    setStarting(true);
+    setError(null);
+    const outcome = await rereadDocument(doc.id);
+    if (outcome.ok) {
+      onStarted(outcome.document);
+      return;
+    }
+    setStarting(false);
+    setError(outcome.message);
+  }
+
+  return (
+    <div
+      role="group"
+      aria-label={`Read ${doc.filename} again`}
+      onKeyDown={(event) => cancelOnEscape(event, onCancel, starting)}
+      className="rounded-lg border border-border bg-card px-4 py-3"
+    >
+      <p className="text-sm font-medium text-foreground">Read &ldquo;{doc.filename}&rdquo; again?</p>
+      <p className="mt-1 text-sm text-muted-foreground">
+        This replaces what Brief read before, including its key terms and questions. Reading takes
+        a little while.
+      </p>
+      {error && (
+        <p role="alert" className="mt-2 text-xs text-destructive">
+          {error}
+        </p>
+      )}
+      <div className="mt-3 flex justify-end gap-2">
+        <Button
+          ref={cancelButton}
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={starting}
+          onClick={onCancel}
+        >
+          Cancel
+        </Button>
+        <Button type="button" size="sm" disabled={starting} onClick={confirm}>
+          {starting ? "Starting..." : "Read again"}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function DocumentRow({
   doc,
   onRetried,
@@ -271,6 +339,7 @@ function DocumentRow({
   const [retryError, setRetryError] = useState<string | null>(null);
   const editButton = useRef<HTMLButtonElement>(null);
   const deleteButton = useRef<HTMLButtonElement>(null);
+  const rereadButton = useRef<HTMLButtonElement>(null);
   const cameFrom = useRef<Mode>("view");
 
   // Closing the form or the question puts focus back on the button that opened it, so someone using
@@ -279,6 +348,7 @@ function DocumentRow({
     if (mode !== "view") return;
     if (cameFrom.current === "edit") editButton.current?.focus();
     if (cameFrom.current === "delete") deleteButton.current?.focus();
+    if (cameFrom.current === "reread") rereadButton.current?.focus();
     cameFrom.current = "view";
   }, [mode]);
 
@@ -304,6 +374,18 @@ function DocumentRow({
         onSaved={(updated) => {
           show("view");
           onUpdated?.(updated);
+        }}
+      />
+    );
+  }
+  if (mode === "reread") {
+    return (
+      <ConfirmReread
+        doc={doc}
+        onCancel={() => show("view")}
+        onStarted={(updated) => {
+          show("view");
+          onRetried?.(updated);
         }}
       />
     );
@@ -377,6 +459,19 @@ function DocumentRow({
             onClick={retry}
           >
             {retrying ? "Starting..." : "Try again"}
+          </Button>
+        )}
+        {readable && (
+          <Button
+            ref={rereadButton}
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            aria-label={`Read ${doc.filename} again`}
+            title="Read again"
+            onClick={() => show("reread")}
+          >
+            <RotateCw aria-hidden />
           </Button>
         )}
         <Button

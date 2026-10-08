@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { DocumentSummary } from "@/lib/documents";
 import { deleteDocument, updateDocument } from "@/lib/document-actions";
 import { retryDocument } from "@/lib/retry";
+import { rereadDocument } from "@/lib/reread";
 import { DocumentList } from "./document-list";
 
 vi.mock("@/lib/document-actions", async (importOriginal) => {
@@ -18,7 +19,13 @@ vi.mock("@/lib/retry", async (importOriginal) => {
   return { ...actual, retryDocument: vi.fn() };
 });
 
+vi.mock("@/lib/reread", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/reread")>();
+  return { ...actual, rereadDocument: vi.fn() };
+});
+
 const retryMock = vi.mocked(retryDocument);
+const rereadMock = vi.mocked(rereadDocument);
 const deleteMock = vi.mocked(deleteDocument);
 const updateMock = vi.mocked(updateDocument);
 
@@ -623,6 +630,82 @@ describe("DocumentList", () => {
 
       expect(screen.getAllByLabelText("Name")).toHaveLength(1);
       expect(screen.getByText("one.pdf")).toBeInTheDocument();
+    });
+  });
+
+  describe("reading again", () => {
+    async function openReread(documents = [doc("ready", "a", "Lease.pdf")]) {
+      const user = userEvent.setup();
+      const onRetried = vi.fn();
+      render(<DocumentList documents={documents} onRetried={onRetried} />);
+      await user.click(screen.getByRole("button", { name: `Read ${documents[0].filename} again` }));
+      return { user, onRetried };
+    }
+
+    it.each(["ready", "needs_retake"])("offers Read again on a %s document", (status) => {
+      render(<DocumentList documents={[doc(status, "a", "Lease.pdf")]} />);
+
+      expect(screen.getByRole("button", { name: "Read Lease.pdf again" })).toBeInTheDocument();
+    });
+
+    it.each(["pending", "uploaded", "processing", "failed"])("does not offer it on a %s document", (status) => {
+      render(<DocumentList documents={[doc(status, "a", "Lease.pdf")]} />);
+
+      expect(screen.queryByRole("button", { name: "Read Lease.pdf again" })).not.toBeInTheDocument();
+    });
+
+    it("asks first, naming the file and saying the old reading is replaced", async () => {
+      await openReread();
+
+      const question = screen.getByRole("group", { name: "Read Lease.pdf again" });
+      expect(question).toHaveTextContent("Read “Lease.pdf” again?");
+      expect(question).toHaveTextContent("replaces what Brief read before");
+      expect(rereadMock).not.toHaveBeenCalled();
+    });
+
+    it("starts on Cancel and goes back without reading when Cancel or Escape is used", async () => {
+      const { user } = await openReread();
+      expect(screen.getByRole("button", { name: "Cancel" })).toHaveFocus();
+
+      await user.keyboard("{Escape}");
+
+      expect(rereadMock).not.toHaveBeenCalled();
+      expect(screen.queryByRole("group")).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Read Lease.pdf again" })).toHaveFocus();
+    });
+
+    it("reads again when confirmed and hands the updated document to the page", async () => {
+      const updated = doc("uploaded", "a", "Lease.pdf");
+      rereadMock.mockResolvedValue({ ok: true, document: updated });
+      const { user, onRetried } = await openReread();
+
+      await user.click(screen.getByRole("button", { name: "Read again" }));
+
+      expect(rereadMock).toHaveBeenCalledWith("a");
+      await waitFor(() => expect(onRetried).toHaveBeenCalledWith(updated));
+    });
+
+    it("shows why and stays open when it cannot start", async () => {
+      rereadMock.mockResolvedValue({ ok: false, message: "This document can't be read again right now." });
+      const { user, onRetried } = await openReread();
+
+      await user.click(screen.getByRole("button", { name: "Read again" }));
+
+      expect(await screen.findByRole("alert")).toHaveTextContent("can't be read again right now");
+      expect(onRetried).not.toHaveBeenCalled();
+      expect(screen.getByRole("button", { name: "Read again" })).toBeEnabled();
+    });
+
+    it("locks both buttons and ignores Escape while it starts", async () => {
+      rereadMock.mockReturnValue(new Promise(() => {}));
+      const { user } = await openReread();
+
+      await user.click(screen.getByRole("button", { name: "Read again" }));
+
+      expect(screen.getByRole("button", { name: "Starting..." })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "Cancel" })).toBeDisabled();
+      fireEvent.keyDown(screen.getByRole("group"), { key: "Escape" });
+      expect(screen.getByRole("group")).toBeInTheDocument();
     });
   });
 
