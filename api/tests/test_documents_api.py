@@ -1600,3 +1600,110 @@ async def test_a_retry_clears_any_old_progress(client, db_session, test_user, mo
     assert (body["progress_done"], body["progress_total"]) == (None, None)
     await db_session.refresh(document)
     assert (document.progress_done, document.progress_total) == (None, None)
+
+
+# --- POST /documents/{id}/reread ---
+
+
+@pytest.mark.parametrize("status", ["ready", "needs_retake"])
+async def test_reread_starts_a_fresh_read_of_a_document_that_was_read(
+    client, db_session, test_user, monkeypatch, status
+):
+    started = _record_ingestion(monkeypatch)
+    document = await _document_with_everything(db_session, test_user)
+    document.status = status
+    await db_session.commit()
+    document_id = document.id
+
+    response = await client.post(f"/documents/{document_id}/reread")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "uploaded"
+    assert started == [document_id]
+
+
+async def test_reread_clears_everything_the_old_read_left_behind(
+    client, db_session, test_user, monkeypatch
+):
+    _record_ingestion(monkeypatch)
+    document = await _document_with_everything(db_session, test_user)
+    other = await _document_with_everything(db_session, test_user, "other.pdf", "fake/other.pdf")
+    document_id, other_id = document.id, other.id
+
+    await client.post(f"/documents/{document_id}/reread")
+
+    db_session.expire_all()
+    mine = await _counts(db_session, document_id)
+    assert (mine["clauses"], mine["embeddings"], mine["key_terms"], mine["checklist"]) == (0, 0, 0, 0)
+    assert mine["document"] == 1  # the document itself stays, its file is read again
+    theirs = await _counts(db_session, other_id)
+    assert (theirs["clauses"], theirs["embeddings"], theirs["key_terms"], theirs["checklist"]) == (1, 1, 1, 1)
+
+
+async def test_reread_keeps_the_name_and_kind(client, db_session, test_user, monkeypatch):
+    _record_ingestion(monkeypatch)
+    document = await _document_with_everything(db_session, test_user, "My lease.pdf")
+
+    body = (await client.post(f"/documents/{document.id}/reread")).json()
+
+    assert (body["filename"], body["doc_type"]) == ("My lease.pdf", "lease")
+
+
+async def test_reread_stamps_the_time_and_clears_any_old_reason_and_progress(
+    client, db_session, test_user, monkeypatch
+):
+    _record_ingestion(monkeypatch)
+    document = await _document_with_everything(db_session, test_user)
+    document.status_changed_at = None
+    document.failure_reason = "rate_limit"
+    document.progress_done, document.progress_total = 3, 9
+    await db_session.commit()
+
+    body = (await client.post(f"/documents/{document.id}/reread")).json()
+
+    assert body["status_changed_at"] is not None
+    assert body["failure_reason"] is None
+    assert (body["progress_done"], body["progress_total"]) == (None, None)
+
+
+@pytest.mark.parametrize("status", ["pending", "uploaded", "processing", "failed"])
+async def test_reread_is_refused_unless_the_document_was_read(
+    client, db_session, test_user, monkeypatch, status
+):
+    started = _record_ingestion(monkeypatch)
+    document = await _document_with(db_session, test_user, status)
+
+    response = await client.post(f"/documents/{document.id}/reread")
+
+    assert response.status_code == 409
+    assert started == []
+
+
+async def test_reread_keeps_what_was_read_when_it_is_refused(client, db_session, test_user, monkeypatch):
+    _record_ingestion(monkeypatch)
+    document = await _document_with_everything(db_session, test_user)
+    document.status = "processing"
+    await db_session.commit()
+    document_id = document.id
+
+    await client.post(f"/documents/{document_id}/reread")
+
+    db_session.expire_all()
+    assert (await _counts(db_session, document_id))["clauses"] == 1
+
+
+async def test_reread_of_another_persons_document_is_not_found(client, db_session, test_user, monkeypatch):
+    started = _record_ingestion(monkeypatch)
+    other = User(email="someone-else-reread@example.com")
+    db_session.add(other)
+    await db_session.commit()
+    document = await _document_with_everything(db_session, other, "theirs.pdf", "fake/theirs.pdf")
+
+    response = await client.post(f"/documents/{document.id}/reread")
+
+    assert response.status_code == 404
+    assert started == []
+
+
+async def test_reread_of_a_document_that_does_not_exist_is_not_found(client):
+    assert (await client.post(f"/documents/{uuid.uuid4()}/reread")).status_code == 404

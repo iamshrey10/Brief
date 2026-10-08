@@ -222,6 +222,39 @@ async def retry_document(
     return DocumentSummary.from_document(document)
 
 
+@app.post("/documents/{document_id}/reread")
+async def reread_document(
+    document_id: str,
+    background_tasks: BackgroundTasks,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> DocumentSummary:
+    """Reads a document that was already read, again from its file, so it gets the benefit of any
+    improvement to how documents are read. The old pieces, key terms and checklist answers are
+    cleared first and worked out again from the new read. Only for a document that was read: one
+    that failed has retry, and one being read is left alone."""
+    document = await _get_owned_document(document_id, user, session)
+    if document.status not in SEARCHABLE_STATUSES:
+        raise HTTPException(status_code=409, detail="this document has not been read yet")
+
+    await session.execute(delete(Extraction).where(Extraction.document_id == document.id))
+    await session.execute(delete(ChecklistAnswerRow).where(ChecklistAnswerRow.document_id == document.id))
+    leftovers = await session.execute(select(Clause).where(Clause.document_id == document.id))
+    for clause in leftovers.scalars().all():
+        await session.delete(clause)
+
+    document.status = "uploaded"
+    document.status_changed_at = datetime.now(timezone.utc)
+    document.failure_reason = None
+    document.progress_done = None
+    document.progress_total = None
+    await session.commit()
+    await session.refresh(document)
+
+    background_tasks.add_task(ingest_document, document.id)
+    return DocumentSummary.from_document(document)
+
+
 MAX_FILENAME_LENGTH = 200
 
 
