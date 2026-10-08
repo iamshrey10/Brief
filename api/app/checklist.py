@@ -158,7 +158,9 @@ def build_judge_prompt(items: list[tuple[ChecklistQuestion, ChecklistAnswer]]) -
     return "\n\n".join(blocks)
 
 
-def judge_answers(items: list[tuple[ChecklistQuestion, ChecklistAnswer]]) -> set[str]:
+def judge_answers(
+    items: list[tuple[ChecklistQuestion, ChecklistAnswer]], seed: int | None = None
+) -> set[str]:
     """Asks a separate model call, shown only each question and its quoted text, whether the
     text states the specific thing asked. Returns the ids it confirms. A fresh look at one quote
     is much easier than finding answers in a whole contract, so it catches a clause that only
@@ -166,6 +168,7 @@ def judge_answers(items: list[tuple[ChecklistQuestion, ChecklistAnswer]]) -> set
     config = types.GenerateContentConfig(
         system_instruction=JUDGE_SYSTEM_INSTRUCTION,
         temperature=0.0,
+        seed=seed,
         response_mime_type="application/json",
         response_schema=JudgeResponse,
     )
@@ -275,9 +278,18 @@ async def answer_checklist(
     # The quote and number checks prove the evidence is real, not that it answers the question.
     # A second, independent look decides that. An answer it does not confirm is withheld, and
     # if the check itself fails the whole request fails rather than show answers unchecked.
+    # The judge is a model call too, and was seen to give different verdicts on the same input, so it
+    # is asked once per seed and an answer is confirmed only if most of those verdicts confirm it.
     to_judge = [(q, a) for q, a in zip(questions, verified, strict=True) if a.status == "answered"]
     if to_judge:
-        confirmed = await asyncio.to_thread(judge_answers, to_judge)
+        verdicts = await asyncio.gather(
+            *(asyncio.to_thread(judge_answers, to_judge, seed) for seed in CHECKLIST_SEEDS)
+        )
+        confirmed = {
+            answer_id
+            for answer_id in {a.id for _q, a in to_judge}
+            if sum(answer_id in verdict for verdict in verdicts) * 2 > len(verdicts)
+        }
         verified = [
             _not_mentioned(q) if a.status == "answered" and a.id not in confirmed else a
             for q, a in zip(questions, verified, strict=True)

@@ -749,7 +749,7 @@ def _fake_checklist_model(monkeypatch, calls: list):
         )
 
     monkeypatch.setattr("app.checklist.generate_checklist", fake_generate)
-    monkeypatch.setattr("app.checklist.judge_answers", lambda items: {q.id for q, _ in items})
+    monkeypatch.setattr("app.checklist.judge_answers", lambda items, seed=None: {q.id for q, _ in items})
 
 
 async def test_checklist_returns_answers_gaps_and_how_to_ask_and_reuses_them(

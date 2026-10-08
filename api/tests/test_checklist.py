@@ -305,7 +305,7 @@ def _fake_model(monkeypatch, build_response, judge=None):
 
     monkeypatch.setattr("app.checklist.generate_checklist", fake_generate)
     monkeypatch.setattr(
-        "app.checklist.judge_answers", judge or (lambda items: {q.id for q, _ in items})
+        "app.checklist.judge_answers", judge or (lambda items, seed=None: {q.id for q, _ in items})
     )
     return seen
 
@@ -432,7 +432,7 @@ async def test_an_answer_the_judge_does_not_confirm_is_withheld_as_not_mentioned
     db_session, test_user, monkeypatch
 ):
     document = await _document(db_session, test_user, [PREPAY_TEXT])
-    _fake_model(monkeypatch, _prepay_response, judge=lambda items: set())
+    _fake_model(monkeypatch, _prepay_response, judge=lambda items, seed=None: set())
 
     result = await answer_checklist(db_session, document.id, "loan")
 
@@ -444,7 +444,7 @@ async def test_an_answer_the_judge_does_not_confirm_is_withheld_as_not_mentioned
 
 async def test_a_confirmed_answer_is_kept(db_session, test_user, monkeypatch):
     document = await _document(db_session, test_user, [PREPAY_TEXT])
-    _fake_model(monkeypatch, _prepay_response, judge=lambda items: {q.id for q, _ in items})
+    _fake_model(monkeypatch, _prepay_response, judge=lambda items, seed=None: {q.id for q, _ in items})
 
     result = await answer_checklist(db_session, document.id, "loan")
 
@@ -454,7 +454,7 @@ async def test_a_confirmed_answer_is_kept(db_session, test_user, monkeypatch):
 async def test_an_answer_the_judge_says_nothing_about_is_withheld(db_session, test_user, monkeypatch):
     # The judge leaves the id out entirely: not confirmed means not shown.
     document = await _document(db_session, test_user, [PREPAY_TEXT])
-    _fake_model(monkeypatch, _prepay_response, judge=lambda items: {"some_other_id"})
+    _fake_model(monkeypatch, _prepay_response, judge=lambda items, seed=None: {"some_other_id"})
 
     result = await answer_checklist(db_session, document.id, "loan")
 
@@ -467,7 +467,7 @@ async def test_the_judge_is_shown_only_the_answers_that_passed_the_first_checks(
     document = await _document(db_session, test_user, [PREPAY_TEXT])
     shown: list[list[str]] = []
 
-    def judge(items):
+    def judge(items, seed=None):
         shown.append([q.id for q, _ in items])
         return {q.id for q, _ in items}
 
@@ -485,7 +485,7 @@ async def test_the_judge_is_shown_only_the_answers_that_passed_the_first_checks(
 
     await answer_checklist(db_session, document.id, "loan")
 
-    assert shown == [["prepayment"]]
+    assert shown == [["prepayment"]] * CHECKLIST_RUNS
 
 
 async def test_when_nothing_is_answered_the_judge_is_not_called(db_session, test_user, monkeypatch):
@@ -494,7 +494,7 @@ async def test_when_nothing_is_answered_the_judge_is_not_called(db_session, test
     _fake_model(
         monkeypatch,
         lambda clauses: ChecklistResponse(answers=[]),
-        judge=lambda items: shown.append(items) or set(),
+        judge=lambda items, seed=None: shown.append(items) or set(),
     )
 
     await answer_checklist(db_session, document.id, "loan")
@@ -507,7 +507,7 @@ async def test_if_the_judge_call_fails_the_whole_checklist_fails_instead_of_show
 ):
     document = await _document(db_session, test_user, [PREPAY_TEXT])
 
-    def failing_judge(items):
+    def failing_judge(items, seed=None):
         raise ChecklistGenerationError("model did not return a valid structured verdict")
 
     _fake_model(monkeypatch, _prepay_response, judge=failing_judge)
@@ -658,11 +658,19 @@ async def test_improved_ask_them_wording_reaches_a_document_that_was_already_che
 # --- several seeded runs, kept by vote, then judged once ---
 
 
+class _JudgeCalls(list):
+    """What each judge call was shown (a list of ids per call), and the seed of each call."""
+
+    def __init__(self):
+        super().__init__()
+        self.seeds: list[int | None] = []
+
+
 def _scripted(monkeypatch, responses, judge=None):
     """A model that plays one scripted response per call and records each call's seed, plus a judge
     that records what it was shown."""
     seeds: list[int | None] = []
-    judged: list[list[str]] = []
+    judged = _JudgeCalls()
     queue = list(responses)
 
     def fake_generate(questions, clauses, seed=None):
@@ -672,9 +680,10 @@ def _scripted(monkeypatch, responses, judge=None):
             raise outcome
         return outcome
 
-    def fake_judge(items):
+    def fake_judge(items, seed=None):
         judged.append([a.id for _q, a in items])
-        return judge(items) if judge else {q.id for q, _ in items}
+        judged.seeds.append(seed)
+        return judge(items, seed) if judge else {q.id for q, _ in items}
 
     monkeypatch.setattr("app.checklist.generate_checklist", fake_generate)
     monkeypatch.setattr("app.checklist.judge_answers", fake_judge)
@@ -720,7 +729,7 @@ async def test_an_answer_only_one_run_gave_becomes_a_gap(db_session, test_user, 
     assert prepay.status == "not_mentioned" and prepay.gap is True
 
 
-async def test_the_judge_is_asked_once_and_only_about_the_answers_that_won_the_vote(
+async def test_the_judge_is_asked_once_per_seed_and_only_about_the_answers_that_won_the_vote(
     db_session, test_user, monkeypatch
 ):
     document = await _document(db_session, test_user, [PREPAY_TEXT])
@@ -728,7 +737,7 @@ async def test_the_judge_is_asked_once_and_only_about_the_answers_that_won_the_v
 
     await answer_checklist(db_session, document.id, "loan")
 
-    assert judged == [["prepayment"]]
+    assert judged == [["prepayment"]] * CHECKLIST_RUNS  # the same question, once per seed
 
 
 async def test_the_judge_is_not_asked_when_no_answer_won_the_vote(db_session, test_user, monkeypatch):
@@ -742,7 +751,7 @@ async def test_the_judge_is_not_asked_when_no_answer_won_the_vote(db_session, te
 
 async def test_a_withheld_answer_stays_withheld_after_the_vote(db_session, test_user, monkeypatch):
     document = await _document(db_session, test_user, [PREPAY_TEXT])
-    _scripted(monkeypatch, [PREPAY_YES()] * CHECKLIST_RUNS, judge=lambda items: set())
+    _scripted(monkeypatch, [PREPAY_YES()] * CHECKLIST_RUNS, judge=lambda items, seed=None: set())
 
     result = await answer_checklist(db_session, document.id, "loan")
 
@@ -778,3 +787,54 @@ async def test_if_one_checklist_run_fails_the_whole_request_fails(db_session, te
 
     with pytest.raises(ChecklistGenerationError):
         await answer_checklist(db_session, document.id, "loan")
+
+
+# --- the second check is also run once per seed and kept by vote ---
+
+
+async def test_the_judge_is_run_with_each_seed(db_session, test_user, monkeypatch):
+    document = await _document(db_session, test_user, [PREPAY_TEXT])
+    _, judged = _scripted(monkeypatch, [PREPAY_YES()] * CHECKLIST_RUNS)
+
+    await answer_checklist(db_session, document.id, "loan")
+
+    assert sorted(judged.seeds) == sorted(CHECKLIST_SEEDS)
+
+
+async def test_an_answer_most_judge_runs_confirm_is_shown(db_session, test_user, monkeypatch):
+    document = await _document(db_session, test_user, [PREPAY_TEXT])
+    verdicts = iter([True, False, True])
+    _scripted(
+        monkeypatch,
+        [PREPAY_YES()] * CHECKLIST_RUNS,
+        judge=lambda items, seed=None: {q.id for q, _ in items} if next(verdicts) else set(),
+    )
+
+    result = await answer_checklist(db_session, document.id, "loan")
+
+    assert next(a for a in result.answers if a.id == "prepayment").status == "answered"
+
+
+async def test_an_answer_only_one_judge_run_confirms_is_withheld(db_session, test_user, monkeypatch):
+    document = await _document(db_session, test_user, [PREPAY_TEXT])
+    verdicts = iter([False, True, False])
+    _scripted(
+        monkeypatch,
+        [PREPAY_YES()] * CHECKLIST_RUNS,
+        judge=lambda items, seed=None: {q.id for q, _ in items} if next(verdicts) else set(),
+    )
+
+    result = await answer_checklist(db_session, document.id, "loan")
+
+    assert next(a for a in result.answers if a.id == "prepayment").status == "not_mentioned"
+
+
+def test_judge_answers_passes_the_seed_it_is_given(monkeypatch):
+    client = _FakeClient(JudgeResponse(verdicts=[]))
+    monkeypatch.setattr("app.checklist.get_genai_client", lambda: client)
+
+    judge_answers([(QUESTIONS[0], _answered())], seed=9)
+    judge_answers([(QUESTIONS[0], _answered())])
+
+    assert client.models.calls[0]["config"].seed == 9
+    assert client.models.calls[1]["config"].seed is None
