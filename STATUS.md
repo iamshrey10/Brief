@@ -3,14 +3,14 @@
 A plain account of what works today, what is still missing, and how long the rest should take. I
 update it every week, so you can hold my pace against my promises.
 
-**Last updated:** October 4, 2026 (day 15 of building)
+**Last updated:** October 8, 2026 (day 19 of building)
 
 ## The short version
 
-Brief is about **50% of the way** to a finished first version, counting working days: 15 done and about
-15 and a half to go. The part that reads a contract and answers questions about it, with a checked quote for every
-answer, works end to end. The parts that make it pleasant to use, easy to trust, and available on the
-internet are still ahead.
+Brief is about **60% of the way** to a finished first version, counting working days: 19 done and about
+12 to go. You can upload a contract, see its key terms and the questions it leaves unanswered on one
+screen, ask questions, and get an answer with a checked quote. The parts still ahead are putting it
+online, proving its quality automatically on every change, and making its results steadier.
 
 **Expected finish for the core product: around October 30**, with a realistic window of October 19 to
 November 4. The extras (Word files, several files at once, sharper photo handling) would add about 4
@@ -20,17 +20,17 @@ more working days.
 
 | | |
 |---|---|
-| Working days so far | 15 |
-| Commits | 65 |
-| Tests | 319 (207 backend, 112 frontend), run on every push |
-| Lines of code vs lines of tests | about 3,590 vs 4,370 |
-| API endpoints | 12 |
+| Working days so far | 19 |
+| Commits | 116 |
+| Tests | 810 (393 backend, 417 frontend), run on every push |
+| Lines of code vs lines of tests | about 5,900 vs 11,100 (tests count the evaluation scripts) |
+| API endpoints | 16 |
 | Database tables | 6 |
 | Evaluations | 4 (search, question answering, key terms, must-ask checklist) |
 | Documents it can read | text PDFs and phone photos or scans (JPG, PNG, HEIC) |
-| Largest upload | 50 MB |
+| Limits | 50 MB a file, 25 documents a person, 100 pages a document |
 | Time to answer a question | about 2.5 seconds on average |
-| Time to read a whole document (key terms or the checklist) | about 3 to 6 seconds |
+| Time to read a whole document (key terms or the checklist) | about 10 and 30 seconds on my test documents, since each is now read three times |
 
 ## What works today
 
@@ -42,13 +42,19 @@ more working days.
 - **Ask a question and get a checked answer.** Each answer points to the clause it came from, and it only
   appears if the quote really is in the document. If the document does not say, Brief says that.
 - **A chat screen** where clicking a citation jumps to the clause and highlights the exact words.
-- **Key terms** such as the interest rate, fees, and dates, each with its quote. Backend only for now,
-  there is no screen for it yet.
+- **Key terms** such as the interest rate, fees, and dates, each with its quote, on an Overview screen
+  next to the document. Clicking one jumps to the clause and highlights the exact words.
 - **Must-ask questions.** For a loan, lease, or job offer, Brief answers the questions people most
   often skip, each with the exact quotes behind it, or says the document does not answer it. An
   important question left unanswered is flagged as a gap, with wording for asking the other side. An
   answer can rest on up to three separate passages, and a second, independent check confirms that the
-  quoted text really answers the question and does not just mention the topic. Backend only for now.
+  quoted text really answers the question and does not just mention the topic. They show on the same
+  Overview screen, with a Copy button for the wording.
+- **A dashboard** with drag and drop upload, a list of your documents, and a way to rename, change the
+  kind of, delete, or read again each one. A document that fails says why in plain words, and a long one
+  shows how far it has got. It works in dark mode and at phone width.
+- **Steadier results.** The key terms and the questions are each read three times with fixed seeds and
+  kept by vote, because the same contract read twice used to come out differently.
 
 ## What is left
 
@@ -57,16 +63,16 @@ heavier on polish and proof than the first.
 
 | Piece | Estimate | Status |
 |---|---|---|
-| Must-ask questions and "what this contract leaves out" | 1 day on the backend, done | Backend finished Oct 4, the screen is in the next row |
-| An "at a glance" screen for key terms and questions | 2 days | Next up |
-| Design polish: dashboard, phone layout, dark mode, loading and empty states | 2 days | Not started |
+| Key terms, must-ask questions, the Overview screen, the dashboard, delete and edit, limits | done | Finished Oct 5 to 8 |
+| Steadier results: finish the voted reads, and fix the second check that judges its items together | 1 day | Started, key terms are steady, the second check is not yet |
 | An agent step that retries a weak search or checks a term against typical terms | 2 to 3 days | Not started |
 | A larger test set, with a build that fails if quality drops | 2 days | Not started |
+| An automatic click-through test of the screens in a real browser | 1 day | Not started |
 | Tracing, so every answer can be inspected afterwards | 1 day | Not started |
 | Putting the backend online | 2 days | Not started |
-| Hardening: delete-my-data, limits, error handling, a security pass | 2 days | Not started |
+| Hardening: the rest of the error handling and a security pass | 1 day | Partly done (limits, delete) |
 | README, diagrams, and a short demo | 2 days | Not started |
-| **Core total still to go** | **about 15 and a half days** (range 12 to 19) | |
+| **Core total still to go** | **about 12 and a half days** (range 10 to 16) | |
 | Word (.docx) files | 1 day | Last |
 | Several files in one upload | 2 days | Last |
 | Sharper handling of low quality photos | 1 day | Last |
@@ -74,11 +80,13 @@ heavier on polish and proof than the first.
 
 ## How long, in calendar time
 
-At five working days a week, 15 and a half days would end around October 26. I add a quarter on top for
-the things that always go wrong, which lands around October 30, so call it **about October 30**. A fast
+At five working days a week, 12 and a half days from October 9 would end around October 27. I add a
+quarter on top for the things that always go wrong, which lands around October 30, so call it **about
+October 30**. A fast
 run at six days a week could finish near October 19, and a slow one at four days a week would reach
-November 4. Adding the extras moves each of those by about a week. The date moved a little earlier
-since last time, because the must-ask backend took one working day instead of the two I had planned.
+November 4. Adding the extras moves each of those by about a week. The date did not move since last time: the
+screens and the dashboard took about the time I planned, and I added work I had not planned, such as
+delete and edit, reasons a read fails, limits, and read progress.
 
 These are estimates, not promises. I will say so in the update log if they move.
 
@@ -87,11 +95,15 @@ These are estimates, not promises. I will say so in the update log if they move.
 - **The test sets are small.** The 24 search questions, the 32 answer questions, and the key-terms
   check are all short, clean examples. The scores on them (96% right clause first, 24 of 24 cited
   correctly, 8 of 8 correctly declined) are not a claim about contracts in general.
-- **Real documents are messier.** On one real three-page lease, key-term extraction found 8 of 12
-  fields in about 3 seconds. One was found and then rejected by my own checks, because the model
-  joined two separate lines into one quote, and key terms still cannot rest on several passages the
-  way the must-ask answers now can. I have not yet confirmed whether the other three are genuinely
-  absent.
+- **Real documents are messier.** Key terms still cannot rest on several separate passages the way the
+  must-ask answers can, so a fact spread over two lines can show as not mentioned. I have not yet
+  confirmed which terms a real lease genuinely lacks, because that needs me to read the whole lease.
+- **Steadier is not the same as more accurate.** On one real 36 clause lease, four unseeded reads of the
+  key terms changed four fields between runs and four voted reads changed none. Six voted reads of the
+  must-ask questions gave the same answers every time. But the second check judges its answers
+  together: shown on its own, the lease's deposit is confirmed every time, and in the group it often is
+  not, so that deposit is now steadily left out. The fix is to judge each answer alone, and I have not
+  built it yet. Voting also costs time, a document now takes up to nine model calls.
 - **The must-ask answers needed a second check.** On the same lease, the model twice treated a
   clause that only named a fee as if it answered the question, which would have hidden a real gap. The
   second check removed that, but it is a model too: on the lease it wrongly withheld a good answer
@@ -101,10 +113,11 @@ These are estimates, not promises. I will say so in the update log if they move.
   matching for now. My test set has no exact-term questions, so I cannot yet say how it does on those.
 - **Reranking made things worse** (67% against 96%), so it is switched off by default.
 - **Free quotas.** The free Gemini tier caps some models at 20 requests a day, and the model I use at
-  15 requests a minute. The must-ask checklist now makes two calls per document, so a few people at
-  once would hit that. Putting this online for other people will probably need a paid plan.
+  15 requests a minute. Reading one document now takes up to nine calls, so a few people at once
+  would hit that. Putting this online for other people will probably need a paid plan.
 - **The slowest answer took 41 seconds.** I have not looked into why.
-- **Phone layout and dark mode** have not been checked yet.
+- **Phone layout and dark mode** were checked on the Overview and the dashboard on October 5, not yet on
+  the newer buttons and failure messages.
 
 ## Update log
 
@@ -112,5 +125,6 @@ These are estimates, not promises. I will say so in the update log if they move.
 |---|---|
 | Oct 3 | First version of this page. Key-term extraction finished on the backend. 49 commits, 242 tests. |
 | Oct 4 | Must-ask questions finished on the backend, with a second check on the answers. The expected finish moved from about November 1 to about October 30. 65 commits, 319 tests. |
+| Oct 8 | The Overview screen and a real dashboard shipped, with delete, edit, read again, reasons a read fails, limits, and read progress. Key terms and questions are now read three times and kept by vote, which made them steadier but not more accurate. 116 commits, 810 tests. The finish stays about October 30. |
 
 Thanks for reading. If something here looks wrong or unclear, please open an issue.
