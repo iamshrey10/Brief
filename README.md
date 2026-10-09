@@ -71,6 +71,47 @@ the ingestion pipeline (text extraction, or cleanup and OCR for photos, then spl
 and embedding them), hybrid search, grounded answers, and key-term extraction, all backed by
 Postgres.
 
+## Security
+
+Brief holds private documents, so each layer limits what it can reach. What is in place today:
+
+- **Sign-in and tokens.** Google sign-in through Auth.js. The browser never calls the API. The web
+  server checks the session, then mints a token signed with a shared secret that expires after 60
+  seconds, and the API rejects any token that is unsigned, uses another algorithm, has no expiry, or has
+  expired. The secret should be at least 32 random characters.
+- **Your documents are yours.** Every document request checks that it belongs to the caller, and
+  someone else's document answers "not found", so its existence is not confirmed.
+- **Uploads.** Files go straight to private storage with links that expire after five minutes. When an
+  upload is confirmed, the real size and the first bytes are read from storage and checked against what
+  the browser claimed. An empty or over-limit file, or one that is not the kind it says, is removed and
+  refused. A second confirm for the same document is refused.
+- **Limits.** 50 MB a file, 25 documents a person, 100 pages a document, and a per-user request limit
+  of 30 a minute in Redis.
+- **Deleting.** Deleting a document removes its file first and then its records, and deleting an
+  account does the same for every document, one at a time, so a failure never leaves a record without
+  its file or a file without a record. It can be repeated until it finishes.
+- **Untrusted text.** The text of a contract is treated as data, never as instructions. The model has
+  no tools to act with, and an answer is only shown if its quote is really in the document.
+- **Web hardening.** Security headers on every response (no framing, no content sniffing, HTTPS only,
+  no camera or microphone), and logs record document ids, not document text.
+- **Dependencies.** A scan of the libraries that ship runs on every push and every Monday, and the
+  build fails on a known high severity problem.
+
+What is not done yet, so nobody assumes it is:
+
+- **It is not deployed.** Putting it online needs HTTPS everywhere and an API that only the web app can
+  reach, because the request limit lives in the web layer.
+- **The text of your documents goes to Google's Gemini.** On the free tier Google's terms allow using
+  that content to improve its products, and I believe paid billing removes that, so check the current
+  terms and turn billing on before real people upload real documents.
+- **PDFs from strangers are parsed by a library.** Brief checks the file type and size first, but a
+  malicious PDF is still a risk worth reducing, for example by reading it in an isolated process.
+- **No audit trail and no retention rule.** Nothing records who opened what, and documents are kept
+  until their owner deletes them.
+- **Encryption at rest** depends on the hosts. Confirm it for the database when it is deployed.
+- **Build and lint tools** have two known high severity reports in their own dependencies. They are not
+  part of what ships, and the scan above covers only what does.
+
 ## Limits and what a failed read says
 
 Every page costs a reading call on a metered service, so there are limits: 50 MB a file, 25
