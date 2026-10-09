@@ -20,7 +20,14 @@ async def verify_service_token(authorization: str = Header(...)) -> str:
 
     token = authorization.removeprefix("Bearer ")
     try:
-        payload = jwt.decode(token, settings.service_jwt_secret, algorithms=["HS256"])
+        # An expiry is required, not just checked when present: a token with no expiry would otherwise
+        # stay valid forever if it ever leaked.
+        payload = jwt.decode(
+            token,
+            settings.service_jwt_secret,
+            algorithms=["HS256"],
+            options={"require_exp": True},
+        )
     except JWTError as exc:
         raise HTTPException(status_code=401, detail="invalid token") from exc
 
