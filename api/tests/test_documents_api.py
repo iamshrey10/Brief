@@ -1909,3 +1909,99 @@ async def test_confirm_of_another_persons_document_never_looks_at_their_file(
 
     assert response.status_code == 404
     assert started == [] and inspected == []
+
+
+# --- DELETE /me: remove an account and everything in it ---
+
+
+async def _user_exists(db_session, user_id) -> bool:
+    from sqlalchemy import func, select
+
+    return bool(await db_session.scalar(select(func.count()).select_from(User).where(User.id == user_id)))
+
+
+async def test_deleting_an_account_removes_every_document_file_and_the_user(
+    client, db_session, test_user, monkeypatch
+):
+    removed = _record_file_deletes(monkeypatch)
+    one = await _document_with_everything(db_session, test_user, "one.pdf", "fake/one.pdf")
+    two = await _document_with_everything(db_session, test_user, "two.pdf", "fake/two.pdf")
+    user_id, one_id, two_id = test_user.id, one.id, two.id
+
+    response = await client.delete("/me")
+
+    assert response.status_code == 204
+    assert sorted(removed) == ["fake/one.pdf", "fake/two.pdf"]
+    db_session.expire_all()
+    for document_id in (one_id, two_id):
+        gone = await _counts(db_session, document_id)
+        assert all(count == 0 for count in gone.values())  # the document, pieces, embeddings, terms, answers
+    assert not await _user_exists(db_session, user_id)
+
+
+async def test_deleting_an_account_with_no_documents_still_works(client, db_session, test_user, monkeypatch):
+    removed = _record_file_deletes(monkeypatch)
+    user_id = test_user.id
+
+    response = await client.delete("/me")
+
+    assert response.status_code == 204
+    assert removed == []
+    db_session.expire_all()
+    assert not await _user_exists(db_session, user_id)
+
+
+async def test_deleting_an_account_leaves_everyone_else_alone(client, db_session, test_user, monkeypatch):
+    removed = _record_file_deletes(monkeypatch)
+    await _document_with_everything(db_session, test_user, "mine.pdf", "fake/mine.pdf")
+    other = User(email="neighbour@example.com")
+    db_session.add(other)
+    await db_session.commit()
+    theirs = await _document_with_everything(db_session, other, "theirs.pdf", "fake/theirs.pdf")
+    other_id, theirs_id = other.id, theirs.id
+
+    await client.delete("/me")
+
+    assert removed == ["fake/mine.pdf"]
+    db_session.expire_all()
+    assert await _user_exists(db_session, other_id)
+    kept = await _counts(db_session, theirs_id)
+    assert (kept["document"], kept["clauses"], kept["embeddings"], kept["key_terms"], kept["checklist"]) == (1, 1, 1, 1, 1)
+
+
+async def test_if_storage_fails_part_way_the_rest_stays_so_it_can_be_tried_again(
+    client, db_session, test_user, monkeypatch
+):
+    removed: list[str] = []
+    fail_on = {"fake/two.pdf"}
+
+    def flaky_delete(key):
+        if key in fail_on:
+            raise RuntimeError("storage is down")
+        removed.append(key)
+
+    monkeypatch.setattr(main_module, "delete_file", flaky_delete)
+    for name in ("one", "two", "three"):
+        await _document_with_everything(db_session, test_user, f"{name}.pdf", f"fake/{name}.pdf")
+    user_id = test_user.id
+
+    first = await client.delete("/me")
+
+    assert first.status_code == 502
+    db_session.expire_all()
+    assert await _user_exists(db_session, user_id)  # the account is only removed once everything else is
+    from sqlalchemy import func, select
+
+    left = await db_session.scalar(select(func.count()).select_from(Document).where(Document.user_id == user_id))
+    # Every document whose file was removed is gone, so no record points at a file that no longer exists.
+    assert left == 3 - len(removed)
+    assert left >= 1
+
+    fail_on.clear()
+    await db_session.refresh(test_user)  # the first request left this object stale
+    second = await client.delete("/me")
+
+    assert second.status_code == 204
+    assert sorted(removed) == ["fake/one.pdf", "fake/three.pdf", "fake/two.pdf"]
+    db_session.expire_all()
+    assert not await _user_exists(db_session, user_id)

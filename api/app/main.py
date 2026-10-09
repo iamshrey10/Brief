@@ -63,6 +63,37 @@ async def me(user: User = Depends(get_current_user)) -> dict[str, str]:
     return {"id": str(user.id), "email": user.email}
 
 
+@app.delete("/me", status_code=204)
+async def delete_my_account(
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> Response:
+    """Deletes the signed-in person's account and everything in it: every document, its file, and
+    everything read from it.
+
+    Documents go one at a time, file first and then its records, exactly as when deleting a single
+    document, so a failure part way never leaves a record pointing at a file that is gone or a file
+    with no record. If storage fails, what is left stays, the account is not removed, and the request
+    can simply be repeated. The account itself goes last."""
+    user_id = user.id  # read now: committing below expires the object
+    result = await session.execute(select(Document).where(Document.user_id == user_id))
+    for document in result.scalars().all():
+        try:
+            await asyncio.to_thread(delete_file, document.storage_key)
+        except Exception as exc:
+            logger.exception("could not remove a file while deleting account %s", user_id)
+            raise HTTPException(
+                status_code=502,
+                detail="could not remove all of your files, nothing more was deleted, try again",
+            ) from exc
+        await session.delete(document)
+        await session.commit()
+
+    await session.execute(delete(User).where(User.id == user_id))
+    await session.commit()
+    return Response(status_code=204)
+
+
 class CreateUploadRequest(BaseModel):
     filename: str
     doc_type: str
