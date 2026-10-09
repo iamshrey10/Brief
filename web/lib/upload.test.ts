@@ -46,3 +46,24 @@ describe("startFailureMessage", () => {
     expect(await startFailureMessage(broken)).toBe(GENERIC);
   });
 });
+
+describe("startFailureMessage with its own fallback", () => {
+  it("uses the fallback it is given instead of the start wording", async () => {
+    expect(await startFailureMessage(refusal(500, {}), "could not confirm the upload")).toBe(
+      "could not confirm the upload",
+    );
+    expect(await startFailureMessage(refusal(409, { detail: "" }), "could not confirm the upload")).toBe(
+      "could not confirm the upload",
+    );
+  });
+
+  it("still shows the server's own sentence when there is one", async () => {
+    const detail = "this file does not look like the kind of file it was said to be";
+
+    expect(await startFailureMessage(refusal(400, { detail }), "could not confirm the upload")).toBe(detail);
+  });
+
+  it("keeps the start wording when no fallback is given", async () => {
+    expect(await startFailureMessage(refusal(502, {}))).toBe("could not start the upload");
+  });
+});

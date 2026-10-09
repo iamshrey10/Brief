@@ -164,7 +164,9 @@ export function DocumentUpload({ initialDocuments }: { initialDocuments: Documen
       const confirmRes = await fetch(`/api/backend/documents/${document_id}/confirm`, {
         method: "PATCH",
       });
-      if (!confirmRes.ok) throw new Error("could not confirm the upload");
+      if (!confirmRes.ok) {
+        throw new Error(await startFailureMessage(confirmRes, "could not confirm the upload"));
+      }
       const confirmed: DocumentSummary = await confirmRes.json();
 
       setDocuments((previous) => putFirst(previous, confirmed));

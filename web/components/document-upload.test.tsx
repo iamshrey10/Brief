@@ -406,6 +406,44 @@ describe("DocumentUpload form", () => {
     expect(screen.getByText("one-too-many.pdf")).toBeInTheDocument();
   });
 
+  it("shows why a file was refused when the upload is confirmed", async () => {
+    const detail = "this file does not look like the kind of file it was said to be";
+    fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url === "/api/backend/documents" && init?.method === "POST") {
+        return ok({ document_id: "d9", upload_url: "https://storage.example/upload" });
+      }
+      if (url === "https://storage.example/upload") return { ok: true } as Response;
+      if (url.endsWith("/confirm")) return { ok: false, status: 400, json: async () => ({ detail }) } as Response;
+      throw new Error(`unexpected request: ${url}`);
+    });
+    render(<DocumentUpload initialDocuments={[]} />);
+
+    chooseFile(pdf("fake.pdf"));
+    fireEvent.click(screen.getByRole("button", { name: "Upload" }));
+    await tick(0);
+
+    expect(screen.getByRole("alert")).toHaveTextContent(detail);
+    expect(screen.getByText("fake.pdf")).toBeInTheDocument();
+  });
+
+  it("says it could not confirm when the confirm fails for no stated reason", async () => {
+    fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url === "/api/backend/documents" && init?.method === "POST") {
+        return ok({ document_id: "d9", upload_url: "https://storage.example/upload" });
+      }
+      if (url === "https://storage.example/upload") return { ok: true } as Response;
+      if (url.endsWith("/confirm")) return { ok: false, status: 500, json: async () => ({}) } as Response;
+      throw new Error(`unexpected request: ${url}`);
+    });
+    render(<DocumentUpload initialDocuments={[]} />);
+
+    chooseFile(pdf("fine.pdf"));
+    fireEvent.click(screen.getByRole("button", { name: "Upload" }));
+    await tick(0);
+
+    expect(screen.getByRole("alert")).toHaveTextContent("could not confirm the upload");
+  });
+
   it("locks the form while uploading, so nothing can change under a request in flight", async () => {
     fetchMock.mockImplementation(() => new Promise(() => {}));
     render(<DocumentUpload initialDocuments={[]} />);
