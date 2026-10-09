@@ -1,7 +1,10 @@
 import type { NextConfig } from "next";
+import { securityHeaderRules } from "./lib/security-headers";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  async headers() {
+    return securityHeaderRules();
+  },
 };
 
 export default nextConfig;
