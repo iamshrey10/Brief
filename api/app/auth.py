@@ -1,5 +1,6 @@
 from fastapi import Depends, Header, HTTPException
-from jose import JWTError, jwt
+import jwt
+from jwt import InvalidTokenError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -26,9 +27,9 @@ async def verify_service_token(authorization: str = Header(...)) -> str:
             token,
             settings.service_jwt_secret,
             algorithms=["HS256"],
-            options={"require_exp": True},
+            options={"require": ["exp"]},
         )
-    except JWTError as exc:
+    except InvalidTokenError as exc:
         raise HTTPException(status_code=401, detail="invalid token") from exc
 
     email = payload.get("sub")

@@ -2,7 +2,7 @@ import time
 
 import pytest
 from fastapi import HTTPException
-from jose import jwt
+import jwt
 from sqlalchemy import func, select
 
 from app.auth import get_current_user, verify_service_token
