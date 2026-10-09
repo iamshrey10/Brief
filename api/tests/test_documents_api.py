@@ -22,6 +22,7 @@ from app.key_terms import (
 from app.main import app
 from app.models import EMBEDDING_DIM, Clause, Document, Embedding, User
 from app.qa import AnswerGenerationError, AnswerResult, CitedClause
+from app.storage import MAX_FILE_SIZE_BYTES, UploadInfo, UploadMissingError
 
 
 @pytest_asyncio.fixture
@@ -105,12 +106,30 @@ async def test_create_upload_rejects_unsupported_content_type(client):
     assert response.status_code == 400
 
 
+def _stored_file(monkeypatch, *, size=2048, head=b"%PDF-1.7\n%\xe2\xe3", error=None):
+    """Makes storage report a file of this size and start, without touching real storage. Returns the
+    keys that were inspected and the keys that were deleted."""
+    inspected: list[str] = []
+    removed: list[str] = []
+
+    def fake_inspect(storage_key):
+        inspected.append(storage_key)
+        if error:
+            raise error
+        return UploadInfo(size=size, head=head)
+
+    monkeypatch.setattr(main_module, "inspect_upload", fake_inspect)
+    monkeypatch.setattr(main_module, "delete_file", lambda key: removed.append(key))
+    return inspected, removed
+
+
 async def test_confirm_upload_marks_document_uploaded_and_triggers_ingestion(
     client, db_session, test_user, monkeypatch
 ):
     calls: list[uuid.UUID] = []
     monkeypatch.setattr(main_module, "ingest_document", lambda document_id: calls.append(document_id))
 
+    _stored_file(monkeypatch)
     document = Document(
         user_id=test_user.id,
         filename="lease.pdf",
@@ -118,6 +137,7 @@ async def test_confirm_upload_marks_document_uploaded_and_triggers_ingestion(
         status="pending",
         storage_key="fake/key.pdf",
         file_size_bytes=1024,
+        content_type="application/pdf",
     )
     db_session.add(document)
     await db_session.commit()
@@ -1718,3 +1738,174 @@ async def test_reread_of_another_persons_document_is_not_found(client, db_sessio
 
 async def test_reread_of_a_document_that_does_not_exist_is_not_found(client):
     assert (await client.post(f"/documents/{uuid.uuid4()}/reread")).status_code == 404
+
+
+# --- PATCH /documents/{id}/confirm: the real file is checked, not the browser's claim ---
+
+
+async def _pending(db_session, test_user, content_type="application/pdf", status="pending"):
+    document = Document(
+        user_id=test_user.id,
+        filename="lease.pdf",
+        doc_type="lease",
+        status=status,
+        storage_key=f"{test_user.id}/abc-lease.pdf",
+        file_size_bytes=1024,
+        content_type=content_type,
+    )
+    db_session.add(document)
+    await db_session.commit()
+    await db_session.refresh(document)
+    return document
+
+
+async def _still_there(db_session, document_id) -> bool:
+    from sqlalchemy import func, select
+
+    return bool(
+        await db_session.scalar(select(func.count()).select_from(Document).where(Document.id == document_id))
+    )
+
+
+async def test_confirm_records_the_real_size_not_the_one_the_browser_claimed(
+    client, db_session, test_user, monkeypatch
+):
+    _record_ingestion(monkeypatch)
+    _stored_file(monkeypatch, size=987_654)
+    document = await _pending(db_session, test_user)
+    document_id = document.id
+
+    await client.patch(f"/documents/{document_id}/confirm")
+
+    db_session.expire_all()
+    assert (await db_session.get(Document, document_id)).file_size_bytes == 987_654
+
+
+async def test_confirm_refuses_an_upload_that_never_arrived_and_keeps_the_document_pending(
+    client, db_session, test_user, monkeypatch
+):
+    started = _record_ingestion(monkeypatch)
+    _stored_file(monkeypatch, error=UploadMissingError("gone"))
+    document = await _pending(db_session, test_user)
+    document_id = document.id
+
+    response = await client.patch(f"/documents/{document_id}/confirm")
+
+    assert response.status_code == 400
+    assert "not uploaded" in response.json()["detail"]
+    assert started == []
+    db_session.expire_all()
+    assert (await db_session.get(Document, document_id)).status == "pending"
+
+
+@pytest.mark.parametrize("size", [0, MAX_FILE_SIZE_BYTES + 1])
+async def test_confirm_removes_a_file_that_is_empty_or_over_the_limit(
+    client, db_session, test_user, monkeypatch, size
+):
+    started = _record_ingestion(monkeypatch)
+    _, removed = _stored_file(monkeypatch, size=size)
+    document = await _pending(db_session, test_user)
+    key, document_id = document.storage_key, document.id
+
+    response = await client.patch(f"/documents/{document_id}/confirm")
+
+    assert response.status_code == 400
+    assert started == []
+    assert removed == [key]
+    db_session.expire_all()
+    assert not await _still_there(db_session, document_id)
+
+
+async def test_confirm_accepts_a_file_of_exactly_the_limit(client, db_session, test_user, monkeypatch):
+    started = _record_ingestion(monkeypatch)
+    _stored_file(monkeypatch, size=MAX_FILE_SIZE_BYTES)
+    document = await _pending(db_session, test_user)
+
+    response = await client.patch(f"/documents/{document.id}/confirm")
+
+    assert response.status_code == 200
+    assert started == [document.id]
+
+
+@pytest.mark.parametrize(
+    "head", [b"\xff\xd8\xff\xe0 a jpeg called a pdf", b"MZ\x90\x00 an executable", b"<html>a web page</html>"]
+)
+async def test_confirm_removes_a_file_that_is_not_what_it_claims_to_be(
+    client, db_session, test_user, monkeypatch, head
+):
+    started = _record_ingestion(monkeypatch)
+    _, removed = _stored_file(monkeypatch, head=head)
+    document = await _pending(db_session, test_user, content_type="application/pdf")
+    key, document_id = document.storage_key, document.id
+
+    response = await client.patch(f"/documents/{document_id}/confirm")
+
+    assert response.status_code == 400
+    assert "does not look like" in response.json()["detail"]
+    assert started == [] and removed == [key]
+    db_session.expire_all()
+    assert not await _still_there(db_session, document_id)
+
+
+async def test_confirm_keeps_the_document_when_the_bad_file_cannot_be_removed(
+    client, db_session, test_user, monkeypatch
+):
+    started = _record_ingestion(monkeypatch)
+    _stored_file(monkeypatch, size=0)
+
+    def failing_delete(key):
+        raise RuntimeError("storage is down")
+
+    monkeypatch.setattr(main_module, "delete_file", failing_delete)
+    document = await _pending(db_session, test_user)
+    document_id = document.id
+
+    response = await client.patch(f"/documents/{document_id}/confirm")
+
+    assert response.status_code == 502
+    assert started == []
+    db_session.expire_all()
+    assert await _still_there(db_session, document_id)  # nothing is orphaned: it can be tried again
+
+
+async def test_confirm_says_storage_is_unavailable_when_it_cannot_be_checked(
+    client, db_session, test_user, monkeypatch
+):
+    started = _record_ingestion(monkeypatch)
+    _stored_file(monkeypatch, error=RuntimeError("storage is down"))
+    document = await _pending(db_session, test_user)
+
+    response = await client.patch(f"/documents/{document.id}/confirm")
+
+    assert response.status_code == 502
+    assert started == []
+
+
+@pytest.mark.parametrize("status", ["uploaded", "processing", "ready", "needs_retake", "failed"])
+async def test_confirm_is_refused_for_a_document_that_is_not_pending(
+    client, db_session, test_user, monkeypatch, status
+):
+    started = _record_ingestion(monkeypatch)
+    inspected, _ = _stored_file(monkeypatch)
+    document = await _pending(db_session, test_user, status=status)
+
+    response = await client.patch(f"/documents/{document.id}/confirm")
+
+    assert response.status_code == 409
+    assert started == [] and inspected == []
+
+
+async def test_confirm_of_another_persons_document_never_looks_at_their_file(
+    client, db_session, monkeypatch
+):
+    started = _record_ingestion(monkeypatch)
+    inspected, _ = _stored_file(monkeypatch)
+    other = User(email="someone-else-confirm@example.com")
+    db_session.add(other)
+    await db_session.commit()
+    document = await _pending(db_session, other)
+
+    response = await client.patch(f"/documents/{document.id}/confirm")
+
+    assert response.status_code == 404
+    assert started == [] and inspected == []

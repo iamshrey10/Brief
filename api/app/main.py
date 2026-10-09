@@ -23,7 +23,10 @@ from app.storage import (
     MAX_FILE_SIZE_BYTES,
     build_storage_key,
     create_presigned_upload_url,
+    UploadMissingError,
     delete_file,
+    file_matches_type,
+    inspect_upload,
 )
 
 logger = logging.getLogger(__name__)
@@ -173,7 +176,39 @@ async def confirm_upload(
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> DocumentSummary:
+    """Starts reading an uploaded document, after checking the file that actually arrived. The size
+    and type the browser claimed were only claims, so the real size and the first bytes are read from
+    storage. A file that is empty, too large, or not what it says it is, is removed and refused."""
     document = await _get_owned_document(document_id, user, session)
+    if document.status != "pending":
+        raise HTTPException(status_code=409, detail="this upload was already confirmed")
+
+    try:
+        info = await asyncio.to_thread(inspect_upload, document.storage_key)
+    except UploadMissingError:
+        raise HTTPException(status_code=400, detail="the file was not uploaded") from None
+    except Exception as exc:
+        logger.exception("could not check the uploaded file for document %s", document.id)
+        raise HTTPException(status_code=502, detail="could not check the uploaded file") from exc
+
+    problem = None
+    if info.size <= 0 or info.size > MAX_FILE_SIZE_BYTES:
+        problem = "file is empty or too large, 50MB max"
+    elif not file_matches_type(document.content_type or "", info.head):
+        problem = "this file does not look like the kind of file it was said to be"
+    if problem:
+        # The file goes first, as when deleting: if storage fails the document is kept so it can be
+        # tried again, and nothing is left behind where nobody can see it.
+        try:
+            await asyncio.to_thread(delete_file, document.storage_key)
+        except Exception as exc:
+            logger.exception("could not remove a refused file for document %s", document.id)
+            raise HTTPException(status_code=502, detail="could not remove the refused file") from exc
+        await session.delete(document)
+        await session.commit()
+        raise HTTPException(status_code=400, detail=problem)
+
+    document.file_size_bytes = info.size
     document.status = "uploaded"
     document.status_changed_at = datetime.now(timezone.utc)
     await session.commit()
