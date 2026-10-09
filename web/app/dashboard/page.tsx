@@ -1,6 +1,7 @@
 import { auth, signOut } from "@/auth";
 import { Button } from "@/components/ui/button";
 import { mintServiceToken } from "@/lib/service-token";
+import { DeleteAccount } from "@/components/delete-account";
 import { DocumentUpload } from "@/components/document-upload";
 
 async function fetchInitialDocuments(email: string) {
@@ -50,9 +51,12 @@ export default async function Dashboard() {
 
       <DocumentUpload initialDocuments={initialDocuments} />
 
-      <p className="text-xs text-muted-foreground">
-        Brief explains what a document says. It isn&apos;t legal advice.
-      </p>
+      <footer className="flex flex-col items-start gap-3">
+        <p className="text-xs text-muted-foreground">
+          Brief explains what a document says. It isn&apos;t legal advice.
+        </p>
+        <DeleteAccount />
+      </footer>
     </div>
   );
 }
