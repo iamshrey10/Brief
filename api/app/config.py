@@ -37,6 +37,14 @@ class Settings(BaseSettings):
         return name
 
     @model_validator(mode="after")
+    def _a_secret_must_exist(self) -> "Settings":
+        # A blank value usually means .env.example was copied and never filled in. Signing tokens with
+        # an empty key would work, and anyone could forge one, so it is refused everywhere.
+        if not self.service_jwt_secret.strip():
+            raise ValueError("SERVICE_JWT_SECRET is empty, set it in .env")
+        return self
+
+    @model_validator(mode="after")
     def _production_needs_real_secrets(self) -> "Settings":
         if self.environment != "production":
             return self

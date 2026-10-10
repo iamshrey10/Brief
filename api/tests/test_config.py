@@ -51,7 +51,7 @@ def test_production_refuses_the_built_in_secret():
         make(environment="production", database_url=PRODUCTION_DATABASE)
 
 
-@pytest.mark.parametrize("length", [0, 1, 16, 31])
+@pytest.mark.parametrize("length", [1, 16, 31])
 def test_production_refuses_a_secret_shorter_than_32_characters(length):
     with pytest.raises(ValidationError, match="32"):
         make(environment="production", service_jwt_secret="x" * length, database_url=PRODUCTION_DATABASE)
@@ -107,3 +107,17 @@ def test_an_unknown_environment_name_is_refused_instead_of_quietly_treated_as_de
 @pytest.mark.parametrize("name", ["development", "test"])
 def test_development_and_test_may_use_the_defaults(name):
     make(environment=name)
+
+
+@pytest.mark.parametrize("environment", ["development", "test", "production"])
+@pytest.mark.parametrize("blank", ["", "   "])
+def test_a_blank_secret_is_refused_in_every_environment(environment, blank):
+    with pytest.raises(ValidationError, match="SERVICE_JWT_SECRET is empty"):
+        make(environment=environment, service_jwt_secret=blank, database_url=PRODUCTION_DATABASE)
+
+
+def test_the_blank_secret_error_does_not_print_anything_secret():
+    with pytest.raises(ValidationError) as caught:
+        make(service_jwt_secret="   ")
+
+    assert "input_value" not in str(caught.value)
