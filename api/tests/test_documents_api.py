@@ -2005,3 +2005,68 @@ async def test_if_storage_fails_part_way_the_rest_stays_so_it_can_be_tried_again
     assert sorted(removed) == ["fake/one.pdf", "fake/three.pdf", "fake/two.pdf"]
     db_session.expire_all()
     assert not await _user_exists(db_session, user_id)
+
+
+# --- the name of an uploaded file is checked, like a rename ---
+
+
+def _upload_named(name: str) -> dict:
+    return {**_upload_body(), "filename": name}
+
+
+@pytest.mark.parametrize("name", ["", "   ", "\t\n"])
+async def test_an_upload_with_no_name_is_refused(client, db_session, name):
+    response = await client.post("/documents", json=_upload_named(name))
+
+    assert response.status_code == 400
+    assert "name" in response.json()["detail"]
+
+
+async def test_an_upload_with_a_very_long_name_is_refused_with_a_clear_message(client):
+    response = await client.post("/documents", json=_upload_named("a" * 201 + ".pdf"))
+
+    assert response.status_code == 400
+    assert "200" in response.json()["detail"]
+
+
+async def test_an_upload_name_of_exactly_the_limit_is_accepted(client):
+    name = "a" * 196 + ".pdf"
+    assert len(name) == 200
+
+    assert (await client.post("/documents", json=_upload_named(name))).status_code == 200
+
+
+@pytest.mark.parametrize("name", ["bad\x00name.pdf", "line\nbreak.pdf", "tab\there.pdf", "bell\x07.pdf", "del\x7f.pdf"])
+async def test_an_upload_name_with_control_characters_is_refused(client, name):
+    response = await client.post("/documents", json=_upload_named(name))
+
+    assert response.status_code == 400
+    assert "control characters" in response.json()["detail"]
+
+
+async def test_a_refused_name_creates_no_record_and_no_upload_link(client, db_session, test_user, monkeypatch):
+    links = []
+    monkeypatch.setattr(main_module, "create_presigned_upload_url", lambda *args: links.append(args) or "url")
+
+    await client.post("/documents", json=_upload_named("x" * 300 + ".pdf"))
+
+    assert links == []
+    assert (await client.get("/documents")).json() == []
+
+
+async def test_the_stored_name_has_its_edges_trimmed(client, db_session):
+    response = await client.post("/documents", json=_upload_named("  My lease.pdf  "))
+
+    document = await db_session.get(Document, uuid.UUID(response.json()["document_id"]))
+    assert document.filename == "My lease.pdf"
+    assert document.storage_key.endswith("-My lease.pdf")  # the storage key uses the trimmed name too
+
+
+async def test_an_upload_name_that_tries_to_climb_folders_stays_inside_the_users_folder(
+    client, db_session, test_user
+):
+    response = await client.post("/documents", json=_upload_named("../../other-user/secret.pdf"))
+
+    document = await db_session.get(Document, uuid.UUID(response.json()["document_id"]))
+    assert document.storage_key.startswith(f"{test_user.id}/")
+    assert "/../" not in document.storage_key and document.storage_key.count("/") == 1

@@ -94,6 +94,22 @@ async def delete_my_account(
     return Response(status_code=204)
 
 
+MAX_FILENAME_LENGTH = 200
+
+
+def clean_filename(value: str) -> str:
+    """The name of a document with its edges trimmed, or a ValueError saying what is wrong with it.
+    Used for both a new upload and a rename, so a name that cannot be renamed to cannot be uploaded."""
+    name = value.strip()
+    if not name:
+        raise ValueError("a name cannot be empty")
+    if len(name) > MAX_FILENAME_LENGTH:
+        raise ValueError(f"a name can be at most {MAX_FILENAME_LENGTH} characters")
+    if re.search(r"[\x00-\x1f\x7f]", name):
+        raise ValueError("a name cannot contain control characters")
+    return name
+
+
 class CreateUploadRequest(BaseModel):
     filename: str
     doc_type: str
@@ -112,6 +128,10 @@ async def create_upload(
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> CreateUploadResponse:
+    try:
+        filename = clean_filename(body.filename)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from None
     if body.doc_type not in DOC_TYPES:
         raise HTTPException(status_code=400, detail="unknown document type")
     if body.content_type not in ALLOWED_CONTENT_TYPES:
@@ -131,11 +151,11 @@ async def create_upload(
             ),
         )
 
-    storage_key = build_storage_key(str(user.id), body.filename)
+    storage_key = build_storage_key(str(user.id), filename)
 
     document = Document(
         user_id=user.id,
-        filename=body.filename,
+        filename=filename,
         doc_type=body.doc_type,
         status="pending",
         storage_key=storage_key,
@@ -321,9 +341,6 @@ async def reread_document(
     return DocumentSummary.from_document(document)
 
 
-MAX_FILENAME_LENGTH = 200
-
-
 class UpdateDocumentRequest(BaseModel):
     filename: str | None = None
     doc_type: str | None = None
@@ -333,14 +350,7 @@ class UpdateDocumentRequest(BaseModel):
     def _valid_filename(cls, value: str | None) -> str | None:
         if value is None:
             return None
-        name = value.strip()
-        if not name:
-            raise ValueError("a name cannot be empty")
-        if len(name) > MAX_FILENAME_LENGTH:
-            raise ValueError(f"a name can be at most {MAX_FILENAME_LENGTH} characters")
-        if re.search(r"[\x00-\x1f\x7f]", name):
-            raise ValueError("a name cannot contain control characters")
-        return name
+        return clean_filename(value)
 
     @field_validator("doc_type")
     @classmethod
