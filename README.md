@@ -143,7 +143,9 @@ Backend (from `api/`):
     uvicorn app.main:app --reload
 
 Copy `api/.env.example` to `api/.env` first and fill in the real values (R2 credentials,
-a Gemini API key, a JWT secret).
+a Gemini API key, a JWT secret). The API refuses to start with a blank JWT secret, and with `ENVIRONMENT=production` it also
+refuses the built-in development secret, a secret under 32 characters, and the development database
+password.
 
 Run the backend test suite (from `api/`, with the venv active and Postgres running):
 
