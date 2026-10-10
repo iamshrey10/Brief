@@ -78,13 +78,17 @@ Brief holds private documents, so each layer limits what it can reach. What is i
 - **Sign-in and tokens.** Google sign-in through Auth.js. The browser never calls the API. The web
   server checks the session, then mints a token signed with a shared secret that expires after 60
   seconds, and the API rejects any token that is unsigned, uses another algorithm, has no expiry, or has
-  expired. The secret should be at least 32 random characters.
+  expired. The secret should be at least 32 random characters, and both the API and the website
+  refuse to run in production with the built-in development secret or a shorter one. The API also
+  refuses a blank secret anywhere, and the development database password in production.
 - **Your documents are yours.** Every document request checks that it belongs to the caller, and
   someone else's document answers "not found", so its existence is not confirmed.
 - **Uploads.** Files go straight to private storage with links that expire after five minutes. When an
   upload is confirmed, the real size and the first bytes are read from storage and checked against what
   the browser claimed. An empty or over-limit file, or one that is not the kind it says, is removed and
   refused. A second confirm for the same document is refused.
+- **File names.** A name is trimmed and must be 1 to 200 characters with no control characters, the
+  same rule for an upload as for a rename.
 - **Limits.** 50 MB a file, 25 documents a person, 100 pages a document, and a per-user request limit
   of 30 a minute in Redis.
 - **Deleting.** Deleting a document removes its file first and then its records, and deleting an
@@ -93,7 +97,10 @@ Brief holds private documents, so each layer limits what it can reach. What is i
 - **Untrusted text.** The text of a contract is treated as data, never as instructions. The model has
   no tools to act with, and an answer is only shown if its quote is really in the document.
 - **Web hardening.** Security headers on every response (no framing, no content sniffing, HTTPS only,
-  no camera or microphone), and logs record document ids, not document text.
+  no camera or microphone), and fonts come from packages, so no visitor's browser asks a third party
+  for one. No other website can call the API from a browser, and a test checks that.
+- **Logs.** A log line may carry only a fixed message and ids. A test reads every logging call and fails
+  if one could carry the text of a document, a question, an answer or a file name.
 - **Dependencies.** A scan of the libraries that ship runs on every push and every Monday, and the
   build fails on a known high severity problem.
 
