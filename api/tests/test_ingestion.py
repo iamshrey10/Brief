@@ -837,3 +837,31 @@ def test_the_model_client_is_created_once_even_when_threads_ask_at_the_same_mome
 
     assert len(created) == 1
     assert len({id(client) for client in got}) == 1
+
+
+# --- what a failed read leaves in the logs ---
+
+
+async def test_a_failed_read_logs_ids_and_never_the_text_of_the_document(
+    db_session, test_user, monkeypatch, caplog
+):
+    import logging
+
+    marker = "MARKER-PHRASE-THAT-MUST-NOT-BE-LOGGED"
+
+    def broken(texts, on_progress=None):
+        raise RuntimeError("the embedding service refused")
+
+    with caplog.at_level(logging.DEBUG):
+        document = await _failed_read(
+            db_session,
+            test_user,
+            monkeypatch,
+            pdf=_make_pdf_bytes([f"The tenant shall pay {marker} each month."]),
+            embed=broken,
+        )
+
+    assert document.status == "failed"
+    assert str(document.id) in caplog.text  # what was logged is useful: it names the document
+    assert marker not in caplog.text
+    assert marker not in " ".join(str(record.__dict__) for record in caplog.records)
