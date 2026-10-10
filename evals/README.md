@@ -44,3 +44,19 @@ Six real Gemini calls. The model under test can be swapped with `KEY_TERMS_EVAL_
 
 The ground truth in `key_terms_fixture.py` was written before any results were seen and is not
 tuned to them.
+
+## Steadiness evaluation
+
+Reads one real, already read document several times two ways and counts how many fields changed
+between runs: one unseeded read per run (how it worked before the votes), and the voted read the app
+uses now. It covers the key terms and the must-ask questions. Nothing is saved.
+
+    cd api && PYTHONPATH=. python ../evals/steadiness_eval.py <document-id> <loan|lease|offer|other> <runs> <label>
+
+The document is a real private one, so the report in `results/` records only field and question ids
+and counts, never a value, a quote or a file name. Fewer changes means steadier, not more accurate,
+and one document is not a general result. Real documents have not been read by a person here to say
+which answers are right.
+
+The free Gemini tier allows 15 requests a minute, and a voted read makes about ten, so a run takes
+minutes and the script waits out rate limits the way the app does not.
