@@ -3,6 +3,27 @@ from pydantic import ValidationError
 
 from app.config import DEV_DATABASE_PASSWORD, DEV_SERVICE_SECRET, Settings
 
+SETTING_NAMES = (
+    "ENVIRONMENT",
+    "DATABASE_URL",
+    "SERVICE_JWT_SECRET",
+    "R2_ACCOUNT_ID",
+    "R2_ACCESS_KEY_ID",
+    "R2_SECRET_ACCESS_KEY",
+    "R2_BUCKET_NAME",
+    "R2_ENDPOINT_URL",
+    "GEMINI_API_KEY",
+)
+
+
+@pytest.fixture(autouse=True)
+def no_settings_from_the_surroundings(monkeypatch):
+    """CI and a person's shell both set some of these as real environment variables, which would
+    replace the defaults these tests are about. Each test starts with none of them set."""
+    for name in SETTING_NAMES:
+        monkeypatch.delenv(name, raising=False)
+
+
 STRONG = "x" * 32
 PRODUCTION_DATABASE = "postgresql+asyncpg://brief:a-real-password@db.internal:5432/brief"
 
