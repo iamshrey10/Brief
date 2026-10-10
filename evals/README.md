@@ -38,7 +38,7 @@ instead of an invented value. Most fields are not stated on purpose. It also rec
 model said before our quote and number checks ran, so a miss can be told apart: the model not
 finding a term, or our checks rejecting a correct one.
 
-Six real Gemini calls. The model under test can be swapped with `KEY_TERMS_EVAL_MODEL`:
+Eighteen real Gemini calls (six extractions, each now the vote of three seeded reads). The model under test can be swapped with `KEY_TERMS_EVAL_MODEL`:
 
     cd api && PYTHONPATH=. python ../evals/key_terms_eval.py
 

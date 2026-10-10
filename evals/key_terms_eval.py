@@ -4,7 +4,7 @@ clause, and say "not mentioned" for the ones it doesn't state?
 Runs the real pipeline, Gemini plus the quote and number checks, over a loan document and a
 lease document built from the fixture in key_terms_fixture.py, then writes a dated markdown
 report to evals/results/. Each document is extracted three times, because a model that gives
-a different answer on a rerun is not one to trust. Six Gemini calls in all.
+a different answer on a rerun is not one to trust. Eighteen Gemini calls in all: six extractions, each the vote of three seeded reads.
 
 It also records what the model said before our checks ran, so a miss can be told apart: the
 model not finding a term, or our checks rejecting a term it found correctly.

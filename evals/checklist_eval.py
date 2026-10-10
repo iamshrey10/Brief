@@ -4,7 +4,8 @@ from the right clause, and say "not mentioned" for what it doesn't state?
 Runs the real pipeline, Gemini plus the quote and number checks, over a loan note and a lease
 built from the messy fixture in checklist_fixture.py, then writes a dated markdown report to
 evals/results/. Each document is run three times, because a model that gives a different answer
-on a rerun is not one to trust. Six Gemini calls in all.
+on a rerun is not one to trust. About a hundred Gemini calls in all: six runs, each three seeded reads of the questions plus two or three
+looks at every answer that is checked, so it takes minutes on the free tier.
 
 It also records what the model said before our checks ran, so a miss can be told apart: the model
 not finding an answer, or our checks rejecting one it found correctly.
