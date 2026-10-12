@@ -57,3 +57,9 @@ describe("next.config", () => {
     expect(await nextConfig.headers?.()).toEqual(securityHeaderRules());
   });
 });
+
+describe("next.config for a container", () => {
+  it("builds a self-contained server, so the image holds only what it runs", () => {
+    expect(nextConfig.output).toBe("standalone");
+  });
+});
