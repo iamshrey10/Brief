@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { auth, signOut } from "@/auth";
 import { Button } from "@/components/ui/button";
 import { mintServiceToken } from "@/lib/service-token";
@@ -22,8 +23,11 @@ async function fetchInitialDocuments(email: string) {
 
 export default async function Dashboard() {
   const session = await auth();
-  const email = session?.user?.email ?? "";
-  const initialDocuments = email ? await fetchInitialDocuments(email) : [];
+  const email = session?.user?.email;
+  // The middleware already turns visitors away, and this makes the page safe on its own too: nobody who
+  // is not signed in is ever shown the dashboard or has anything fetched for it.
+  if (!email) redirect("/");
+  const initialDocuments = await fetchInitialDocuments(email);
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-8 px-6 py-10">
