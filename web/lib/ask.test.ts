@@ -90,6 +90,29 @@ describe("askQuestion", () => {
     if (!outcome.ok) expect(outcome.message).toMatch(/faster than/i);
   });
 
+  it("shows the server's own sentence when the daily limit of questions is reached", async () => {
+    const detail = "You have reached today's limit of 100 questions. Try again tomorrow.";
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({ detail }, 429)));
+
+    expect(await askQuestion("doc", "q")).toEqual({ ok: false, message: detail });
+  });
+
+  it("keeps the wait a few seconds advice for the per minute limit", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({ error: "too many requests" }, 429)));
+
+    const outcome = await askQuestion("doc", "q");
+
+    expect(outcome.ok === false && outcome.message).toMatch(/faster than/i);
+  });
+
+  it("does not show a detail from any other kind of failure", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({ detail: "internal traceback text" }, 500)));
+
+    const outcome = await askQuestion("doc", "q");
+
+    expect(outcome.ok === false && outcome.message).toMatch(/something went wrong/i);
+  });
+
   it("turns a network error into a generic failure", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("Failed to fetch")));
 

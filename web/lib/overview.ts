@@ -1,3 +1,5 @@
+import { dailyLimitMessage } from "@/lib/daily-limit";
+
 export type KeyTerm = {
   name: string;
   label: string;
@@ -61,7 +63,9 @@ async function request<T>(documentId: string, kind: string): Promise<LoadOutcome
     const res = await fetch(`/api/backend/documents/${encodeURIComponent(documentId)}/${kind}`, {
       signal: controller.signal,
     });
-    if (!res.ok) return { ok: false, message: messageForFailure(res.status) };
+    if (!res.ok) {
+      return { ok: false, message: (await dailyLimitMessage(res)) ?? messageForFailure(res.status) };
+    }
     return { ok: true, result: (await res.json()) as T };
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {

@@ -1,3 +1,5 @@
+import { dailyLimitMessage } from "@/lib/daily-limit";
+
 export type AskCitation = {
   clause_id: string;
   page_number: number;
@@ -46,7 +48,9 @@ export async function askQuestion(documentId: string, question: string): Promise
       body: JSON.stringify({ question }),
       signal: controller.signal,
     });
-    if (!res.ok) return { ok: false, message: messageForFailure(res.status) };
+    if (!res.ok) {
+      return { ok: false, message: (await dailyLimitMessage(res)) ?? messageForFailure(res.status) };
+    }
     return { ok: true, result: (await res.json()) as AskResult };
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {

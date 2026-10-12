@@ -68,6 +68,22 @@ describe("fetchKeyTerms and fetchChecklist", () => {
     expect(fetchMock.mock.calls[0][0]).toBe("/api/backend/documents/a%2Fb%20c/key-terms");
   });
 
+  it("shows the server's own sentence when the daily limit of overviews is reached", async () => {
+    const detail = "You have reached today's limit of 60 document overviews. Try again tomorrow.";
+    fetchMock.mockResolvedValue(jsonResponse({ detail }, 429));
+
+    expect(await fetchKeyTerms("doc-limit")).toEqual({ ok: false, message: detail });
+    expect(await fetchChecklist("doc-limit")).toEqual({ ok: false, message: detail });
+  });
+
+  it("keeps the wait a few seconds advice for the per minute limit", async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ error: "too many requests" }, 429));
+
+    const outcome = await fetchKeyTerms("doc-busy");
+
+    expect(outcome.ok === false && outcome.message).toMatch(/few seconds/i);
+  });
+
   it("turns an error status into a plain message", async () => {
     fetchMock.mockResolvedValue(jsonResponse({ detail: "x" }, 502));
 
