@@ -1,0 +1,14 @@
+# Nothing that is only for working on Brief, or that holds a secret, goes into the image.
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+tests/
+scripts/
+pytest.ini
+ruff.toml
+requirements-dev.txt
+.env
+.env.*
+README.md
