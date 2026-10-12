@@ -2070,3 +2070,103 @@ async def test_an_upload_name_that_tries_to_climb_folders_stays_inside_the_users
     document = await db_session.get(Document, uuid.UUID(response.json()["document_id"]))
     assert document.storage_key.startswith(f"{test_user.id}/")
     assert "/../" not in document.storage_key and document.storage_key.count("/") == 1
+
+
+# --- the daily limits on model-backed actions ---
+
+
+@pytest.fixture
+def tiny_limits(monkeypatch):
+    from app import usage
+
+    monkeypatch.setattr(usage, "DAILY_LIMITS", {"ask": 2, "read": 2, "analyze": 2})
+
+
+def _counting_answers(monkeypatch) -> list[str]:
+    asked: list[str] = []
+
+    async def fake_answer(session, document_id, question):
+        asked.append(question)
+        return AnswerResult(found=False, answer="", citations=[])
+
+    monkeypatch.setattr(main_module, "answer_question", fake_answer)
+    return asked
+
+
+async def test_questions_stop_at_the_daily_limit_with_a_clear_message(
+    client, db_session, test_user, monkeypatch, tiny_limits
+):
+    asked = _counting_answers(monkeypatch)
+    document = await _ready_document(db_session, test_user)
+    path = f"/documents/{document.id}/ask"
+
+    statuses = [(await client.post(path, json={"question": f"Question {n}?"})).status_code for n in range(4)]
+    refused = await client.post(path, json={"question": "One more?"})
+
+    assert statuses == [200, 200, 429, 429]
+    assert refused.status_code == 429
+    assert "2 questions" in refused.json()["detail"] and "tomorrow" in refused.json()["detail"]
+    assert asked == ["Question 0?", "Question 1?"]  # the refused ones never reached the model
+
+
+async def test_a_refused_question_is_not_counted_against_the_limit_again(
+    client, db_session, test_user, monkeypatch, tiny_limits
+):
+    _counting_answers(monkeypatch)
+    document = await _ready_document(db_session, test_user)
+    path = f"/documents/{document.id}/ask"
+    for n in range(6):
+        await client.post(path, json={"question": f"Question {n}?"})
+
+    from app.models import Usage
+    from sqlalchemy import select
+
+    assert await db_session.scalar(select(Usage.count).where(Usage.kind == "ask")) == 2
+
+
+async def test_a_question_that_is_not_valid_does_not_use_up_the_limit(
+    client, db_session, test_user, monkeypatch, tiny_limits
+):
+    asked = _counting_answers(monkeypatch)
+    ready = await _ready_document(db_session, test_user)
+    not_ready = await _document_with(db_session, test_user, "processing")
+
+    for _ in range(3):
+        assert (await client.post(f"/documents/{ready.id}/ask", json={"question": "   "})).status_code == 400
+        assert (await client.post(f"/documents/{not_ready.id}/ask", json={"question": "Hi?"})).status_code == 409
+        assert (await client.post(f"/documents/{uuid.uuid4()}/ask", json={"question": "Hi?"})).status_code == 404
+
+    assert (await client.post(f"/documents/{ready.id}/ask", json={"question": "A real one?"})).status_code == 200
+    assert asked == ["A real one?"]
+
+
+async def test_someone_elses_document_is_not_found_and_costs_nothing(
+    client, db_session, test_user, monkeypatch, tiny_limits
+):
+    _counting_answers(monkeypatch)
+    other = User(email="someone-else-ask@example.com")
+    db_session.add(other)
+    await db_session.commit()
+    theirs = await _ready_document(db_session, other)
+    mine = await _ready_document(db_session, test_user)
+
+    for _ in range(3):
+        assert (await client.post(f"/documents/{theirs.id}/ask", json={"question": "Hi?"})).status_code == 404
+
+    assert (await client.post(f"/documents/{mine.id}/ask", json={"question": "Hi?"})).status_code == 200
+
+
+async def test_the_limit_is_per_person(client, db_session, test_user, monkeypatch, tiny_limits):
+    from app import usage
+
+    _counting_answers(monkeypatch)
+    other = User(email="someone-else-ask-limit@example.com")
+    db_session.add(other)
+    await db_session.commit()
+    for _ in range(2):
+        await usage.spend(db_session, other.id, "ask")
+    document = await _ready_document(db_session, test_user)
+
+    response = await client.post(f"/documents/{document.id}/ask", json={"question": "Mine?"})
+
+    assert response.status_code == 200

@@ -18,6 +18,7 @@ from app.key_terms import KeyTermsGenerationError, KeyTermsResult, get_key_terms
 from app.models import ChecklistAnswerRow, Clause, Document, Extraction, User
 from app.qa import AnswerGenerationError, AnswerResult, answer_question
 from app.retrieval import hybrid_search, reranked_search
+from app import usage
 from app.storage import (
     ALLOWED_CONTENT_TYPES,
     MAX_FILE_SIZE_BYTES,
@@ -108,6 +109,24 @@ def clean_filename(value: str) -> str:
     if re.search(r"[\x00-\x1f\x7f]", name):
         raise ValueError("a name cannot contain control characters")
     return name
+
+
+# What each limited kind of action is called in the message a person sees when they reach its limit.
+LIMIT_NOUNS = {"ask": "questions", "read": "document reads", "analyze": "document overviews"}
+
+
+async def _spend_or_refuse(session: AsyncSession, user: User, kind: str) -> None:
+    """Counts one model-backed action against the person's daily limit, or refuses with a plain
+    message. Called only once the request is known to be valid and theirs, so a mistaken or
+    forbidden request never uses up the limit."""
+    if not await usage.spend(session, user.id, kind):
+        raise HTTPException(
+            status_code=429,
+            detail=(
+                f"You have reached today's limit of {usage.DAILY_LIMITS[kind]} {LIMIT_NOUNS[kind]}. "
+                "Try again tomorrow."
+            ),
+        )
 
 
 class CreateUploadRequest(BaseModel):
@@ -498,6 +517,7 @@ async def ask_document(
     if not body.question.strip():
         raise HTTPException(status_code=400, detail="question cannot be empty")
 
+    await _spend_or_refuse(session, user, "ask")
     try:
         return await answer_question(session, document.id, body.question)
     except (AnswerGenerationError, genai_errors.APIError) as exc:
