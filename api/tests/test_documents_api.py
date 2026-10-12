@@ -2170,3 +2170,88 @@ async def test_the_limit_is_per_person(client, db_session, test_user, monkeypatc
     response = await client.post(f"/documents/{document.id}/ask", json={"question": "Mine?"})
 
     assert response.status_code == 200
+
+
+async def _document_with_text(db_session, test_user) -> Document:
+    document = await _ready_document(db_session, test_user)
+    await _add_clause(db_session, document, 0, 2, LEASE_RENT_TEXT)
+    await db_session.commit()
+    return document
+
+
+@pytest.mark.parametrize(
+    ("route", "fake"),
+    [("key-terms", _fake_key_term_model), ("checklist", _fake_checklist_model)],
+)
+async def test_the_first_overview_request_counts_and_later_ones_from_the_saved_copy_do_not(
+    client, db_session, test_user, monkeypatch, tiny_limits, route, fake
+):
+    from sqlalchemy import select
+
+    from app.models import Usage
+
+    document = await _document_with_text(db_session, test_user)
+    fake(monkeypatch, [])
+
+    for _ in range(5):
+        assert (await client.get(f"/documents/{document.id}/{route}")).status_code == 200
+
+    assert await db_session.scalar(select(Usage.count).where(Usage.kind == "analyze")) == 1
+
+
+@pytest.mark.parametrize(
+    ("route", "fake"),
+    [("key-terms", _fake_key_term_model), ("checklist", _fake_checklist_model)],
+)
+async def test_a_document_that_needs_the_model_is_refused_at_the_limit_and_never_reaches_it(
+    client, db_session, test_user, monkeypatch, tiny_limits, route, fake
+):
+    from app import usage
+
+    document = await _document_with_text(db_session, test_user)
+    calls: list = []
+    fake(monkeypatch, calls)
+    for _ in range(2):
+        await usage.spend(db_session, test_user.id, "analyze")
+
+    response = await client.get(f"/documents/{document.id}/{route}")
+
+    assert response.status_code == 429
+    assert "2 document overviews" in response.json()["detail"] and "tomorrow" in response.json()["detail"]
+    assert calls == []
+
+
+@pytest.mark.parametrize(
+    ("route", "fake"),
+    [("key-terms", _fake_key_term_model), ("checklist", _fake_checklist_model)],
+)
+async def test_an_overview_already_saved_can_still_be_read_after_the_limit_is_reached(
+    client, db_session, test_user, monkeypatch, tiny_limits, route, fake
+):
+    from app import usage
+
+    document = await _document_with_text(db_session, test_user)
+    fake(monkeypatch, [])
+    assert (await client.get(f"/documents/{document.id}/{route}")).status_code == 200  # saved
+    await usage.spend(db_session, test_user.id, "analyze")  # now the day's limit is used up
+
+    again = await client.get(f"/documents/{document.id}/{route}")
+
+    assert again.status_code == 200
+
+
+@pytest.mark.parametrize("route", ["key-terms", "checklist"])
+async def test_an_overview_request_that_is_not_valid_does_not_use_up_the_limit(
+    client, db_session, test_user, tiny_limits, route
+):
+    from sqlalchemy import select
+
+    from app.models import Usage
+
+    not_ready = await _document_with(db_session, test_user, "processing")
+
+    for _ in range(3):
+        assert (await client.get(f"/documents/{not_ready.id}/{route}")).status_code == 409
+        assert (await client.get(f"/documents/{uuid.uuid4()}/{route}")).status_code == 404
+
+    assert await db_session.scalar(select(Usage.count).where(Usage.kind == "analyze")) is None

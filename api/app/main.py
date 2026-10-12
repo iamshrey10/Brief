@@ -11,10 +11,10 @@ from sqlalchemy import delete, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import get_current_user
-from app.checklist import ChecklistGenerationError, ChecklistResult, get_checklist
+from app.checklist import ChecklistGenerationError, ChecklistResult, get_checklist, load_checklist
 from app.db import get_session
 from app.ingestion import ingest_document
-from app.key_terms import KeyTermsGenerationError, KeyTermsResult, get_key_terms
+from app.key_terms import KeyTermsGenerationError, KeyTermsResult, get_key_terms, load_key_terms
 from app.models import ChecklistAnswerRow, Clause, Document, Extraction, User
 from app.qa import AnswerGenerationError, AnswerResult, answer_question
 from app.retrieval import hybrid_search, reranked_search
@@ -597,6 +597,10 @@ async def document_key_terms(
     again, which is why this is a GET even though the first call does the work."""
     document = await _get_readable_document(document_id, user, session)
 
+    # Only a first request, one that has to call the model, counts against the daily limit.
+    # Reading what was already saved is free, so reaching the limit never locks anyone out of it.
+    if await load_key_terms(session, document.id, document.doc_type) is None:
+        await _spend_or_refuse(session, user, "analyze")
     try:
         return await get_key_terms(session, document.id, document.doc_type)
     except (KeyTermsGenerationError, genai_errors.APIError) as exc:
@@ -617,6 +621,8 @@ async def document_checklist(
     first request does the work and later ones read the saved copy."""
     document = await _get_readable_document(document_id, user, session)
 
+    if await load_checklist(session, document.id, document.doc_type) is None:
+        await _spend_or_refuse(session, user, "analyze")
     try:
         return await get_checklist(session, document.id, document.doc_type)
     except (ChecklistGenerationError, genai_errors.APIError) as exc:
