@@ -24,7 +24,7 @@ describe("startFailureMessage", () => {
 
   it("uses the generic line when signed out or rate limited, which have their own handling", async () => {
     expect(await startFailureMessage(refusal(401, { detail: "nope" }))).toBe(GENERIC);
-    expect(await startFailureMessage(refusal(429, { detail: "slow down" }))).toBe(GENERIC);
+    expect(await startFailureMessage(refusal(429, { error: "too many requests" }))).toBe(GENERIC);
   });
 
   it("uses the generic line when the detail is missing, empty, blank or not text", async () => {
@@ -65,5 +65,24 @@ describe("startFailureMessage with its own fallback", () => {
 
   it("keeps the start wording when no fallback is given", async () => {
     expect(await startFailureMessage(refusal(502, {}))).toBe("could not start the upload");
+  });
+});
+
+describe("startFailureMessage when the daily limit is reached", () => {
+  const detail = "You have reached today's limit of 30 document reads. Try again tomorrow.";
+
+  it("shows the server's own sentence for a 429 that carries one", async () => {
+    expect(await startFailureMessage(refusal(429, { detail }))).toBe(detail);
+  });
+
+  it("uses the fallback it is given when the 429 has no usable sentence", async () => {
+    expect(await startFailureMessage(refusal(429, {}), "could not confirm the upload")).toBe(
+      "could not confirm the upload",
+    );
+    expect(await startFailureMessage(refusal(429, { detail: "  " }))).toBe(GENERIC);
+  });
+
+  it("still gives the generic line for a 401 that carries a sentence", async () => {
+    expect(await startFailureMessage(refusal(401, { detail }))).toBe(GENERIC);
   });
 });

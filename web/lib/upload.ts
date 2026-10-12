@@ -1,3 +1,5 @@
+import { dailyLimitMessage } from "@/lib/daily-limit";
+
 const GENERIC_START_FAILURE = "could not start the upload";
 
 /**
@@ -5,15 +7,16 @@ const GENERIC_START_FAILURE = "could not start the upload";
  * reader can act on (too many documents, a file that is too large) comes with its own plain
  * sentence, which is shown as written. Anything else, a server error or an odd response, gets the
  * generic line rather than whatever text happened to come back. Each step of an upload passes its
- * own generic line, so a failure to confirm does not claim the upload could not start.
+ * own generic line, so a failure to confirm does not claim the upload could not start. A 429 is shown
+ * only when it is the API's daily limit, which carries its own sentence, and not the website's own
+ * per minute limit.
  */
 export async function startFailureMessage(
   response: Pick<Response, "status" | "json">,
   fallback: string = GENERIC_START_FAILURE,
 ): Promise<string> {
-  if (response.status < 400 || response.status >= 500 || response.status === 401 || response.status === 429) {
-    return fallback;
-  }
+  if (response.status === 429) return (await dailyLimitMessage(response)) ?? fallback;
+  if (response.status < 400 || response.status >= 500 || response.status === 401) return fallback;
   try {
     const body = await response.json();
     const detail = body?.detail;

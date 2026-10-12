@@ -406,6 +406,23 @@ describe("DocumentUpload form", () => {
     expect(screen.getByText("one-too-many.pdf")).toBeInTheDocument();
   });
 
+  it("shows the daily limit sentence when starting an upload is refused for it", async () => {
+    const detail = "You have reached today's limit of 30 document reads. Try again tomorrow.";
+    fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url === "/api/backend/documents" && init?.method === "POST") {
+        return { ok: false, status: 429, json: async () => ({ detail }) } as Response;
+      }
+      throw new Error(`unexpected request: ${url}`);
+    });
+    render(<DocumentUpload initialDocuments={[]} />);
+
+    chooseFile(pdf("one-more.pdf"));
+    fireEvent.click(screen.getByRole("button", { name: "Upload" }));
+    await tick(0);
+
+    expect(screen.getByRole("alert")).toHaveTextContent(detail);
+  });
+
   it("shows why a file was refused when the upload is confirmed", async () => {
     const detail = "this file does not look like the kind of file it was said to be";
     fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
