@@ -2255,3 +2255,128 @@ async def test_an_overview_request_that_is_not_valid_does_not_use_up_the_limit(
         assert (await client.get(f"/documents/{uuid.uuid4()}/{route}")).status_code == 404
 
     assert await db_session.scalar(select(Usage.count).where(Usage.kind == "analyze")) is None
+
+
+async def _reads_counted(db_session) -> int | None:
+    from sqlalchemy import select
+
+    from app.models import Usage
+
+    return await db_session.scalar(select(Usage.count).where(Usage.kind == "read"))
+
+
+async def test_new_uploads_stop_at_the_daily_limit_with_no_record_and_no_upload_link(
+    client, db_session, test_user, monkeypatch, tiny_limits
+):
+    links: list = []
+    monkeypatch.setattr(main_module, "create_presigned_upload_url", lambda *args: links.append(args) or "url")
+
+    statuses = [(await client.post("/documents", json=_upload_body(f"n{n}.pdf"))).status_code for n in range(4)]
+    refused = await client.post("/documents", json=_upload_body("late.pdf"))
+
+    assert statuses == [200, 200, 429, 429]
+    assert "2 document reads" in refused.json()["detail"] and "tomorrow" in refused.json()["detail"]
+    assert len(links) == 2
+    assert len((await client.get("/documents")).json()) == 2
+
+
+async def test_an_upload_that_is_not_valid_does_not_use_up_the_limit(
+    client, db_session, test_user, monkeypatch, tiny_limits
+):
+    monkeypatch.setattr(main_module, "MAX_DOCUMENTS_PER_USER", 1)
+    await client.post("/documents", json=_upload_body("first.pdf"))  # one read counted, one document kept
+    before = await _reads_counted(db_session)
+
+    bad_type = {**_upload_body(), "content_type": "application/x-msdownload"}
+    refusals = [
+        await client.post("/documents", json=bad_type),
+        await client.post("/documents", json=_upload_named("")),
+        await client.post("/documents", json={**_upload_body(), "doc_type": "nonsense"}),
+        await client.post("/documents", json={**_upload_body(), "file_size_bytes": 0}),
+        await client.post("/documents", json=_upload_body("too-many.pdf")),  # over the document limit
+    ]
+
+    assert [r.status_code for r in refusals] == [400, 400, 400, 400, 409]
+    assert await _reads_counted(db_session) == before == 1
+
+
+async def test_a_retry_counts_and_is_refused_at_the_limit_without_starting_a_read(
+    client, db_session, test_user, monkeypatch, tiny_limits
+):
+    from app import usage
+
+    started = _record_ingestion(monkeypatch)
+    document = await _document_with(db_session, test_user, "failed")
+    for _ in range(2):
+        await usage.spend(db_session, test_user.id, "read")
+
+    response = await client.post(f"/documents/{document.id}/retry")
+
+    assert response.status_code == 429
+    assert started == []
+    await db_session.refresh(document)
+    assert document.status == "failed"  # it stays as it was, so it can be tried again tomorrow
+
+
+async def test_a_retry_that_is_allowed_counts_once(client, db_session, test_user, monkeypatch, tiny_limits):
+    started = _record_ingestion(monkeypatch)
+    document = await _document_with(db_session, test_user, "failed")
+
+    assert (await client.post(f"/documents/{document.id}/retry")).status_code == 200
+
+    assert started == [document.id]
+    assert await _reads_counted(db_session) == 1
+
+
+async def test_a_retry_that_is_not_allowed_does_not_use_up_the_limit(
+    client, db_session, test_user, monkeypatch, tiny_limits
+):
+    _record_ingestion(monkeypatch)
+    fine = await _document_with(db_session, test_user, "ready")
+
+    for _ in range(3):
+        assert (await client.post(f"/documents/{fine.id}/retry")).status_code == 409
+        assert (await client.post(f"/documents/{uuid.uuid4()}/retry")).status_code == 404
+
+    assert await _reads_counted(db_session) is None
+
+
+async def test_reading_again_counts_and_is_refused_at_the_limit_keeping_what_was_read(
+    client, db_session, test_user, monkeypatch, tiny_limits
+):
+    from app import usage
+
+    started = _record_ingestion(monkeypatch)
+    document = await _document_with_everything(db_session, test_user)
+    document_id = document.id
+    for _ in range(2):
+        await usage.spend(db_session, test_user.id, "read")
+
+    response = await client.post(f"/documents/{document_id}/reread")
+
+    assert response.status_code == 429
+    assert started == []
+    db_session.expire_all()
+    kept = await _counts(db_session, document_id)
+    assert (kept["clauses"], kept["embeddings"], kept["key_terms"], kept["checklist"]) == (1, 1, 1, 1)
+
+
+async def test_a_reread_that_is_allowed_counts_once(client, db_session, test_user, monkeypatch, tiny_limits):
+    _record_ingestion(monkeypatch)
+    document = await _document_with_everything(db_session, test_user)
+
+    assert (await client.post(f"/documents/{document.id}/reread")).status_code == 200
+
+    assert await _reads_counted(db_session) == 1
+
+
+async def test_confirming_an_upload_is_not_counted_again(client, db_session, test_user, monkeypatch, tiny_limits):
+    _record_ingestion(monkeypatch)
+    _stored_file(monkeypatch)
+    created = await client.post("/documents", json=_upload_body())  # counted here, when the upload starts
+    document_id = created.json()["document_id"]
+
+    confirmed = await client.patch(f"/documents/{document_id}/confirm")
+
+    assert confirmed.status_code == 200
+    assert await _reads_counted(db_session) == 1

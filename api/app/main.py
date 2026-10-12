@@ -170,6 +170,10 @@ async def create_upload(
             ),
         )
 
+    # Only now, once the upload is known to be valid and allowed, does it count against the daily limit,
+    # and before any record or upload link exists, so a refusal leaves nothing behind.
+    await _spend_or_refuse(session, user, "read")
+
     storage_key = build_storage_key(str(user.id), filename)
 
     document = Document(
@@ -309,6 +313,7 @@ async def retry_document(
     )
     if document.status != "failed" and not stuck:
         raise HTTPException(status_code=409, detail="this document does not need another try")
+    await _spend_or_refuse(session, user, "read")
 
     # A failed read saves nothing, but clear any leftovers so a retry always starts clean.
     leftovers = await session.execute(select(Clause).where(Clause.document_id == document.id))
@@ -341,6 +346,7 @@ async def reread_document(
     document = await _get_owned_document(document_id, user, session)
     if document.status not in SEARCHABLE_STATUSES:
         raise HTTPException(status_code=409, detail="this document has not been read yet")
+    await _spend_or_refuse(session, user, "read")
 
     await session.execute(delete(Extraction).where(Extraction.document_id == document.id))
     await session.execute(delete(ChecklistAnswerRow).where(ChecklistAnswerRow.document_id == document.id))
