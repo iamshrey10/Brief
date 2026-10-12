@@ -61,3 +61,20 @@ describe("retryDocument", () => {
     }
   });
 });
+
+describe("retryDocument when the daily limit is reached", () => {
+  it("shows the server's own sentence", async () => {
+    const detail = "You have reached today's limit of 30 document reads. Try again tomorrow.";
+    fetchMock.mockResolvedValue(response({ detail }, 429));
+
+    expect(await retryDocument("d1")).toEqual({ ok: false, message: detail });
+  });
+
+  it("keeps the wait a few seconds advice for the per minute limit", async () => {
+    fetchMock.mockResolvedValue(response({ error: "too many requests" }, 429));
+
+    const outcome = await retryDocument("d1");
+
+    expect(outcome.ok === false && outcome.message).toMatch(/few seconds/i);
+  });
+});
