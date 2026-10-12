@@ -1,9 +1,11 @@
+import datetime as dt
 import uuid
 from datetime import datetime
 
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     Computed,
+    Date,
     DateTime,
     Float,
     ForeignKey,
@@ -164,3 +166,18 @@ class ChecklistAnswerRow(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     document: Mapped["Document"] = relationship(back_populates="checklist_answers")
+
+
+class Usage(Base):
+    """How many times one person did one kind of model-backed thing on one day. It is what a daily
+    limit is counted from, so one account cannot run up the bill. A row is created by the first use of
+    the day. It goes when the account goes."""
+
+    __tablename__ = "usage"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    day: Mapped[dt.date] = mapped_column(Date, primary_key=True)
+    kind: Mapped[str] = mapped_column(String(50), primary_key=True)
+    count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
