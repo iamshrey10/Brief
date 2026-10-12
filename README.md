@@ -90,7 +90,10 @@ Brief holds private documents, so each layer limits what it can reach. What is i
 - **File names.** A name is trimmed and must be 1 to 200 characters with no control characters, the
   same rule for an upload as for a rename.
 - **Limits.** 50 MB a file, 25 documents a person, 100 pages a document, and a per-user request limit
-  of 30 a minute in Redis.
+  of 30 a minute in Redis. Each person also has a daily limit on what calls the model, counted in
+  Postgres with one atomic statement so simultaneous requests cannot slip past it: 100 questions, 30
+  document reads (an upload, a retry or reading again) and 60 overviews. Reading an overview that was
+  already saved is free, so reaching the limit never locks anyone out of their results.
 - **Deleting.** Deleting a document removes its file first and then its records, and deleting an
   account does the same for every document, one at a time, so a failure never leaves a record without
   its file or a file without a record. It can be repeated until it finishes.
@@ -177,6 +180,30 @@ Frontend checks: `pnpm lint`, `pnpm test`, and `pnpm build`.
 
 The evaluations call the real Gemini API and need Postgres running. Each one is a single command,
 see [evals/README.md](evals/README.md).
+
+## Running it in containers
+
+Both parts have a Dockerfile. Neither image contains a secret, every setting comes from the environment,
+and both run as a non-root user.
+
+    docker build -t brief-api api
+    docker build -t brief-web web
+
+The API listens on `$PORT` (8000 if unset) and has a health check on `/health`. It needs the settings in
+`api/.env.example`. With `ENVIRONMENT=production` it refuses to start on the built-in secret, a secret
+under 32 characters, or the development database password. The database schema is a separate step, run
+once for each release:
+
+    docker run --rm --env-file api/.env brief-api alembic upgrade head
+
+The website listens on `$PORT` (3000 if unset). It needs `AUTH_SECRET`, `AUTH_GOOGLE_ID`,
+`AUTH_GOOGLE_SECRET`, `SERVICE_JWT_SECRET` (the same value the API has), `BACKEND_URL` and `REDIS_URL`.
+Outside Vercel, Auth.js also needs `AUTH_TRUST_HOST=true`, and without it the sign in routes answer 500.
+
+I built both images and ran them: the API refused weak production settings and started with good ones,
+and the website served the landing page with its security headers and turned away anonymous requests.
+The API image is about 1 GB, mostly OpenCV and the reranker, and the website image about 400 MB. Nothing
+is deployed anywhere yet.
 
 ## License
 
