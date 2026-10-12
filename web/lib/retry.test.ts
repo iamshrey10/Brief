@@ -41,7 +41,8 @@ describe("retryDocument", () => {
     [429, /too many requests/i],
     [500, /couldn't start that/i],
   ])("explains a %i in plain words", async (status, pattern) => {
-    fetchMock.mockResolvedValue(response({ detail: "x" }, status));
+    // The website's own per minute limit answers with an `error`, the API's daily limit with a `detail`.
+    fetchMock.mockResolvedValue(response({ error: "x" }, status));
 
     const outcome = await retryDocument("d1");
 
