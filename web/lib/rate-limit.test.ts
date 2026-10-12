@@ -5,12 +5,18 @@ const redis = vi.hoisted(() => ({
   expires: [] as [string, number][],
   incr: vi.fn(),
   expire: vi.fn(),
+  on: vi.fn(),
+  created: [] as (string | undefined)[],
 }));
 
 vi.mock("ioredis", () => ({
   default: class FakeRedis {
     incr = redis.incr;
     expire = redis.expire;
+    on = redis.on;
+    constructor(url?: string) {
+      redis.created.push(url);
+    }
   },
 }));
 
@@ -103,5 +109,62 @@ describe("checkRateLimit", () => {
     redis.incr.mockRejectedValue(new Error("redis is down"));
 
     await expect(checkRateLimit("a@b.c")).rejects.toThrow("redis is down");
+  });
+});
+
+describe("the Redis connection", () => {
+  /** A fresh copy of the module, as if the server had just started, with nothing recorded yet. */
+  async function freshLimiter() {
+    vi.resetModules();
+    redis.created.length = 0;
+    redis.on.mockClear();
+    return (await import("./rate-limit")).checkRateLimit;
+  }
+
+  it("is not opened just by loading the file, so a build or a test never reaches for Redis", async () => {
+    await freshLimiter();
+
+    expect(redis.created).toEqual([]);
+  });
+
+  it("is opened once, on first use, and reused for every later request", async () => {
+    const check = await freshLimiter();
+
+    await check("a@b.c");
+    await check("someone@else.c");
+    await check("a@b.c");
+
+    expect(redis.created).toHaveLength(1);
+  });
+
+  it("is opened with the address from the environment", async () => {
+    vi.stubEnv("REDIS_URL", "redis://cache.internal:6380");
+    const check = await freshLimiter();
+
+    await check("a@b.c");
+
+    expect(redis.created).toEqual(["redis://cache.internal:6380"]);
+    vi.unstubAllEnvs();
+  });
+
+  it("listens for connection errors, so a Redis outage is logged instead of crashing the process", async () => {
+    const check = await freshLimiter();
+
+    await check("a@b.c");
+
+    expect(redis.on).toHaveBeenCalledWith("error", expect.any(Function));
+  });
+
+  it("never logs who was being checked when Redis cannot be reached", async () => {
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    const check = await freshLimiter();
+    await check("private-person@example.com");
+    const handler = redis.on.mock.calls.find(([event]) => event === "error")?.[1] as (e: Error) => void;
+
+    handler(new Error("connect ECONNREFUSED for private-person@example.com"));
+
+    expect(logged).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(logged.mock.calls)).not.toContain("private-person");
+    logged.mockRestore();
   });
 });
