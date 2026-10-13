@@ -1,6 +1,7 @@
 import datetime
 import uuid
 
+from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -47,3 +48,24 @@ async def spend(
     counted = (await session.execute(statement)).scalar_one_or_none()
     await session.commit()
     return counted is not None
+
+
+async def usage_today(
+    session: AsyncSession, user_id: uuid.UUID, today: datetime.date | None = None
+) -> dict[str, dict[str, int]]:
+    """Where this person stands today for every limited kind: how many they have used, the limit, and how
+    many are left (never below zero, even if a limit was lowered after they used more). Only reads, so
+    looking never uses anything up."""
+    day = today or datetime.datetime.now(datetime.timezone.utc).date()
+    rows = await session.execute(
+        select(Usage.kind, Usage.count).where(Usage.user_id == user_id, Usage.day == day)
+    )
+    used = dict(rows.all())
+    return {
+        kind: {
+            "used": used.get(kind, 0),
+            "limit": limit,
+            "left": max(limit - used.get(kind, 0), 0),
+        }
+        for kind, limit in DAILY_LIMITS.items()
+    }
