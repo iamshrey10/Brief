@@ -65,6 +65,16 @@ async def me(user: User = Depends(get_current_user)) -> dict[str, str]:
     return {"id": str(user.id), "email": user.email}
 
 
+@app.get("/me/usage")
+async def my_usage(
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, dict[str, int]]:
+    """Where the signed-in person stands today against each daily limit: used, the limit, and what is
+    left. Only reads, so looking never uses anything up."""
+    return await usage.usage_today(session, user.id)
+
+
 @app.delete("/me", status_code=204)
 async def delete_my_account(
     user: User = Depends(get_current_user),

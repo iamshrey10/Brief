@@ -2476,3 +2476,49 @@ async def test_someone_elses_abandoned_uploads_are_left_alone(client, db_session
     assert (await client.post("/documents", json=_upload_body())).status_code == 200
 
     assert removed == []
+
+
+# --- GET /me/usage ---
+
+
+async def test_usage_starts_with_everything_left(client, tiny_limits):
+    response = await client.get("/me/usage")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "ask": {"used": 0, "limit": 2, "left": 2},
+        "read": {"used": 0, "limit": 2, "left": 2},
+        "analyze": {"used": 0, "limit": 2, "left": 2},
+    }
+
+
+async def test_usage_follows_what_the_person_does(client, db_session, test_user, monkeypatch, tiny_limits):
+    _counting_answers(monkeypatch)
+    document = await _ready_document(db_session, test_user)
+    await client.post(f"/documents/{document.id}/ask", json={"question": "One?"})
+    await client.post("/documents", json=_upload_body("new.pdf"))
+
+    body = (await client.get("/me/usage")).json()
+
+    assert body["ask"] == {"used": 1, "limit": 2, "left": 1}
+    assert body["read"] == {"used": 1, "limit": 2, "left": 1}
+    assert body["analyze"] == {"used": 0, "limit": 2, "left": 2}
+
+
+async def test_looking_at_usage_costs_nothing(client, tiny_limits):
+    for _ in range(5):
+        await client.get("/me/usage")
+
+    assert (await client.get("/me/usage")).json()["ask"]["used"] == 0
+
+
+async def test_usage_shows_only_this_persons_numbers(client, db_session, test_user, tiny_limits):
+    from app import usage
+
+    other = User(email="someone-else-usage-endpoint@example.com")
+    db_session.add(other)
+    await db_session.commit()
+    for _ in range(2):
+        await usage.spend(db_session, other.id, "ask")
+
+    assert (await client.get("/me/usage")).json()["ask"]["used"] == 0
