@@ -815,3 +815,62 @@ async def test_saving_again_replaces_the_stored_quotes(db_session, test_user, mo
     row = next(r for r in await _saved_rows(db_session, document) if r.field_name == "interest_rate")
     await db_session.refresh(row)
     assert len(row.evidence) == 1
+
+
+# --- what the model is told about quotes ---
+
+
+def test_the_model_is_told_it_may_add_extra_quotes_when_a_fact_spans_sentences():
+    from app.key_terms import SYSTEM_INSTRUCTION
+
+    assert "extra_evidence" in SYSTEM_INSTRUCTION
+    assert "up to two" in SYSTEM_INSTRUCTION
+    assert "the amount" in SYSTEM_INSTRUCTION and "next sentence" in SYSTEM_INSTRUCTION
+
+
+def test_the_model_is_told_every_number_in_the_value_must_be_in_a_quote():
+    from app.key_terms import SYSTEM_INSTRUCTION
+
+    assert "every number" in SYSTEM_INSTRUCTION.lower() and "one of your quotes" in SYSTEM_INSTRUCTION
+
+
+def test_the_model_is_still_told_each_quote_is_one_continuous_passage_copied_exactly():
+    from app.key_terms import SYSTEM_INSTRUCTION
+
+    assert "ONE continuous passage" in SYSTEM_INSTRUCTION and "word for word" in SYSTEM_INSTRUCTION
+    assert "never join separate lines" in SYSTEM_INSTRUCTION
+
+
+def test_the_structured_answer_the_model_must_fill_in_includes_the_extra_quotes():
+    schema = ExtractionResponse.model_json_schema()
+    field = schema["$defs"]["ExtractedField"]["properties"]
+
+    assert "extra_evidence" in field
+    assert field["extra_evidence"]["type"] == "array"
+
+
+def test_a_model_answer_without_extra_quotes_is_still_valid():
+    parsed = ExtractionResponse.model_validate(
+        {"fields": [{"name": "late_fee", "found": True, "value": "$25.00", "clause_ref": "C1", "quote": "q"}]}
+    )
+
+    assert parsed.fields[0].extra_evidence == []
+
+
+def test_a_model_answer_with_extra_quotes_is_read_into_evidence():
+    parsed = ExtractionResponse.model_validate(
+        {
+            "fields": [
+                {
+                    "name": "late_fee",
+                    "found": True,
+                    "value": "$25.00",
+                    "clause_ref": "C1",
+                    "quote": "q",
+                    "extra_evidence": [{"clause_ref": "C2", "quote": "more"}],
+                }
+            ]
+        }
+    )
+
+    assert parsed.fields[0].extra_evidence == [Evidence(clause_ref="C2", quote="more")]

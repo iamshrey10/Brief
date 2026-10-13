@@ -36,12 +36,16 @@ SYSTEM_INSTRUCTION = (
     "If the clauses do not state a field, set found to false and leave the other values empty, "
     "never guess and never use outside knowledge. "
     "When found is true, value states the fact itself in a few plain words, the amount, date, "
-    "or rule and not just the name of the thing it is about, taken from the quote and never "
-    "adding a number that the quote does not contain. clause_ref is the label of the clause it "
-    "came from, like C2. quote is ONE continuous passage copied exactly, word for word, from "
-    "that clause: never join separate lines, never skip text in the middle. If the fact "
-    "appears in several separate places, quote the clearest single place and give the value "
-    "for that place only. This is explanation, not legal advice."
+    "or rule and not just the name of the thing it is about. clause_ref is the label of the "
+    "clause it came from, like C2. quote is ONE continuous passage copied exactly, word for "
+    "word, from that clause: never join separate lines, never skip text in the middle. "
+    "If the fact needs more than one passage, for example the amount in one sentence and the "
+    "rule about it in the next sentence, give the clearest passage as quote and put up to two "
+    "more in extra_evidence, each with its own clause_ref and each one continuous passage "
+    "copied exactly. Most fields need only quote. Every number in value must appear in one of "
+    "your quotes, never add a number that none of your quotes contains. If the fact appears "
+    "in several separate places, give the value for the clearest place only. "
+    "This is explanation, not legal advice."
 )
 
 
