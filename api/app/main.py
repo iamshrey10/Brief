@@ -15,6 +15,7 @@ from app.checklist import ChecklistGenerationError, ChecklistResult, get_checkli
 from app.db import get_session
 from app.housekeeping import remove_abandoned_uploads
 from app.ingestion import ingest_document
+from app.logging_setup import configure_logging
 from app.key_terms import KeyTermsGenerationError, KeyTermsResult, get_key_terms, load_key_terms
 from app.models import ChecklistAnswerRow, Clause, Document, Extraction, User
 from app.qa import AnswerGenerationError, AnswerResult, answer_question
@@ -31,6 +32,7 @@ from app.storage import (
     inspect_upload,
 )
 
+configure_logging()
 logger = logging.getLogger(__name__)
 
 SEARCHABLE_STATUSES = {"ready", "needs_retake"}
