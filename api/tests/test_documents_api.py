@@ -679,9 +679,13 @@ async def test_key_terms_returns_verified_terms_and_reuses_them(
         "clause_id": str(clause.id),
         "page_number": 2,
         "quote": "Monthly rent is $2,054.00",
+        "evidence": [
+            {"clause_id": str(clause.id), "page_number": 2, "quote": "Monthly rent is $2,054.00"}
+        ],
     }
     deposit = next(t for t in body["terms"] if t["name"] == "security_deposit")
     assert deposit["found"] is False and deposit["value"] is None
+    assert deposit["evidence"] == []
     assert second.json() == body
     assert len(calls) == KEY_TERMS_RUNS  # the second request used the saved copy
 

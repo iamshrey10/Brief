@@ -3,6 +3,7 @@ from sqlalchemy import select
 
 from app import document_text, key_terms
 from app.key_term_fields import KeyTermField
+from app.evidence import Evidence
 from app.key_terms import (
     KEY_TERMS_MODEL,
     KEY_TERMS_RUNS,
@@ -573,3 +574,159 @@ def test_refused_key_terms_wait_and_are_found_instead_of_failing(monkeypatch):
 
     assert generate_key_terms(FIELDS, [("C1", RATE_TEXT)], seed=1) == expected
     assert client.calls == 2
+
+
+# --- a key term may rest on more than one quote ---
+
+TWO_SENTENCES = "The loan bears a fixed rate of 6.5% per year. It is calculated daily on the balance."
+
+
+def _two_clause_verify(entry):
+    clauses = {
+        "C1": _clause(TWO_SENTENCES, page=1),
+        "C2": _clause(LATE_TEXT, page=2),
+    }
+    (term, *_rest) = verify_terms(FIELDS[:1], ExtractionResponse(fields=[entry]), clauses)
+    return term
+
+
+def _with_extra(entry: ExtractedField, *extra: tuple[str, str]) -> ExtractedField:
+    entry.extra_evidence = [Evidence(clause_ref=ref, quote=quote) for ref, quote in extra]
+    return entry
+
+
+def test_a_number_may_be_backed_by_a_second_quote_when_the_main_quote_lacks_it():
+    entry = _with_extra(
+        _entry("interest_rate", "6.5% per year, calculated daily", "C1", "It is calculated daily on the balance."),
+        ("C1", "The loan bears a fixed rate of 6.5% per year."),
+    )
+
+    term = _two_clause_verify(entry)
+
+    assert term.found is True
+    assert [e.quote for e in term.evidence] == [
+        "It is calculated daily on the balance.",
+        "The loan bears a fixed rate of 6.5% per year.",
+    ]
+
+
+def test_without_a_second_quote_the_same_value_is_still_refused():
+    entry = _entry("interest_rate", "6.5% per year, calculated daily", "C1", "It is calculated daily on the balance.")
+
+    assert _two_clause_verify(entry).found is False
+
+
+def test_the_first_quote_stays_the_main_one_for_the_fields_that_always_existed():
+    entry = _with_extra(
+        _entry("interest_rate", "6.5% per year", "C1", "The loan bears a fixed rate of 6.5% per year."),
+        ("C1", "It is calculated daily on the balance."),
+    )
+
+    term = _two_clause_verify(entry)
+
+    assert term.quote == "The loan bears a fixed rate of 6.5% per year."
+    assert term.page_number == 1
+    assert term.clause_id is not None
+
+
+def test_a_term_with_one_quote_has_exactly_one_piece_of_evidence():
+    term = _two_clause_verify(_entry("interest_rate", "6.5% per year", "C1", "fixed rate of 6.5% per year"))
+
+    assert len(term.evidence) == 1
+    assert (term.evidence[0].quote, term.evidence[0].page_number) == (term.quote, term.page_number)
+    assert term.evidence[0].clause_id == term.clause_id
+
+
+def test_an_extra_quote_that_is_not_in_its_clause_is_dropped_and_cannot_support_a_number():
+    entry = _with_extra(
+        _entry("interest_rate", "6.5% per year, calculated daily", "C1", "It is calculated daily on the balance."),
+        ("C1", "The loan bears a fixed rate of about 6.5% per year."),  # not what the clause says
+    )
+
+    assert _two_clause_verify(entry).found is False
+
+
+def test_a_dropped_extra_quote_does_not_spoil_a_term_the_main_quote_supports():
+    entry = _with_extra(
+        _entry("interest_rate", "6.5% per year", "C1", "The loan bears a fixed rate of 6.5% per year."),
+        ("C1", "words that appear nowhere in the clause"),
+    )
+
+    term = _two_clause_verify(entry)
+
+    assert term.found is True and len(term.evidence) == 1
+
+
+def test_an_extra_quote_may_come_from_another_clause_and_keeps_that_clauses_page():
+    entry = _with_extra(
+        _entry("interest_rate", "6.5% per year, late charge $25.00", "C1", "The loan bears a fixed rate of 6.5% per year."),
+        ("C2", "A late charge of $25.00 applies"),
+    )
+
+    term = _two_clause_verify(entry)
+
+    assert term.found is True
+    assert [e.page_number for e in term.evidence] == [1, 2]
+
+
+def test_an_extra_quote_naming_a_clause_the_model_was_never_shown_is_dropped():
+    entry = _with_extra(
+        _entry("interest_rate", "6.5% per year", "C1", "The loan bears a fixed rate of 6.5% per year."),
+        ("C9", "It is calculated daily on the balance."),
+    )
+
+    assert len(_two_clause_verify(entry).evidence) == 1
+
+
+def test_at_most_three_quotes_are_kept():
+    entry = _with_extra(
+        _entry("interest_rate", "6.5% per year", "C1", "The loan bears a fixed rate of 6.5% per year."),
+        ("C1", "It is calculated daily on the balance."),
+        ("C2", "A late charge of $25.00 applies"),
+        ("C2", "if a payment is more than 15 days late"),
+    )
+
+    assert len(_two_clause_verify(entry).evidence) == 3
+
+
+def test_the_same_quote_given_twice_is_kept_once():
+    entry = _with_extra(
+        _entry("interest_rate", "6.5% per year", "C1", "The loan bears a fixed rate of 6.5% per year."),
+        ("C1", "The loan bears a fixed rate of 6.5% per year."),
+    )
+
+    assert len(_two_clause_verify(entry).evidence) == 1
+
+
+def test_when_the_main_quote_is_not_real_a_real_extra_quote_takes_its_place():
+    entry = _with_extra(
+        _entry("interest_rate", "6.5% per year", "C1", "an invented sentence about a rate"),
+        ("C1", "The loan bears a fixed rate of 6.5% per year."),
+    )
+
+    term = _two_clause_verify(entry)
+
+    assert term.found is True
+    assert term.quote == "The loan bears a fixed rate of 6.5% per year."
+    assert len(term.evidence) == 1
+
+
+def test_a_term_with_no_real_quote_at_all_is_not_mentioned_and_has_no_evidence():
+    entry = _with_extra(
+        _entry("interest_rate", "6.5% per year", "C1", "made up one"), ("C1", "made up two")
+    )
+
+    term = _two_clause_verify(entry)
+
+    assert term.found is False and term.evidence == []
+
+
+def test_a_term_the_model_says_is_absent_has_no_evidence_even_with_extra_quotes():
+    entry = _with_extra(
+        _entry("interest_rate", "6.5% per year", "C1", "The loan bears a fixed rate of 6.5% per year.", found=False),
+        ("C1", "It is calculated daily on the balance."),
+    )
+
+    term = _two_clause_verify(entry)
+
+    assert term.found is False and term.evidence == []

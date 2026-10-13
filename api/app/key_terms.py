@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.consensus import majority_of_runs
 from app.document_text import load_prompt_clauses
+from app.evidence import MAX_EVIDENCE, Evidence, EvidenceOut
 from app.grounding import numbers_supported, quote_appears_in
 from app.ingestion import get_genai_client
 from app.key_term_fields import KeyTermField, fields_for
@@ -50,6 +51,9 @@ class ExtractedField(BaseModel):
     value: str
     clause_ref: str
     quote: str
+    # More passages that state parts of the value, for a fact spread over a few sentences, such as the
+    # amount in one and the rule about it in the next. Optional, and empty for most fields.
+    extra_evidence: list[Evidence] = []
 
 
 class ExtractionResponse(BaseModel):
@@ -65,9 +69,12 @@ class KeyTerm(BaseModel):
     label: str
     found: bool
     value: str | None = None
+    # The first piece of evidence, kept as plain fields because that is how a term was always shown
     clause_id: str | None = None
     page_number: int | None = None
     quote: str | None = None
+    # Every quote that was checked word for word and backs the value, the first one first
+    evidence: list[EvidenceOut] = []
 
 
 class KeyTermsResult(BaseModel):
@@ -109,6 +116,29 @@ def generate_key_terms(
     return parsed
 
 
+def _verified_evidence(
+    entry: ExtractedField, clause_by_label: dict[str, Clause]
+) -> list[tuple[Clause, str]]:
+    """The model's quotes that really appear, word for word, in the clause each one names: the main
+    quote first, then the extra ones, without repeats and at most MAX_EVIDENCE. A quote that is not
+    really there, or names a clause that was never shown, is dropped."""
+    candidates = [(entry.clause_ref, entry.quote)] + [
+        (extra.clause_ref, extra.quote) for extra in entry.extra_evidence
+    ]
+    kept: list[tuple[Clause, str]] = []
+    seen: set[tuple[str, str]] = set()
+    for label, quote in candidates:
+        clause = clause_by_label.get(label)
+        if clause is None or (label, quote) in seen:
+            continue
+        seen.add((label, quote))
+        if quote_appears_in(quote, clause.text):
+            kept.append((clause, quote))
+        if len(kept) == MAX_EVIDENCE:
+            break
+    return kept
+
+
 def verify_terms(
     fields: tuple[KeyTermField, ...],
     response: ExtractionResponse,
@@ -116,9 +146,10 @@ def verify_terms(
 ) -> list[KeyTerm]:
     """Keeps a field only if the model's own evidence checks out.
 
-    The quote must be in the clause it names, word for word. The value is the model's
-    summary and can't be checked as text, so every figure in it must also appear in the
-    quote: that blocks the failure that matters most, an invented or misread number. A
+    At least one quote must be in the clause it names, word for word, and a quote that is not is
+    dropped. The value is the model's summary and can't be checked as text, so every figure in it
+    must appear in the quotes that survived, together: that blocks the failure that matters most,
+    an invented or misread number, while letting a fact spread over two sentences rest on both. A
     field that fails either check becomes "not mentioned" instead of a wrong answer.
     """
     by_name: dict[str, ExtractedField] = {}
@@ -128,25 +159,30 @@ def verify_terms(
     terms: list[KeyTerm] = []
     for field in fields:
         entry = by_name.get(field.name)
-        clause = clause_by_label.get(entry.clause_ref) if entry else None
+        evidence = _verified_evidence(entry, clause_by_label) if entry and entry.found else []
         verified = (
             entry is not None
-            and entry.found
-            and clause is not None
             and entry.value.strip() != ""
-            and quote_appears_in(entry.quote, clause.text)
-            and numbers_supported(entry.value, [entry.quote])
+            and bool(evidence)
+            and numbers_supported(entry.value, [quote for _clause, quote in evidence])
         )
         if verified:
+            first_clause, first_quote = evidence[0]
             terms.append(
                 KeyTerm(
                     name=field.name,
                     label=field.label,
                     found=True,
                     value=entry.value.strip(),
-                    clause_id=str(clause.id),
-                    page_number=clause.page_number,
-                    quote=entry.quote,
+                    clause_id=str(first_clause.id),
+                    page_number=first_clause.page_number,
+                    quote=first_quote,
+                    evidence=[
+                        EvidenceOut(
+                            clause_id=str(clause.id), page_number=clause.page_number, quote=quote
+                        )
+                        for clause, quote in evidence
+                    ],
                 )
             )
         else:
@@ -212,6 +248,19 @@ async def load_key_terms(
         if extraction.value is None:
             terms.append(KeyTerm(name=field.name, label=field.label, found=False))
         else:
+            # A row saved with one quote, which is every row saved before a term could have several,
+            # has exactly that one piece of evidence.
+            evidence = (
+                [
+                    EvidenceOut(
+                        clause_id=str(extraction.clause_id),
+                        page_number=row.page_number,
+                        quote=extraction.quote,
+                    )
+                ]
+                if extraction.quote and extraction.clause_id and row.page_number is not None
+                else []
+            )
             terms.append(
                 KeyTerm(
                     name=field.name,
@@ -221,6 +270,7 @@ async def load_key_terms(
                     clause_id=str(extraction.clause_id),
                     page_number=row.page_number,
                     quote=extraction.quote,
+                    evidence=evidence,
                 )
             )
     return KeyTermsResult(terms=terms)
