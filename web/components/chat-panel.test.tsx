@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -10,6 +10,7 @@ import {
   type AskOutcome,
   type AskResult,
 } from "@/lib/ask";
+import { fetchUsage, type Usage, type UsageEntry } from "@/lib/usage";
 import { ChatPanel } from "./chat-panel";
 
 vi.mock("@/lib/ask", async (importOriginal) => {
@@ -17,7 +18,16 @@ vi.mock("@/lib/ask", async (importOriginal) => {
   return { ...actual, askQuestion: vi.fn() };
 });
 
+vi.mock("@/lib/usage", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/usage")>();
+  return { ...actual, fetchUsage: vi.fn() };
+});
+
 const askMock = vi.mocked(askQuestion);
+const usageMock = vi.mocked(fetchUsage);
+
+const entry = (used: number, limit = 100): UsageEntry => ({ used, limit, left: Math.max(limit - used, 0) });
+const usageWith = (asked: number): Usage => ({ ask: entry(asked), read: entry(0, 30), analyze: entry(0, 60) });
 
 const FOUND: AskResult = {
   found: true,
@@ -39,6 +49,7 @@ const NOT_FOUND: AskResult = {
 };
 
 beforeEach(() => {
+  usageMock.mockResolvedValue({ ok: true, usage: usageWith(0) });
   // jsdom doesn't implement element scrolling, and the panel scrolls its own conversation.
   Object.defineProperty(Element.prototype, "scrollTo", { value: vi.fn(), configurable: true });
 });
@@ -209,5 +220,84 @@ describe("ChatPanel", () => {
     await user.click(await screen.findByRole("button", { name: /late fee of fifty dollars/ }));
 
     expect(onCitationSelect).toHaveBeenCalledWith(second);
+  });
+});
+
+describe("ChatPanel daily limit note", () => {
+  it("says nothing while plenty of questions are left", async () => {
+    usageMock.mockResolvedValue({ ok: true, usage: usageWith(10) });
+    renderPanel();
+
+    await waitFor(() => expect(usageMock).toHaveBeenCalled());
+
+    expect(screen.queryByText(/left today/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/used all of today/i)).not.toBeInTheDocument();
+  });
+
+  it("says how many are left once few remain", async () => {
+    usageMock.mockResolvedValue({ ok: true, usage: usageWith(95) });
+    renderPanel();
+
+    expect(await screen.findByText("5 questions left today")).toBeInTheDocument();
+  });
+
+  it("says plainly when none are left, and still lets a question be sent, since the server decides", async () => {
+    usageMock.mockResolvedValue({ ok: true, usage: usageWith(100) });
+    askMock.mockResolvedValue({ ok: false, message: "You have reached today's limit of 100 questions. Try again tomorrow." });
+    const { user, box } = renderPanel();
+
+    expect(await screen.findByText("You have used all of today's questions. Try again tomorrow.")).toBeInTheDocument();
+    await user.type(box, "One more?");
+
+    expect(screen.getByRole("button", { name: "Ask" })).toBeEnabled();
+  });
+
+  it("shows nothing and works as usual when the numbers cannot be fetched", async () => {
+    usageMock.mockResolvedValue({ ok: false });
+    askMock.mockResolvedValue({ ok: true, result: FOUND });
+    const { user, box } = renderPanel();
+    await waitFor(() => expect(usageMock).toHaveBeenCalled());
+
+    await user.type(box, "Can I pay early?{Enter}");
+
+    expect(await screen.findByText(FOUND.answer)).toBeInTheDocument();
+    const footer = screen.getByText("Explains what the document says. Not legal advice.").parentElement;
+    expect(footer?.querySelectorAll("p")).toHaveLength(1); // only the disclaimer, no note of any kind
+  });
+
+  it("looks again after a question is answered, so the count goes down as the person works", async () => {
+    usageMock.mockResolvedValueOnce({ ok: true, usage: usageWith(91) });
+    usageMock.mockResolvedValueOnce({ ok: true, usage: usageWith(92) });
+    askMock.mockResolvedValue({ ok: true, result: FOUND });
+    const { user, box } = renderPanel();
+    expect(await screen.findByText("9 questions left today")).toBeInTheDocument();
+
+    await user.type(box, "Can I pay early?{Enter}");
+
+    expect(await screen.findByText("8 questions left today")).toBeInTheDocument();
+    expect(usageMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("looks again after a refused question too, since that is when the number matters most", async () => {
+    usageMock.mockResolvedValueOnce({ ok: true, usage: usageWith(99) });
+    usageMock.mockResolvedValueOnce({ ok: true, usage: usageWith(100) });
+    askMock.mockResolvedValue({ ok: false, message: "Something went wrong getting an answer. Try again in a moment." });
+    const { user, box } = renderPanel();
+    expect(await screen.findByText("1 question left today")).toBeInTheDocument();
+
+    await user.type(box, "Anything?{Enter}");
+
+    expect(await screen.findByText("You have used all of today's questions. Try again tomorrow.")).toBeInTheDocument();
+  });
+
+  it("does not look at anything other than the questions limit", async () => {
+    usageMock.mockResolvedValue({
+      ok: true,
+      usage: { ask: entry(0), read: { used: 30, limit: 30, left: 0 }, analyze: { used: 60, limit: 60, left: 0 } },
+    });
+    renderPanel();
+    await waitFor(() => expect(usageMock).toHaveBeenCalled());
+
+    expect(screen.queryByText(/used all of today/i)).not.toBeInTheDocument();
   });
 });

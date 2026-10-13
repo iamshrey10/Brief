@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { askQuestion, MAX_QUESTION_LENGTH, type AskCitation, type AskResult } from "@/lib/ask";
+import { fetchUsage, questionsLeftNote } from "@/lib/usage";
 
 type Message =
   | { id: number; kind: "question"; text: string }
@@ -59,8 +60,22 @@ export function ChatPanel({
   const [messages, setMessages] = useState<Message[]>([]);
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState(false);
+  // What to say about the daily limit of questions, or nothing while plenty are left.
+  const [limitNote, setLimitNote] = useState<string | null>(null);
   const nextId = useRef(0);
   const listRef = useRef<HTMLDivElement>(null);
+
+  // Looks at where the person stands today. It is only a hint, so when the numbers cannot be had, or
+  // the panel has gone by the time they arrive, nothing is shown and nothing is thrown.
+  useEffect(() => {
+    let current = true;
+    void fetchUsage().then((outcome) => {
+      if (current) setLimitNote(outcome.ok ? questionsLeftNote(outcome.usage.ask) : null);
+    });
+    return () => {
+      current = false;
+    };
+  }, []);
 
   // Scrolls only the conversation, not the whole page, so a new answer never yanks the
   // reader away from the document they are comparing it against.
@@ -84,6 +99,10 @@ export function ChatPanel({
       : { id: nextId.current++, kind: "error", text: outcome.message };
     setMessages((previous) => [...previous, reply]);
     setPending(false);
+
+    // Whether the question was answered or refused, the count has moved, so look again.
+    const usage = await fetchUsage();
+    if (usage.ok) setLimitNote(questionsLeftNote(usage.usage.ask));
   }
 
   return (
@@ -160,9 +179,12 @@ export function ChatPanel({
           className="w-full resize-none rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
         />
         <div className="flex items-center justify-between gap-3">
-          <p className="text-xs text-muted-foreground">
-            Explains what the document says. Not legal advice.
-          </p>
+          <div className="flex flex-col">
+            <p className="text-xs text-muted-foreground">
+              Explains what the document says. Not legal advice.
+            </p>
+            {limitNote && <p className="text-xs font-medium text-foreground">{limitNote}</p>}
+          </div>
           <Button type="submit" disabled={!draft.trim() || pending}>
             {pending ? "Asking..." : "Ask"}
           </Button>
