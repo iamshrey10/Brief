@@ -51,3 +51,36 @@ describe("the dashboard page", () => {
     expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe("Bearer token");
   });
 });
+
+type Node = { type?: unknown; props?: { className?: string; children?: unknown } };
+
+/** Every element in a rendered tree, so a test can find a part of the page without a browser. */
+function elements(tree: unknown): Node[] {
+  if (Array.isArray(tree)) return tree.flatMap(elements);
+  if (typeof tree !== "object" || tree === null) return [];
+  const node = tree as Node;
+  return [node, ...elements(node.props?.children)];
+}
+
+describe("the dashboard heading on a phone", () => {
+  async function header(): Promise<Node> {
+    authMock.mockResolvedValue({ user: { email: "reader@example.com" } });
+    const found = elements(await Dashboard()).find((node) => node.type === "header");
+    if (!found) throw new Error("no header on the page");
+    return found;
+  }
+
+  it("stacks the text above the sign out button on a narrow screen, and side by side on a wide one", async () => {
+    const className = (await header()).props?.className ?? "";
+
+    expect(className).toContain("flex-col");
+    expect(className).toContain("sm:flex-row");
+    expect(className).toContain("sm:justify-between");
+  });
+
+  it("does not squeeze the description beside the button on a narrow screen", async () => {
+    const className = (await header()).props?.className ?? "";
+
+    expect(className.split(" ")).not.toContain("justify-between");
+  });
+});
