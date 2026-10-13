@@ -2380,3 +2380,99 @@ async def test_confirming_an_upload_is_not_counted_again(client, db_session, tes
 
     assert confirmed.status_code == 200
     assert await _reads_counted(db_session) == 1
+
+
+# --- starting an upload clears away this person's abandoned ones first ---
+
+
+def _removed_files(monkeypatch) -> list[str]:
+    from app import housekeeping
+
+    removed: list[str] = []
+    monkeypatch.setattr(housekeeping, "delete_file", lambda key: removed.append(key))
+    return removed
+
+
+async def test_abandoned_uploads_do_not_hold_a_slot_against_the_document_limit(
+    client, db_session, test_user, monkeypatch
+):
+    monkeypatch.setattr(main_module, "MAX_DOCUMENTS_PER_USER", 2)
+    removed = _removed_files(monkeypatch)
+    for _ in range(2):
+        await _document_with(db_session, test_user, "pending", age_minutes=180)
+
+    response = await client.post("/documents", json=_upload_body())
+
+    assert response.status_code == 200
+    assert len(removed) == 2  # both abandoned files were removed from storage
+    assert len((await client.get("/documents")).json()) == 1  # only the new one is left
+
+
+async def test_an_upload_that_may_still_be_in_progress_still_counts_towards_the_limit(
+    client, db_session, test_user, monkeypatch
+):
+    monkeypatch.setattr(main_module, "MAX_DOCUMENTS_PER_USER", 2)
+    removed = _removed_files(monkeypatch)
+    for _ in range(2):
+        await _document_with(db_session, test_user, "pending", age_minutes=5)
+
+    response = await client.post("/documents", json=_upload_body())
+
+    assert response.status_code == 409
+    assert removed == []
+
+
+async def test_old_documents_that_were_read_are_never_cleared_and_still_count(
+    client, db_session, test_user, monkeypatch
+):
+    monkeypatch.setattr(main_module, "MAX_DOCUMENTS_PER_USER", 2)
+    removed = _removed_files(monkeypatch)
+    await _document_with(db_session, test_user, "ready", age_minutes=60 * 24 * 30)
+    await _document_with(db_session, test_user, "failed", age_minutes=60 * 24 * 30)
+
+    response = await client.post("/documents", json=_upload_body())
+
+    assert response.status_code == 409
+    assert removed == []
+
+
+async def test_a_request_that_is_not_valid_clears_nothing_away(client, db_session, test_user, monkeypatch):
+    removed = _removed_files(monkeypatch)
+    await _document_with(db_session, test_user, "pending", age_minutes=180)
+
+    response = await client.post("/documents", json={**_upload_body(), "content_type": "application/x-msdownload"})
+
+    assert response.status_code == 400
+    assert removed == []
+    assert len((await client.get("/documents")).json()) == 1
+
+
+async def test_an_abandoned_file_that_cannot_be_removed_keeps_counting_and_nothing_is_orphaned(
+    client, db_session, test_user, monkeypatch
+):
+    from app import housekeeping
+
+    monkeypatch.setattr(main_module, "MAX_DOCUMENTS_PER_USER", 1)
+
+    def failing(key):
+        raise RuntimeError("storage is down")
+
+    monkeypatch.setattr(housekeeping, "delete_file", failing)
+    await _document_with(db_session, test_user, "pending", age_minutes=180)
+
+    response = await client.post("/documents", json=_upload_body())
+
+    assert response.status_code == 409
+    assert len((await client.get("/documents")).json()) == 1  # still there, so it is tried again next time
+
+
+async def test_someone_elses_abandoned_uploads_are_left_alone(client, db_session, test_user, monkeypatch):
+    removed = _removed_files(monkeypatch)
+    other = User(email="someone-else-abandoned@example.com")
+    db_session.add(other)
+    await db_session.commit()
+    await _document_with(db_session, other, "pending", age_minutes=180)
+
+    assert (await client.post("/documents", json=_upload_body())).status_code == 200
+
+    assert removed == []

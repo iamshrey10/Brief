@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth import get_current_user
 from app.checklist import ChecklistGenerationError, ChecklistResult, get_checklist, load_checklist
 from app.db import get_session
+from app.housekeeping import remove_abandoned_uploads
 from app.ingestion import ingest_document
 from app.key_terms import KeyTermsGenerationError, KeyTermsResult, get_key_terms, load_key_terms
 from app.models import ChecklistAnswerRow, Clause, Document, Extraction, User
@@ -158,6 +159,9 @@ async def create_upload(
     if body.file_size_bytes <= 0 or body.file_size_bytes > MAX_FILE_SIZE_BYTES:
         raise HTTPException(status_code=400, detail="file is too large, 50MB max")
 
+    # Uploads this person started and never confirmed would otherwise hold a slot for ever. Cleared only
+    # now that the request is known to be valid, so a refused request changes nothing.
+    await remove_abandoned_uploads(session, user.id)
     kept = await session.scalar(
         select(func.count()).select_from(Document).where(Document.user_id == user.id)
     )
