@@ -633,6 +633,49 @@ describe("DocumentList", () => {
     });
   });
 
+  describe("on a phone", () => {
+    // The names of documents were cut to "3-sa..." because the badge and four buttons shared one line
+    // with them. On a narrow screen the name has the whole first line and the buttons go below it.
+    it("stacks the name above the buttons on a narrow screen and puts them side by side on a wide one", () => {
+      render(<DocumentList documents={[doc("ready", "a", "A very long lease name.pdf")]} />);
+
+      const row = screen.getByRole("link").parentElement as HTMLElement;
+
+      expect(row).toHaveClass("flex-col");
+      expect(row).toHaveClass("sm:flex-row");
+    });
+
+    it("lets the name use the full width on a narrow screen and share it on a wide one", () => {
+      render(<DocumentList documents={[doc("ready", "a", "A very long lease name.pdf")]} />);
+
+      const link = screen.getByRole("link");
+
+      expect(link).not.toHaveClass("flex-1");
+      expect(link).toHaveClass("sm:flex-1");
+    });
+
+    it("puts the buttons on their own line at the right on a narrow screen", () => {
+      render(<DocumentList documents={[doc("ready", "a", "A very long lease name.pdf")]} />);
+
+      const buttons = screen.getByRole("button", { name: "Edit A very long lease name.pdf" }).parentElement;
+
+      expect(buttons).toHaveClass("justify-end");
+      expect(buttons).toHaveClass("sm:p-0");
+    });
+
+    it("does the same for a document that cannot be opened, such as one that failed", () => {
+      render(<DocumentList documents={[doc("failed", "a", "broken.pdf")]} />);
+
+      const name = screen.getByText("broken.pdf");
+      const row = name.closest("div.flex-col") as HTMLElement | null;
+      const main = name.closest("div.min-w-0");
+
+      expect(row).not.toBeNull();
+      expect(main).not.toHaveClass("flex-1");
+      expect(main).toHaveClass("sm:flex-1");
+    });
+  });
+
   describe("reading again", () => {
     async function openReread(documents = [doc("ready", "a", "Lease.pdf")]) {
       const user = userEvent.setup();

@@ -437,18 +437,18 @@ function DocumentRow({
   // The actions sit beside the link, not inside it: a button inside a link is not valid, and
   // pressing one must never also open the document.
   return (
-    <div className="flex items-center gap-1 rounded-lg border border-border bg-card pr-2">
+    <div className="flex flex-col rounded-lg border border-border bg-card sm:flex-row sm:items-center sm:gap-1 sm:pr-2">
       {readable ? (
         <Link
           href={`/dashboard/documents/${doc.id}`}
-          className="flex min-w-0 flex-1 items-center gap-3 rounded-lg px-4 py-3 transition-colors outline-none hover:bg-accent focus-visible:ring-3 focus-visible:ring-ring/50"
+          className="flex min-w-0 items-center gap-3 rounded-lg px-4 py-3 transition-colors sm:flex-1 outline-none hover:bg-accent focus-visible:ring-3 focus-visible:ring-ring/50"
         >
           {main}
         </Link>
       ) : (
-        <div className="flex min-w-0 flex-1 items-center gap-3 px-4 py-3">{main}</div>
+        <div className="flex min-w-0 items-center gap-3 px-4 py-3 sm:flex-1">{main}</div>
       )}
-      <div className="flex shrink-0 items-center gap-1">
+      <div className="flex shrink-0 items-center justify-end gap-1 px-2 pb-2 sm:p-0">
         {canRetry(doc) && (
           <Button
             type="button"
