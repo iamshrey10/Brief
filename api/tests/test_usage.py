@@ -179,3 +179,12 @@ async def test_looking_does_not_use_anything_up(db_session, test_user):
         await usage_today(db_session, test_user.id, today=DAY)
 
     assert await count_of(db_session, test_user.id, "ask") is None
+
+
+async def test_someone_who_only_used_things_yesterday_starts_today_with_everything_left(db_session, test_user):
+    for _ in range(3):
+        await spend(db_session, test_user.id, "ask", today=DAY - datetime.timedelta(days=1))
+
+    report = await usage_today(db_session, test_user.id, today=DAY)
+
+    assert report["ask"] == {"used": 0, "limit": 3, "left": 3}
