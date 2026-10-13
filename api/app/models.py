@@ -134,6 +134,10 @@ class Extraction(Base):
     value: Mapped[str | None] = mapped_column(Text, nullable=True)
     # the passage copied from the clause that backs the value, checked word for word
     quote: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # every checked quote that backs the value, as {clause_id, page_number, quote} items with the first
+    # one first. Empty for a term the document does not state, and null on rows saved before a term could
+    # rest on several quotes, which then have just the one in `quote`.
+    evidence: Mapped[list[dict] | None] = mapped_column(JSONB, nullable=True)
     confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

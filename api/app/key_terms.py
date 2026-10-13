@@ -248,19 +248,22 @@ async def load_key_terms(
         if extraction.value is None:
             terms.append(KeyTerm(name=field.name, label=field.label, found=False))
         else:
-            # A row saved with one quote, which is every row saved before a term could have several,
-            # has exactly that one piece of evidence.
-            evidence = (
-                [
-                    EvidenceOut(
-                        clause_id=str(extraction.clause_id),
-                        page_number=row.page_number,
-                        quote=extraction.quote,
-                    )
-                ]
-                if extraction.quote and extraction.clause_id and row.page_number is not None
-                else []
-            )
+            if extraction.evidence:
+                evidence = [EvidenceOut(**item) for item in extraction.evidence]
+            else:
+                # A row saved with one quote, which is every row saved before a term could have
+                # several, has exactly that one piece of evidence.
+                evidence = (
+                    [
+                        EvidenceOut(
+                            clause_id=str(extraction.clause_id),
+                            page_number=row.page_number,
+                            quote=extraction.quote,
+                        )
+                    ]
+                    if extraction.quote and extraction.clause_id and row.page_number is not None
+                    else []
+                )
             terms.append(
                 KeyTerm(
                     name=field.name,
@@ -288,12 +291,13 @@ async def save_key_terms(
             "clause_id": uuid.UUID(term.clause_id) if term.clause_id else None,
             "value": term.value,
             "quote": term.quote,
+            "evidence": [item.model_dump() for item in term.evidence] or None,
         }
         statement = insert(Extraction).values(**values)
         await session.execute(
             statement.on_conflict_do_update(
                 constraint="uq_extractions_field",
-                set_={key: values[key] for key in ("clause_id", "value", "quote")},
+                set_={key: values[key] for key in ("clause_id", "value", "quote", "evidence")},
             )
         )
     await session.commit()

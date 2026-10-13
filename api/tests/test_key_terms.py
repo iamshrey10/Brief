@@ -730,3 +730,88 @@ def test_a_term_the_model_says_is_absent_has_no_evidence_even_with_extra_quotes(
     term = _two_clause_verify(entry)
 
     assert term.found is False and term.evidence == []
+
+
+# --- saving and loading a term with several quotes ---
+
+
+def _two_quote_response(clauses) -> ExtractionResponse:
+    entry = _entry(
+        "interest_rate",
+        "6.5% per year, calculated daily",
+        "C1",
+        "It is calculated daily on the balance.",
+    )
+    entry.extra_evidence = [Evidence(clause_ref="C1", quote="The loan bears a fixed rate of 6.5% per year.")]
+    return ExtractionResponse(fields=[entry])
+
+
+async def _extract_two_quote_term(db_session, test_user, monkeypatch):
+    document = await _document(db_session, test_user, [TWO_SENTENCES])
+    _fake_model(monkeypatch, _two_quote_response)
+    return document, await extract_key_terms(db_session, document.id, "loan")
+
+
+async def test_every_quote_of_a_term_survives_saving_and_loading(db_session, test_user, monkeypatch):
+    document, extracted = await _extract_two_quote_term(db_session, test_user, monkeypatch)
+    assert any(len(t.evidence) == 2 for t in extracted.terms)  # the premise: the term really has two
+
+    await save_key_terms(db_session, document.id, extracted)
+    loaded = await load_key_terms(db_session, document.id, "loan")
+
+    assert loaded == extracted
+    rate = next(t for t in loaded.terms if t.name == "interest_rate")
+    assert [e.quote for e in rate.evidence] == [
+        "It is calculated daily on the balance.",
+        "The loan bears a fixed rate of 6.5% per year.",
+    ]
+
+
+async def test_the_quotes_are_stored_with_the_row_in_order(db_session, test_user, monkeypatch):
+    document, extracted = await _extract_two_quote_term(db_session, test_user, monkeypatch)
+
+    await save_key_terms(db_session, document.id, extracted)
+
+    row = next(r for r in await _saved_rows(db_session, document) if r.field_name == "interest_rate")
+    assert [item["quote"] for item in row.evidence] == [
+        "It is calculated daily on the balance.",
+        "The loan bears a fixed rate of 6.5% per year.",
+    ]
+    assert row.quote == "It is calculated daily on the balance."  # the first, as the plain column always held
+
+
+async def test_a_term_that_is_not_mentioned_stores_no_quotes(db_session, test_user, monkeypatch):
+    document, extracted = await _extract_two_quote_term(db_session, test_user, monkeypatch)
+
+    await save_key_terms(db_session, document.id, extracted)
+
+    others = [r for r in await _saved_rows(db_session, document) if r.field_name != "interest_rate"]
+    assert others and all(not r.evidence for r in others)
+
+
+async def test_a_row_saved_before_terms_could_have_several_quotes_loads_with_its_one_quote(
+    db_session, test_user, monkeypatch
+):
+    document, extracted = await _extract_two_quote_term(db_session, test_user, monkeypatch)
+    await save_key_terms(db_session, document.id, extracted)
+    row = next(r for r in await _saved_rows(db_session, document) if r.field_name == "interest_rate")
+    row.evidence = None  # how every row looked before the column existed
+    await db_session.commit()
+
+    loaded = await load_key_terms(db_session, document.id, "loan")
+
+    rate = next(t for t in loaded.terms if t.name == "interest_rate")
+    assert [e.quote for e in rate.evidence] == ["It is calculated daily on the balance."]
+
+
+async def test_saving_again_replaces_the_stored_quotes(db_session, test_user, monkeypatch):
+    document, extracted = await _extract_two_quote_term(db_session, test_user, monkeypatch)
+    await save_key_terms(db_session, document.id, extracted)
+    rate = next(t for t in extracted.terms if t.name == "interest_rate")
+    rate.evidence = rate.evidence[:1]
+
+    await save_key_terms(db_session, document.id, extracted)
+
+    row = next(r for r in await _saved_rows(db_session, document) if r.field_name == "interest_rate")
+    await db_session.refresh(row)
+    assert len(row.evidence) == 1
