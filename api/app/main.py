@@ -21,6 +21,7 @@ from app.models import ChecklistAnswerRow, Clause, Document, Extraction, User
 from app.qa import AnswerGenerationError, AnswerResult, answer_question
 from app.retrieval import hybrid_search, reranked_search
 from app import usage
+from app.telemetry import describe_failure
 from app.storage import (
     ALLOWED_CONTENT_TYPES,
     MAX_FILE_SIZE_BYTES,
@@ -543,6 +544,7 @@ async def ask_document(
     try:
         return await answer_question(session, document.id, body.question)
     except (AnswerGenerationError, genai_errors.APIError) as exc:
+        logger.warning("model call failed: %s", describe_failure(exc))
         raise HTTPException(
             status_code=502, detail="the answering service is unavailable, try again"
         ) from exc
@@ -626,6 +628,7 @@ async def document_key_terms(
     try:
         return await get_key_terms(session, document.id, document.doc_type)
     except (KeyTermsGenerationError, genai_errors.APIError) as exc:
+        logger.warning("model call failed: %s", describe_failure(exc))
         raise HTTPException(
             status_code=502, detail="the reading service is unavailable, try again"
         ) from exc
@@ -648,6 +651,7 @@ async def document_checklist(
     try:
         return await get_checklist(session, document.id, document.doc_type)
     except (ChecklistGenerationError, genai_errors.APIError) as exc:
+        logger.warning("model call failed: %s", describe_failure(exc))
         raise HTTPException(
             status_code=502, detail="the reading service is unavailable, try again"
         ) from exc

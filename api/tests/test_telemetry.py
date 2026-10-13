@@ -3,7 +3,7 @@ import logging
 import pytest
 
 from app import telemetry
-from app.telemetry import KINDS, timed
+from app.telemetry import KINDS, describe_failure, timed
 
 
 @pytest.fixture
@@ -84,3 +84,40 @@ def test_a_call_that_takes_no_time_is_logged_as_zero(caplog, clock):
             pass
 
     assert telemetry_lines(caplog) == ["model call embed ok in 0.0s"]
+
+
+# --- saying why a call failed without saying what was in it ---
+
+
+def test_a_service_error_is_described_by_its_type_and_status_code():
+    from google.genai import errors as genai_errors
+
+    error = genai_errors.ClientError(
+        429, {"error": {"message": "Quota exceeded for the tenant Jane Doe", "status": "RESOURCE_EXHAUSTED"}}, None
+    )
+
+    assert describe_failure(error) == "ClientError 429"
+
+
+def test_a_server_side_error_keeps_its_own_code():
+    from google.genai import errors as genai_errors
+
+    error = genai_errors.ServerError(503, {"error": {"message": "overloaded", "status": "UNAVAILABLE"}}, None)
+
+    assert describe_failure(error) == "ServerError 503"
+
+
+def test_any_other_error_is_described_by_its_type_alone():
+    assert describe_failure(RuntimeError("the tenant pays $2,054.00")) == "RuntimeError"
+    assert describe_failure(ValueError()) == "ValueError"
+
+
+def test_the_description_never_contains_the_message():
+    from google.genai import errors as genai_errors
+
+    secret = "the tenant Jane Doe pays $2,054.00"
+    for error in (
+        RuntimeError(secret),
+        genai_errors.ClientError(400, {"error": {"message": secret, "status": "INVALID_ARGUMENT"}}, None),
+    ):
+        assert "Jane" not in describe_failure(error) and "2,054" not in describe_failure(error)

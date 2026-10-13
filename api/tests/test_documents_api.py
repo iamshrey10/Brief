@@ -2522,3 +2522,54 @@ async def test_usage_shows_only_this_persons_numbers(client, db_session, test_us
         await usage.spend(db_session, other.id, "ask")
 
     assert (await client.get("/me/usage")).json()["ask"]["used"] == 0
+
+
+# --- a failed model call is logged by type and code, never by message ---
+
+
+@pytest.mark.parametrize("route", ["key-terms", "checklist"])
+async def test_a_failed_overview_is_logged_with_its_type_and_code_and_no_text(
+    client, db_session, test_user, monkeypatch, caplog, route
+):
+    import logging
+
+    from google.genai import errors as genai_errors
+
+    secret = "the tenant Jane Doe pays 2054 dollars"
+    refused = genai_errors.ClientError(429, {"error": {"message": secret, "status": "RESOURCE_EXHAUSTED"}}, None)
+
+    def failing(*args, **kwargs):
+        raise refused
+
+    monkeypatch.setattr("app.key_terms.generate_key_terms", failing)
+    monkeypatch.setattr("app.checklist.generate_checklist", failing)
+    document = await _document_with_text(db_session, test_user)
+
+    with caplog.at_level(logging.WARNING):
+        response = await client.get(f"/documents/{document.id}/{route}")
+
+    assert response.status_code == 502
+    lines = [r.getMessage() for r in caplog.records if r.name == "app.main"]
+    assert lines == ["model call failed: ClientError 429"]
+    assert "Jane" not in caplog.text and "2054" not in caplog.text
+
+
+async def test_a_failed_question_is_logged_with_its_type_and_code_and_no_text(
+    client, db_session, test_user, monkeypatch, caplog
+):
+    import logging
+
+    async def failing(session, document_id, question):
+        raise AnswerGenerationError("model did not return a valid structured answer about Jane Doe")
+
+    monkeypatch.setattr(main_module, "answer_question", failing)
+    document = await _ready_document(db_session, test_user)
+
+    with caplog.at_level(logging.WARNING):
+        response = await client.post(f"/documents/{document.id}/ask", json={"question": "What does Jane owe?"})
+
+    assert response.status_code == 502
+    assert [r.getMessage() for r in caplog.records if r.name == "app.main"] == [
+        "model call failed: AnswerGenerationError"
+    ]
+    assert "Jane" not in caplog.text
