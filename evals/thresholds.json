@@ -1,0 +1,11 @@
+{
+  "retrieval_hybrid_hit_at_1": { "min": 90 },
+  "qa_cited_right_clause": { "min": 95 },
+  "qa_hallucinated": { "max": 0 },
+  "qa_correctly_abstained": { "min": 95 },
+  "key_terms_right": { "min": 95 },
+  "key_terms_invented": { "max": 0 },
+  "checklist_right": { "min": 95 },
+  "checklist_invented": { "max": 0 },
+  "checklist_gaps_flagged": { "min": 95 }
+}
