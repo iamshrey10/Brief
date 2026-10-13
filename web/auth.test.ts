@@ -3,7 +3,9 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("next-auth", () => ({
   default: vi.fn(() => ({ handlers: {}, auth: vi.fn(), signIn: vi.fn(), signOut: vi.fn() })),
 }));
-vi.mock("next-auth/providers/google", () => ({ default: { id: "google" } }));
+vi.mock("next-auth/providers/google", () => ({
+  default: (options: unknown) => ({ id: "google", options }),
+}));
 
 import { authConfig } from "./auth";
 
@@ -27,6 +29,13 @@ describe("the sign in rule for protected pages", () => {
 
   it("sends a visitor who is not signed in to the landing page, where the sign in button is", () => {
     expect(authConfig.pages.signIn).toBe("/");
+  });
+
+  it("always shows Google's account chooser, so one tap never signs in as whoever Google remembers", () => {
+    expect(authConfig.providers[0]).toEqual({
+      id: "google",
+      options: { authorization: { params: { prompt: "select_account" } } },
+    });
   });
 
   it("signs in with Google", () => {
