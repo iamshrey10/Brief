@@ -152,15 +152,20 @@ async def test_a_count_above_a_limit_that_was_lowered_later_shows_zero_left(db_s
     assert (await usage_today(db_session, test_user.id, today=DAY))["ask"] == {"used": 3, "limit": 2, "left": 0}
 
 
-async def test_yesterdays_and_other_peoples_counts_are_not_mixed_in(db_session, test_user):
+async def test_yesterdays_and_other_peoples_counts_are_not_mixed_in(db_session, test_user, monkeypatch):
     other = User(email="someone-else-usage-today@example.com")
     db_session.add(other)
     await db_session.commit()
-    await spend(db_session, test_user.id, "ask", today=DAY - datetime.timedelta(days=1))
-    await spend(db_session, other.id, "ask", today=DAY)
-    await spend(db_session, test_user.id, "ask", today=DAY)
+    # Different counts on purpose, so a report that mixed them in could not come out right by luck.
+    monkeypatch.setattr(usage, "DAILY_LIMITS", {"ask": 50, "read": 2, "analyze": 1})
+    for _ in range(2):
+        await spend(db_session, test_user.id, "ask", today=DAY - datetime.timedelta(days=1))  # yesterday: 2
+    for _ in range(3):
+        await spend(db_session, other.id, "ask", today=DAY)  # someone else, today: 3
+    await spend(db_session, test_user.id, "ask", today=DAY)  # this person, today: 1
 
     assert (await usage_today(db_session, test_user.id, today=DAY))["ask"]["used"] == 1
+    assert (await usage_today(db_session, other.id, today=DAY))["ask"]["used"] == 3
 
 
 async def test_the_day_is_taken_from_the_clock_in_utc_when_none_is_given_for_the_report(db_session, test_user):
