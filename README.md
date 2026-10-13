@@ -93,7 +93,12 @@ Brief holds private documents, so each layer limits what it can reach. What is i
   of 30 a minute in Redis. Each person also has a daily limit on what calls the model, counted in
   Postgres with one atomic statement so simultaneous requests cannot slip past it: 100 questions, 30
   document reads (an upload, a retry or reading again) and 60 overviews. Reading an overview that was
-  already saved is free, so reaching the limit never locks anyone out of their results.
+  already saved is free, so reaching the limit never locks anyone out of their results. `GET /me/usage`
+  reports where a person stands, and the chat box says how many questions are left once ten or fewer
+  remain.
+- **Abandoned uploads.** An upload that was started and never confirmed within an hour is removed, file
+  first and then its record, when its owner starts the next upload, so it cannot sit as "Uploading" for
+  ever or hold a slot against the document limit. Only a pending document is ever touched.
 - **Deleting.** Deleting a document removes its file first and then its records, and deleting an
   account does the same for every document, one at a time, so a failure never leaves a record without
   its file or a file without a record. It can be repeated until it finishes.
@@ -102,7 +107,9 @@ Brief holds private documents, so each layer limits what it can reach. What is i
 - **Web hardening.** Security headers on every response (no framing, no content sniffing, HTTPS only,
   no camera or microphone), and fonts come from packages, so no visitor's browser asks a third party
   for one. No other website can call the API from a browser, and a test checks that.
-- **Logs.** A log line may carry only a fixed message and ids. A test reads every logging call and fails
+- **Logs.** Each model call is timed and logged as a fixed line such as `model call answer ok in 2.5s`,
+  with a kind from a short fixed list, whether it worked, and how long it took, and nothing of what was
+  sent or received, not even an error message. A log line may carry only a fixed message and ids. A test reads every logging call and fails
   if one could carry the text of a document, a question, an answer or a file name.
 - **Dependencies.** A scan of the libraries that ship runs on every push and every Monday, and the
   build fails on a known high severity problem.
