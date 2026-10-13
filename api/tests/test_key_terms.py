@@ -540,3 +540,36 @@ def test_generate_key_terms_logs_how_long_the_model_call_took(monkeypatch, caplo
     lines = [r.getMessage() for r in caplog.records if r.name == "app.telemetry"]
     assert len(lines) == 1 and lines[0].startswith("model call key_terms ok in ")
     assert "6.5%" not in caplog.text
+
+def _refused_once_then(response):
+    """A model client that says "too many requests" the first time and then gives `response`."""
+    from google.genai import errors as genai_errors
+
+    class Client:
+        calls = 0
+
+        class models:
+            @staticmethod
+            def generate_content(**kwargs):
+                Client.calls += 1
+                if Client.calls == 1:
+                    raise genai_errors.ClientError(
+                        429,
+                        {"error": {"message": "Quota exceeded. Please retry in 5s.", "status": "RESOURCE_EXHAUSTED"}},
+                        None,
+                    )
+                return type("Response", (), {"parsed": response})()
+
+    return Client
+
+
+def test_refused_key_terms_wait_and_are_found_instead_of_failing(monkeypatch):
+    from app import model_call
+
+    monkeypatch.setattr(model_call, "_sleep", lambda seconds: None)
+    expected = ExtractionResponse(fields=[])
+    client = _refused_once_then(expected)
+    monkeypatch.setattr("app.key_terms.get_genai_client", lambda: client)
+
+    assert generate_key_terms(FIELDS, [("C1", RATE_TEXT)], seed=1) == expected
+    assert client.calls == 2

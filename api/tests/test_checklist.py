@@ -923,3 +923,47 @@ def test_generate_checklist_and_the_judge_each_log_their_own_timing(monkeypatch,
     lines = [r.getMessage() for r in caplog.records if r.name == "app.telemetry"]
     assert [line.split(" in ")[0] for line in lines] == ["model call checklist ok", "model call judge ok"]
     assert "prepay" not in caplog.text
+
+def _refused_once_then(response):
+    """A model client that says "too many requests" the first time and then gives `response`."""
+    from google.genai import errors as genai_errors
+
+    class Client:
+        calls = 0
+
+        class models:
+            @staticmethod
+            def generate_content(**kwargs):
+                Client.calls += 1
+                if Client.calls == 1:
+                    raise genai_errors.ClientError(
+                        429,
+                        {"error": {"message": "Quota exceeded. Please retry in 5s.", "status": "RESOURCE_EXHAUSTED"}},
+                        None,
+                    )
+                return type("Response", (), {"parsed": response})()
+
+    return Client
+
+
+def test_a_refused_checklist_waits_and_is_answered_instead_of_failing(monkeypatch):
+    from app import model_call
+
+    monkeypatch.setattr(model_call, "_sleep", lambda seconds: None)
+    expected = ChecklistResponse(answers=[])
+    client = _refused_once_then(expected)
+    monkeypatch.setattr("app.checklist.get_genai_client", lambda: client)
+
+    assert generate_checklist(QUESTIONS, [("C1", PREPAY_TEXT)], seed=1) == expected
+    assert client.calls == 2
+
+
+def test_a_refused_second_check_waits_and_is_judged_instead_of_failing(monkeypatch):
+    from app import model_call
+
+    monkeypatch.setattr(model_call, "_sleep", lambda seconds: None)
+    client = _refused_once_then(JudgeResponse(verdicts=[Verdict(id="prepay", answers=True)]))
+    monkeypatch.setattr("app.checklist.get_genai_client", lambda: client)
+
+    assert judge_answers([(QUESTIONS[0], _answered("prepay"))], seed=1) == {"prepay"}
+    assert client.calls == 2

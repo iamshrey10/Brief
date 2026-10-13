@@ -354,3 +354,36 @@ def test_generate_answer_logs_a_failed_call_and_still_raises(monkeypatch, caplog
     assert [r.getMessage() for r in caplog.records if r.name == "app.telemetry"][0].startswith(
         "model call answer failed in "
     )
+
+def _refused_once_then(response):
+    """A model client that says "too many requests" the first time and then gives `response`."""
+    from google.genai import errors as genai_errors
+
+    class Client:
+        calls = 0
+
+        class models:
+            @staticmethod
+            def generate_content(**kwargs):
+                Client.calls += 1
+                if Client.calls == 1:
+                    raise genai_errors.ClientError(
+                        429,
+                        {"error": {"message": "Quota exceeded. Please retry in 5s.", "status": "RESOURCE_EXHAUSTED"}},
+                        None,
+                    )
+                return type("Response", (), {"parsed": response})()
+
+    return Client
+
+
+def test_a_refused_question_waits_and_is_answered_instead_of_failing(monkeypatch):
+    from app import model_call
+
+    monkeypatch.setattr(model_call, "_sleep", lambda seconds: None)
+    expected = GroundedAnswer(found=False, answer="", citations=[])
+    client = _refused_once_then(expected)
+    monkeypatch.setattr("app.qa.get_genai_client", lambda: client)
+
+    assert generate_answer("Can I pay early?", [("C1", "The borrower may prepay.")]) == expected
+    assert client.calls == 2
