@@ -18,6 +18,11 @@ ALLOWED_ARGUMENTS = {
     "wait",
     "attempt + 1",
     "MAX_RATE_LIMIT_RETRIES",
+    # In app/telemetry.py: the kind is one of a fixed list (anything else is refused before it runs),
+    # the outcome is "ok" or "failed", and the time is a number. None of them can carry text.
+    "kind",
+    "outcome",
+    "elapsed",
 }
 
 
