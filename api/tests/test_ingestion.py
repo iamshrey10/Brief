@@ -865,3 +865,19 @@ async def test_a_failed_read_logs_ids_and_never_the_text_of_the_document(
     assert str(document.id) in caplog.text  # what was logged is useful: it names the document
     assert marker not in caplog.text
     assert marker not in " ".join(str(record.__dict__) for record in caplog.records)
+
+
+# --- timing of the embedding calls ---
+
+
+def test_each_embedding_call_is_timed_and_a_refused_one_is_logged_as_failed(monkeypatch, caplog):
+    import logging
+
+    _install(monkeypatch, [_rate_limited(), "ok"])
+
+    with caplog.at_level(logging.INFO):
+        embed_texts(["one", "two"])
+
+    lines = [r.getMessage().split(" in ")[0] for r in caplog.records if r.name == "app.telemetry"]
+    assert lines == ["model call embed failed", "model call embed ok"]
+    assert "one" not in caplog.text.replace("model call embed", "")  # none of the text sent is logged

@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.grounding import quote_appears_in
 from app.ingestion import get_genai_client
 from app.retrieval import hybrid_search
+from app.telemetry import timed
 
 # Pinned rather than a moving "latest" alias, so an answer-quality change always traces
 # to a change we made, not a silent provider-side model update. Pinning doesn't stop a model
@@ -74,9 +75,10 @@ def generate_answer(question: str, clauses: list[tuple[str, str]]) -> GroundedAn
         response_mime_type="application/json",
         response_schema=GroundedAnswer,
     )
-    response = get_genai_client().models.generate_content(
-        model=ANSWER_MODEL, contents=build_prompt(question, clauses), config=config
-    )
+    with timed("answer"):
+        response = get_genai_client().models.generate_content(
+            model=ANSWER_MODEL, contents=build_prompt(question, clauses), config=config
+        )
 
     parsed = response.parsed
     if not isinstance(parsed, GroundedAnswer):

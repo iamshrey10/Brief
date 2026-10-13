@@ -319,3 +319,38 @@ async def test_answer_question_shows_the_model_labeled_clauses_from_this_documen
     texts = {text for _label, text in shown[0]}
     assert labels == ["C1", "C2"]
     assert texts == {PREPAY_TEXT, LATE_TEXT}
+
+
+# --- timing of the model call ---
+
+
+def test_generate_answer_logs_how_long_the_model_call_took(monkeypatch, caplog):
+    import logging
+
+    _install_fake_client(monkeypatch, GroundedAnswer(found=False, answer="", citations=[]))
+
+    with caplog.at_level(logging.INFO):
+        generate_answer("Can I pay early?", [("C1", "The borrower may prepay.")])
+
+    lines = [r.getMessage() for r in caplog.records if r.name == "app.telemetry"]
+    assert len(lines) == 1 and lines[0].startswith("model call answer ok in ")
+    assert "prepay" not in caplog.text and "pay early" not in caplog.text  # nothing about the question
+
+
+def test_generate_answer_logs_a_failed_call_and_still_raises(monkeypatch, caplog):
+    import logging
+
+    class Broken:
+        class models:
+            @staticmethod
+            def generate_content(**kwargs):
+                raise RuntimeError("the service refused")
+
+    monkeypatch.setattr("app.qa.get_genai_client", lambda: Broken())
+
+    with caplog.at_level(logging.INFO), pytest.raises(RuntimeError):
+        generate_answer("q", [("C1", "text")])
+
+    assert [r.getMessage() for r in caplog.records if r.name == "app.telemetry"][0].startswith(
+        "model call answer failed in "
+    )

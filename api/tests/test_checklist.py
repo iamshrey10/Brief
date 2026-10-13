@@ -905,3 +905,21 @@ def test_judge_answers_passes_the_seed_it_is_given(monkeypatch):
 
     assert client.models.calls[0]["config"].seed == 9
     assert client.models.calls[1]["config"].seed is None
+
+
+def test_generate_checklist_and_the_judge_each_log_their_own_timing(monkeypatch, caplog):
+    import logging
+
+    with caplog.at_level(logging.INFO):
+        monkeypatch.setattr(
+            "app.checklist.get_genai_client", lambda: _FakeClient(ChecklistResponse(answers=[]))
+        )
+        generate_checklist(QUESTIONS, [("C1", PREPAY_TEXT)], seed=1)
+        monkeypatch.setattr(
+            "app.checklist.get_genai_client", lambda: _FakeClient(JudgeResponse(verdicts=[]))
+        )
+        judge_answers([(QUESTIONS[0], _answered())], seed=1)
+
+    lines = [r.getMessage() for r in caplog.records if r.name == "app.telemetry"]
+    assert [line.split(" in ")[0] for line in lines] == ["model call checklist ok", "model call judge ok"]
+    assert "prepay" not in caplog.text

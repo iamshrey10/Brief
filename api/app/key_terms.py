@@ -15,6 +15,7 @@ from app.ingestion import get_genai_client
 from app.key_term_fields import KeyTermField, fields_for
 from app.models import Clause, Extraction
 from app.qa import ANSWER_MODEL
+from app.telemetry import timed
 
 # Same pinned model as question answering, so one evaluation covers both. Re-run
 # evals/key_terms_eval.py whenever this changes.
@@ -94,9 +95,10 @@ def generate_key_terms(
         response_mime_type="application/json",
         response_schema=ExtractionResponse,
     )
-    response = get_genai_client().models.generate_content(
-        model=KEY_TERMS_MODEL, contents=build_prompt(fields, clauses), config=config
-    )
+    with timed("key_terms"):
+        response = get_genai_client().models.generate_content(
+            model=KEY_TERMS_MODEL, contents=build_prompt(fields, clauses), config=config
+        )
 
     parsed = response.parsed
     if not isinstance(parsed, ExtractionResponse):

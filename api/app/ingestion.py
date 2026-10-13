@@ -22,6 +22,7 @@ from app.image_processing import OCR_CONFIDENCE_THRESHOLD, ocr_image
 from app.models import EMBEDDING_DIM, Clause, Document, Embedding
 from app.pdf_text import page_text
 from app.storage import download_file
+from app.telemetry import timed
 
 logger = logging.getLogger(__name__)
 
@@ -191,9 +192,10 @@ def embed_texts(
 
         for attempt in range(MAX_RATE_LIMIT_RETRIES + 1):
             try:
-                response = client.models.embed_content(
-                    model=EMBEDDING_MODEL, contents=batch, config=config
-                )
+                with timed("embed"):
+                    response = client.models.embed_content(
+                        model=EMBEDDING_MODEL, contents=batch, config=config
+                    )
                 break
             except genai_errors.APIError as error:
                 wait = _rate_limit_wait(error)

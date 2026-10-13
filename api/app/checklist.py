@@ -15,6 +15,7 @@ from app.grounding import numbers_supported, quote_appears_in
 from app.ingestion import get_genai_client
 from app.models import ChecklistAnswerRow, Clause
 from app.qa import ANSWER_MODEL
+from app.telemetry import timed
 
 # Same pinned model as question answering and key terms, so one set of evaluations covers all
 # three. Re-run evals/checklist_eval.py whenever this changes.
@@ -119,9 +120,10 @@ def generate_checklist(
         response_mime_type="application/json",
         response_schema=ChecklistResponse,
     )
-    response = get_genai_client().models.generate_content(
-        model=CHECKLIST_MODEL, contents=build_prompt(questions, clauses), config=config
-    )
+    with timed("checklist"):
+        response = get_genai_client().models.generate_content(
+            model=CHECKLIST_MODEL, contents=build_prompt(questions, clauses), config=config
+        )
 
     parsed = response.parsed
     if not isinstance(parsed, ChecklistResponse):
@@ -172,9 +174,10 @@ def judge_answers(
         response_mime_type="application/json",
         response_schema=JudgeResponse,
     )
-    response = get_genai_client().models.generate_content(
-        model=CHECKLIST_MODEL, contents=build_judge_prompt(items), config=config
-    )
+    with timed("judge"):
+        response = get_genai_client().models.generate_content(
+            model=CHECKLIST_MODEL, contents=build_judge_prompt(items), config=config
+        )
 
     parsed = response.parsed
     if not isinstance(parsed, JudgeResponse):

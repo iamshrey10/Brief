@@ -525,3 +525,18 @@ async def test_if_one_run_fails_the_whole_request_fails_instead_of_voting_on_les
 
     with pytest.raises(KeyTermsGenerationError):
         await extract_key_terms(db_session, document.id, "loan")
+
+
+def test_generate_key_terms_logs_how_long_the_model_call_took(monkeypatch, caplog):
+    import logging
+
+    monkeypatch.setattr(
+        "app.key_terms.get_genai_client", lambda: _FakeClient(ExtractionResponse(fields=[]))
+    )
+
+    with caplog.at_level(logging.INFO):
+        generate_key_terms(FIELDS, [("C1", RATE_TEXT)], seed=1)
+
+    lines = [r.getMessage() for r in caplog.records if r.name == "app.telemetry"]
+    assert len(lines) == 1 and lines[0].startswith("model call key_terms ok in ")
+    assert "6.5%" not in caplog.text
