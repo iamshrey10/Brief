@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.checklist_questions import ChecklistQuestion, questions_for
 from app.consensus import majority_of_runs
 from app.document_text import load_prompt_clauses
+from app.evidence import MAX_EVIDENCE, Evidence, EvidenceOut
 from app.grounding import numbers_supported, quote_appears_in
 from app.ingestion import get_genai_client
 from app.models import ChecklistAnswerRow, Clause
@@ -26,10 +27,6 @@ CHECKLIST_MODEL = ANSWER_MODEL
 # gave good results on any document: a seed only makes a run repeatable, it does not make it right.
 CHECKLIST_SEEDS = (1, 2, 3)
 CHECKLIST_RUNS = len(CHECKLIST_SEEDS)
-
-# An answer can rest on several separate passages (two different fees, say), but three is
-# plenty for a short answer and keeps the highlighting readable.
-MAX_EVIDENCE = 3
 
 SYSTEM_INSTRUCTION = (
     "You help a person check a contract before they sign it, using ONLY the numbered clauses you "
@@ -52,11 +49,6 @@ SYSTEM_INSTRUCTION = (
 )
 
 
-class Evidence(BaseModel):
-    clause_ref: str
-    quote: str
-
-
 class ChecklistEntry(BaseModel):
     id: str
     found: bool
@@ -70,12 +62,6 @@ class ChecklistResponse(BaseModel):
 
 class ChecklistGenerationError(Exception):
     """The model returned something that isn't a usable structured result."""
-
-
-class EvidenceOut(BaseModel):
-    clause_id: str
-    page_number: int
-    quote: str
 
 
 class ChecklistAnswer(BaseModel):
