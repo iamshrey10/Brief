@@ -8,6 +8,7 @@ export type KeyTerm = {
   clause_id: string | null;
   page_number: number | null;
   quote: string | null;
+  evidence: ChecklistEvidence[];
 };
 
 export type KeyTermsResult = { terms: KeyTerm[]; truncated: boolean };

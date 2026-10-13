@@ -34,6 +34,7 @@ const FOUND_TERM = (name: string, label: string, value: string, page = 1): KeyTe
   clause_id: `clause-${name}`,
   page_number: page,
   quote: `${label} quote`,
+  evidence: [{ clause_id: `clause-${name}`, page_number: page, quote: `${label} quote` }],
 });
 
 const MISSING_TERM = (name: string, label: string): KeyTerm => ({
@@ -44,6 +45,7 @@ const MISSING_TERM = (name: string, label: string): KeyTerm => ({
   clause_id: null,
   page_number: null,
   quote: null,
+  evidence: [],
 });
 
 const KEY_TERMS: KeyTermsResult = {
@@ -204,6 +206,30 @@ describe("OverviewPanel checklist", () => {
     const worth = within(section).getByRole("heading", { name: "Worth asking about" });
     const says = within(section).getByRole("heading", { name: "What the document says" });
     expect(worth.compareDocumentPosition(says) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("shows one button per quote when a key term rests on several", async () => {
+    const deposit: KeyTerm = {
+      ...FOUND_TERM("security_deposit", "Security deposit", "$1,450.00, refundable in 30 days"),
+      evidence: [
+        { clause_id: "clause-deposit-a", page_number: 1, quote: "Tenant shall pay a security deposit of $1,450.00" },
+        { clause_id: "clause-deposit-b", page_number: 2, quote: "The deposit is refundable within 30 days" },
+      ],
+    };
+    keyTermsMock.mockResolvedValue({ ok: true, result: { terms: [deposit], truncated: false } });
+    checklistMock.mockResolvedValue({ ok: true, result: { answers: [], truncated: false } });
+    const onSelect = vi.fn();
+    const user = userEvent.setup();
+
+    render(<OverviewPanel documentId="doc-1" onCitationSelect={onSelect} />);
+
+    const buttons = await screen.findAllByRole("button", { name: /Show "Security deposit" in the document/ });
+    expect(buttons).toHaveLength(2);
+    await user.click(buttons[1]);
+    expect(onSelect).toHaveBeenCalledWith({
+      clauseId: "clause-deposit-b",
+      quote: "The deposit is refundable within 30 days",
+    });
   });
 
   it("counts what was answered and what the document leaves out", async () => {

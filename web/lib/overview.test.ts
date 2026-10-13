@@ -154,6 +154,7 @@ const term = (name: string, found: boolean): KeyTerm => ({
   clause_id: found ? "c1" : null,
   page_number: found ? 1 : null,
   quote: found ? "q" : null,
+  evidence: found ? [{ clause_id: "c1", page_number: 1, quote: "q" }] : [],
 });
 
 describe("splitKeyTerms", () => {

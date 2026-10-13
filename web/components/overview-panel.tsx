@@ -180,16 +180,17 @@ function KeyTermCard({
         {term.label}
       </p>
       <p className="text-sm font-medium text-card-foreground">{term.value}</p>
-      {term.clause_id && term.quote && (
+      {term.evidence.map((item) => (
         <EvidenceButton
+          key={`${item.clause_id}-${item.quote}`}
           label={term.label}
-          page={term.page_number}
-          quote={term.quote}
-          clauseId={term.clause_id}
+          page={item.page_number}
+          quote={item.quote}
+          clauseId={item.clause_id}
           showQuote={false}
           onSelect={onSelect}
         />
-      )}
+      ))}
     </li>
   );
 }

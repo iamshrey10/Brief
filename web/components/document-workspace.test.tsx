@@ -67,6 +67,7 @@ const KEY_TERMS: KeyTermsResult = {
       clause_id: "clause-a",
       page_number: 1,
       quote: "six percent per year",
+      evidence: [{ clause_id: "clause-a", page_number: 1, quote: "six percent per year" }],
     },
   ],
   truncated: false,
