@@ -416,7 +416,9 @@ function DocumentRow({
         <DocTypeIcon type={doc.doc_type} className="size-4.5" />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-medium text-foreground">{doc.filename}</span>
+        <span className="block text-sm font-medium break-words text-foreground sm:truncate">
+          {doc.filename}
+        </span>
         <span className="block truncate text-xs text-muted-foreground">
           {typeLabel}
           {uploaded && ` · Uploaded ${uploaded}`}

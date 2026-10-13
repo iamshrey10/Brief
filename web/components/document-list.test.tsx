@@ -174,7 +174,13 @@ describe("DocumentList", () => {
   it("keeps long file names from pushing the status off the row", () => {
     render(<DocumentList documents={[doc("ready", "a", "a-very-long-file-name.pdf".repeat(10))]} />);
 
-    expect(screen.getByText(/a-very-long-file-name\.pdf/)).toHaveClass("truncate");
+    const name = screen.getByText(/a-very-long-file-name\.pdf/);
+
+    // On a wide screen it is cut with an ellipsis, on a phone a name with no spaces is broken across
+    // lines, and either way the box it sits in may shrink, which is what keeps the status on the row.
+    expect(name).toHaveClass("sm:truncate");
+    expect(name).toHaveClass("break-words");
+    expect(name.parentElement).toHaveClass("min-w-0");
   });
 
   it.each([
@@ -661,6 +667,16 @@ describe("DocumentList", () => {
 
       expect(buttons).toHaveClass("justify-end");
       expect(buttons).toHaveClass("sm:p-0");
+    });
+
+    it("lets a long name wrap onto a second line on a phone instead of cutting it short, and cuts it on a wide screen", () => {
+      render(<DocumentList documents={[doc("ready", "a", "Deposit Agreement for the apartment on University Drive.pdf")]} />);
+
+      const name = screen.getByText("Deposit Agreement for the apartment on University Drive.pdf");
+
+      expect(name).not.toHaveClass("truncate");
+      expect(name).toHaveClass("break-words");
+      expect(name).toHaveClass("sm:truncate");
     });
 
     it("does the same for a document that cannot be opened, such as one that failed", () => {
