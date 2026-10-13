@@ -71,3 +71,5 @@ jobs:
       - run: python -c "import app.main"
       - run: alembic upgrade head
       - run: python -m pytest -v
+      # The recorded evaluation results must still meet their minimums. No model or secret is needed.
+      - run: python ../evals/check_results.py

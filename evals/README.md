@@ -60,3 +60,18 @@ which answers are right.
 
 The free Gemini tier allows 15 requests a minute, and a voted read makes about ten, so a run takes
 minutes and the script waits out rate limits the way the app does not.
+
+## The quality gate
+
+`check_results.py` reads the newest committed report of each evaluation and fails the build if a number
+is below its minimum in `thresholds.json` (or above its maximum, for the bad outcomes, which must stay at
+zero). It needs no model and no secret, and CI runs it on every push.
+
+    python evals/check_results.py
+
+It checks the committed reports. So a change that makes answers worse is caught when the evaluations are
+run again and their new reports are committed, which is part of changing a prompt or the search: run the
+affected evaluation, commit the report it writes, and the gate then judges the new numbers. A report or a
+line that is missing is an error and never a pass, and a limit that matches no number, or a number with no
+limit, is an error too, so a typo cannot hide a check. The limits are set below today's results on purpose:
+they catch a real drop, not noise, and they are not a claim about contracts in general.
