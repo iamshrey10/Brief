@@ -4,7 +4,7 @@ import re
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Response
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request, Response
 from google.genai import errors as genai_errors
 from pydantic import BaseModel, Field, field_validator, model_validator
 from sqlalchemy import delete, func, select, text
@@ -17,6 +17,7 @@ from app.housekeeping import remove_abandoned_uploads
 from app.ingestion import ingest_document
 from app.logging_setup import configure_logging
 from app.readiness import check_ready
+from app import request_id
 from app.key_terms import KeyTermsGenerationError, KeyTermsResult, get_key_terms, load_key_terms
 from app.models import ChecklistAnswerRow, Clause, Document, Extraction, User
 from app.qa import AnswerGenerationError, AnswerResult, answer_question
@@ -49,6 +50,20 @@ MAX_DOCUMENTS_PER_USER = 25
 STUCK_AFTER = timedelta(minutes=15)
 
 app = FastAPI(title="Brief API")
+
+
+@app.middleware("http")
+async def tag_with_request_id(request: Request, call_next):
+    """Gives every request an id, handed back in X-Request-ID, so one request can be followed through the logs."""
+    this_one = request_id.accept_or_make(request.headers.get("x-request-id"))
+    token = request_id.current.set(this_one)
+    try:
+        response = await call_next(request)
+    finally:
+        request_id.current.reset(token)
+    response.headers["X-Request-ID"] = this_one
+    return response
+
 
 DOC_TYPES = {"loan", "lease", "offer", "other"}
 
