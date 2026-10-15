@@ -61,3 +61,27 @@ async def test_it_is_not_ready_when_the_database_cannot_be_reached_and_asks_noth
 
     assert status == {"database": "unreachable", "migrations": "unknown"}
     assert session.asked == 1
+
+
+async def test_it_says_the_migration_is_different_when_the_database_is_on_another_one():
+    session = FakeSession(1, "0000000000aa")
+
+    status = await check_ready(session)
+
+    assert status == {"database": "ok", "migrations": "different"}
+
+
+async def test_it_says_the_migration_is_unknown_when_the_version_table_does_not_exist():
+    session = FakeSession(1, RuntimeError("relation alembic_version does not exist"))
+
+    status = await check_ready(session)
+
+    assert status == {"database": "ok", "migrations": "unknown"}
+
+
+async def test_it_says_the_migration_is_unknown_when_the_version_table_is_empty():
+    session = FakeSession(1, None)
+
+    status = await check_ready(session)
+
+    assert status == {"database": "ok", "migrations": "unknown"}

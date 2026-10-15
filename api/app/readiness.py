@@ -24,6 +24,11 @@ async def check_ready(session: AsyncSession) -> dict[str, str]:
         await session.execute(text("SELECT 1"))
     except Exception:
         return {"database": "unreachable", "migrations": "unknown"}
-    result = await session.execute(text("SELECT version_num FROM alembic_version"))
-    current = result.scalar_one_or_none()
+    try:
+        result = await session.execute(text("SELECT version_num FROM alembic_version"))
+        current = result.scalar_one_or_none()
+    except Exception:
+        return {"database": "ok", "migrations": "unknown"}
+    if current is None:
+        return {"database": "ok", "migrations": "unknown"}
     return {"database": "ok", "migrations": "current" if current == expected_revision() else "different"}
