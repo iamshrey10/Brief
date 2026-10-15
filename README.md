@@ -202,7 +202,10 @@ and both run as a non-root user.
     docker build -t brief-api api
     docker build -t brief-web web
 
-The API listens on `$PORT` (8000 if unset) and has a health check on `/health`. It needs the settings in
+The API listens on `$PORT` (8000 if unset). `/health` only says the process is up, so use it to decide
+whether to restart the container. `/health/ready` answers 200 only when the database responds and is on the
+migration this code expects, and 503 otherwise, so use it to decide whether to send traffic. Its answer
+never includes an error message. It needs the settings in
 `api/.env.example`. With `ENVIRONMENT=production` it refuses to start on the built-in secret, a secret
 under 32 characters, or the development database password. The database schema is a separate step, run
 once for each release:

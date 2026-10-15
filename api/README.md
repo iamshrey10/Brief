@@ -14,6 +14,9 @@ Ingestion, retrieval, extraction, grounded Q&A, citation verifier, agentic tool 
 
 Open http://localhost:8000/health and http://localhost:8000/health/db
 
+`/health` says the process is up. `/health/db` checks the database connection. `/health/ready` is the one for a
+load balancer: 200 only when the database answers and its migrations are current, 503 otherwise.
+
 ## Database
 
 Schema is managed with SQLAlchemy models (`app/models.py`) and Alembic migrations
