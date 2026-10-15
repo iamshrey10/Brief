@@ -189,7 +189,7 @@ redirect URI.
     pnpm install
     pnpm dev
 
-Frontend checks: `pnpm lint`, `pnpm test`, and `pnpm build`.
+Frontend checks: `pnpm lint`, `pnpm test`, `pnpm build`, and `pnpm e2e` (browser tests of the signed out pages).
 
 The evaluations call the real Gemini API and need Postgres running. Each one is a single command,
 see [evals/README.md](evals/README.md).
