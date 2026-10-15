@@ -16,6 +16,7 @@ from app.db import get_session
 from app.housekeeping import remove_abandoned_uploads
 from app.ingestion import ingest_document
 from app.logging_setup import configure_logging
+from app.readiness import check_ready
 from app.key_terms import KeyTermsGenerationError, KeyTermsResult, get_key_terms, load_key_terms
 from app.models import ChecklistAnswerRow, Clause, Document, Extraction, User
 from app.qa import AnswerGenerationError, AnswerResult, answer_question
@@ -61,6 +62,21 @@ def health() -> dict[str, str]:
 async def health_db(session: AsyncSession = Depends(get_session)) -> dict[str, str]:
     await session.execute(text("SELECT 1"))
     return {"status": "ok"}
+
+
+@app.get("/health/ready")
+async def health_ready(
+    response: Response, session: AsyncSession = Depends(get_session)
+) -> dict[str, str | bool]:
+    """For a load balancer: 200 only when this server can do real work, 503 otherwise.
+
+    /health only says the process is up. This also needs the database and its migrations.
+    """
+    status = await check_ready(session)
+    ready = status == {"database": "ok", "migrations": "current"}
+    response.status_code = 200 if ready else 503
+    response.headers["Cache-Control"] = "no-store"
+    return {"ready": ready, **status}
 
 
 @app.get("/me")
