@@ -285,4 +285,16 @@ describe("the request id", () => {
     expect(res.status).toBe(204);
     expect(res.headers.get("X-Request-ID")).toBe(sentId());
   });
+
+  it("is on a refusal too, so a person who is not signed in or is rate limited can still quote one", async () => {
+    sessionMock.mockResolvedValue({
+      error: Response.json({ error: "too many requests" }, { status: 429 }),
+    });
+
+    const res = await proxyGet("/documents");
+
+    expect(res.status).toBe(429);
+    expect(res.headers.get("X-Request-ID")).toMatch(UUID);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });

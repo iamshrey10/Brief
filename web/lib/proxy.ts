@@ -14,13 +14,17 @@ type Method = "GET" | "POST" | "PATCH" | "DELETE";
  * passes straight through, since that is how a delete says it worked.
  */
 async function forward(method: Method, path: string, body?: unknown): Promise<Response> {
-  const result = await requireSession();
-  if ("error" in result) return result.error;
-
   // One id per request, sent to the backend and handed back to the browser, so the same request can be
-  // found in both sets of logs.
+  // found in both sets of logs. A refusal gets one too.
   const requestId = crypto.randomUUID();
   const idHeader = { "X-Request-ID": requestId };
+
+  const result = await requireSession();
+  if ("error" in result) {
+    result.error.headers.set("X-Request-ID", requestId);
+    return result.error;
+  }
+
   const headers: Record<string, string> = { Authorization: `Bearer ${result.token}`, ...idHeader };
   if (body !== undefined) headers["Content-Type"] = "application/json";
 
