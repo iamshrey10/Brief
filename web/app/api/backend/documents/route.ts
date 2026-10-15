@@ -1,32 +1,18 @@
-import { requireSession } from "@/lib/require-session";
+import { proxyGet, proxyPost } from "@/lib/proxy";
 
-const backendUrl = process.env.BACKEND_URL ?? "http://localhost:8000";
-
+/** The signed-in person's documents. */
 export async function GET() {
-  const result = await requireSession();
-  if ("error" in result) return result.error;
-
-  const res = await fetch(`${backendUrl}/documents`, {
-    headers: { Authorization: `Bearer ${result.token}` },
-  });
-  const data = await res.json();
-  return Response.json(data, { status: res.status });
+  return proxyGet("/documents");
 }
 
+/** Starts an upload: the backend answers with the document and where to send the file. */
 export async function POST(request: Request) {
-  const result = await requireSession();
-  if ("error" in result) return result.error;
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return Response.json({ detail: "invalid request" }, { status: 400 });
+  }
 
-  const body = await request.json();
-
-  const res = await fetch(`${backendUrl}/documents`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${result.token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
-  const data = await res.json();
-  return Response.json(data, { status: res.status });
+  return proxyPost("/documents", body);
 }
