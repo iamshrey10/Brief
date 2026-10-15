@@ -12,7 +12,7 @@ async def anonymous_client():
         yield client
 
 
-@pytest.mark.parametrize("path", ["/health", "/documents", "/me"])
+@pytest.mark.parametrize("path", ["/health", "/health/ready", "/documents", "/me"])
 async def test_a_plain_request_from_another_site_gets_no_permission_to_read_the_answer(
     anonymous_client, path
 ):
