@@ -105,6 +105,17 @@ describe("proxyPost", () => {
     expect(await res.json()).toEqual({ status: "uploaded" });
   });
 
+  it("sends a JSON body when it is given one", async () => {
+    fetchMock.mockResolvedValue(backendResponse({ id: "d9" }));
+
+    await proxyPost("/documents", { filename: "Lease.pdf", doc_type: "lease" });
+
+    const [, init] = fetchMock.mock.calls[0];
+    expect(init.method).toBe("POST");
+    expect(init.headers["Content-Type"]).toBe("application/json");
+    expect(init.body).toBe('{"filename":"Lease.pdf","doc_type":"lease"}');
+  });
+
   it("is refused without calling the backend when the user is not allowed", async () => {
     sessionMock.mockResolvedValue({
       error: Response.json({ error: "too many requests" }, { status: 429 }),

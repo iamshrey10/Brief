@@ -47,6 +47,6 @@ async function forward(method: Method, path: string, body?: unknown): Promise<Re
 }
 
 export const proxyGet = (path: string) => forward("GET", path);
-export const proxyPost = (path: string) => forward("POST", path);
+export const proxyPost = (path: string, body?: unknown) => forward("POST", path, body);
 export const proxyPatch = (path: string, body: unknown) => forward("PATCH", path, body);
 export const proxyDelete = (path: string) => forward("DELETE", path);
