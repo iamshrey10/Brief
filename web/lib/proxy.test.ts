@@ -19,6 +19,8 @@ afterEach(() => {
   sessionMock.mockReset();
 });
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
 const backendResponse = (body: unknown, status = 200) =>
   ({ status, json: async () => body }) as Response;
 
@@ -41,7 +43,10 @@ describe("proxyGet", () => {
 
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe("http://localhost:8000/documents/d1/key-terms");
-    expect(init.headers).toEqual({ Authorization: "Bearer signed-token" });
+    expect(init.headers).toEqual({
+      Authorization: "Bearer signed-token",
+      "X-Request-ID": expect.stringMatching(UUID),
+    });
     expect(init.cache).toBe("no-store");
   });
 
@@ -95,7 +100,7 @@ describe("proxyPost", () => {
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe("http://localhost:8000/documents/d1/retry");
     expect(init.method).toBe("POST");
-    expect(init.headers).toEqual({ Authorization: "Bearer signed-token" });
+    expect(init.headers).toEqual({ Authorization: "Bearer signed-token", "X-Request-ID": expect.stringMatching(UUID) });
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ status: "uploaded" });
   });
@@ -145,6 +150,7 @@ describe("proxyPatch", () => {
     expect(init.method).toBe("PATCH");
     expect(init.headers).toEqual({
       Authorization: "Bearer signed-token",
+      "X-Request-ID": expect.stringMatching(UUID),
       "Content-Type": "application/json",
     });
     expect(init.body).toBe('{"filename":"New.pdf"}');
@@ -183,7 +189,7 @@ describe("proxyDelete", () => {
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe("http://localhost:8000/documents/d1");
     expect(init.method).toBe("DELETE");
-    expect(init.headers).toEqual({ Authorization: "Bearer signed-token" });
+    expect(init.headers).toEqual({ Authorization: "Bearer signed-token", "X-Request-ID": expect.stringMatching(UUID) });
     expect(init.body).toBeUndefined();
   });
 
@@ -228,7 +234,55 @@ describe("a request without a body sends no content type", () => {
     await proxyGet("/a");
     await proxyPost("/b");
 
-    expect(fetchMock.mock.calls[0][1].headers).toEqual({ Authorization: "Bearer signed-token" });
-    expect(fetchMock.mock.calls[1][1].headers).toEqual({ Authorization: "Bearer signed-token" });
+    expect(fetchMock.mock.calls[0][1].headers).toEqual({ Authorization: "Bearer signed-token", "X-Request-ID": expect.stringMatching(UUID) });
+    expect(fetchMock.mock.calls[1][1].headers).toEqual({ Authorization: "Bearer signed-token", "X-Request-ID": expect.stringMatching(UUID) });
+  });
+});
+
+describe("the request id", () => {
+  const sentId = () => fetchMock.mock.calls.at(-1)![1].headers["X-Request-ID"] as string;
+
+  it("is new for every request, so two requests never share one in the logs", async () => {
+    fetchMock.mockResolvedValue(backendResponse({}));
+
+    await proxyGet("/documents");
+    const first = sentId();
+    await proxyGet("/documents");
+
+    expect(sentId()).not.toBe(first);
+  });
+
+  it("is handed back to the browser, so a person can quote it when something goes wrong", async () => {
+    fetchMock.mockResolvedValue(backendResponse({ ok: true }));
+
+    const res = await proxyGet("/documents");
+
+    expect(res.headers.get("X-Request-ID")).toBe(sentId());
+  });
+
+  it("is handed back on an error from the backend too", async () => {
+    fetchMock.mockResolvedValue(backendResponse({ detail: "nope" }, 409));
+
+    const res = await proxyPost("/documents/d1/retry");
+
+    expect(res.headers.get("X-Request-ID")).toBe(sentId());
+  });
+
+  it("is handed back when the backend cannot be reached", async () => {
+    fetchMock.mockRejectedValue(new TypeError("fetch failed"));
+
+    const res = await proxyGet("/documents");
+
+    expect(res.status).toBe(502);
+    expect(res.headers.get("X-Request-ID")).toBe(sentId());
+  });
+
+  it("is handed back on a delete, which has no body", async () => {
+    fetchMock.mockResolvedValue({ status: 204 } as Response);
+
+    const res = await proxyDelete("/documents/d1");
+
+    expect(res.status).toBe(204);
+    expect(res.headers.get("X-Request-ID")).toBe(sentId());
   });
 });

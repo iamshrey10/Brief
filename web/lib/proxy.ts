@@ -17,7 +17,11 @@ async function forward(method: Method, path: string, body?: unknown): Promise<Re
   const result = await requireSession();
   if ("error" in result) return result.error;
 
-  const headers: Record<string, string> = { Authorization: `Bearer ${result.token}` };
+  // One id per request, sent to the backend and handed back to the browser, so the same request can be
+  // found in both sets of logs.
+  const requestId = crypto.randomUUID();
+  const idHeader = { "X-Request-ID": requestId };
+  const headers: Record<string, string> = { Authorization: `Bearer ${result.token}`, ...idHeader };
   if (body !== undefined) headers["Content-Type"] = "application/json";
 
   try {
@@ -27,11 +31,14 @@ async function forward(method: Method, path: string, body?: unknown): Promise<Re
       ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
       cache: "no-store",
     });
-    if (res.status === 204) return new Response(null, { status: 204 });
+    if (res.status === 204) return new Response(null, { status: 204, headers: idHeader });
     const data = await res.json();
-    return Response.json(data, { status: res.status });
+    return Response.json(data, { status: res.status, headers: idHeader });
   } catch {
-    return Response.json({ detail: "could not reach the reading service" }, { status: 502 });
+    return Response.json(
+      { detail: "could not reach the reading service" },
+      { status: 502, headers: idHeader },
+    );
   }
 }
 
