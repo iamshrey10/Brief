@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { mintServiceToken } from "@/lib/service-token";
 import { DeleteAccount } from "@/components/delete-account";
 import { DocumentUpload } from "@/components/document-upload";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 async function fetchInitialDocuments(email: string) {
   const backendUrl = process.env.BACKEND_URL ?? "http://localhost:8000";
@@ -39,18 +40,21 @@ export default async function Dashboard() {
             exact words behind every answer.
           </p>
         </div>
-        <form
-          action={async () => {
-            "use server";
-            await signOut({ redirectTo: "/" });
-          }}
-          className="flex shrink-0 flex-col items-start gap-1 sm:items-end"
-        >
-          <p className="max-w-[12rem] truncate text-xs text-muted-foreground">{email}</p>
-          <Button type="submit" variant="outline" size="sm">
-            Sign out
-          </Button>
-        </form>
+        <div className="flex shrink-0 items-start gap-3">
+          <ThemeToggle />
+          <form
+            action={async () => {
+              "use server";
+              await signOut({ redirectTo: "/" });
+            }}
+            className="flex shrink-0 flex-col items-start gap-1 sm:items-end"
+          >
+            <p className="max-w-[12rem] truncate text-xs text-muted-foreground">{email}</p>
+            <Button type="submit" variant="outline" size="sm">
+              Sign out
+            </Button>
+          </form>
+        </div>
       </header>
 
       <DocumentUpload initialDocuments={initialDocuments} />

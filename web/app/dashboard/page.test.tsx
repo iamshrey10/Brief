@@ -11,6 +11,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 import { auth } from "@/auth";
+import { ThemeToggle } from "@/components/theme-toggle";
 import Dashboard from "./page";
 
 const authMock = auth as unknown as ReturnType<typeof vi.fn>;
@@ -82,5 +83,15 @@ describe("the dashboard heading on a phone", () => {
     const className = (await header()).props?.className ?? "";
 
     expect(className.split(" ")).not.toContain("justify-between");
+  });
+});
+
+describe("the dashboard light and dark mode button", () => {
+  it("is in the heading, so the choice made on the landing page can be changed after signing in", async () => {
+    authMock.mockResolvedValue({ user: { email: "reader@example.com" } });
+    const tree = await Dashboard();
+    const header = elements(tree).find((node) => node.type === "header");
+
+    expect(elements(header).some((node) => node.type === ThemeToggle)).toBe(true);
   });
 });
