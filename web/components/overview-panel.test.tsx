@@ -225,11 +225,23 @@ describe("OverviewPanel checklist", () => {
 
     const buttons = await screen.findAllByRole("button", { name: /Show "Security deposit" in the document/ });
     expect(buttons).toHaveLength(2);
+    expect(buttons[0]).toHaveAccessibleName('Show "Security deposit" in the document, page 1, quote 1 of 2');
+    expect(buttons[1]).toHaveAccessibleName('Show "Security deposit" in the document, page 2, quote 2 of 2');
     await user.click(buttons[1]);
     expect(onSelect).toHaveBeenCalledWith({
       clauseId: "clause-deposit-b",
       quote: "The deposit is refundable within 30 days",
     });
+  });
+
+  it("does not number the quote when a key term has only one", async () => {
+    keyTermsMock.mockResolvedValue({ ok: true, result: { terms: [FOUND_TERM("late_fee", "Late fee", "4%")], truncated: false } });
+    checklistMock.mockResolvedValue({ ok: true, result: { answers: [], truncated: false } });
+
+    render(<OverviewPanel documentId="doc-1" onCitationSelect={vi.fn()} />);
+
+    const button = await screen.findByRole("button", { name: /Show "Late fee" in the document/ });
+    expect(button).toHaveAccessibleName('Show "Late fee" in the document, page 1');
   });
 
   it("counts what was answered and what the document leaves out", async () => {

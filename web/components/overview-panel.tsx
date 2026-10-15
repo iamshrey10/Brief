@@ -103,6 +103,7 @@ function EvidenceButton({
   quote,
   clauseId,
   showQuote,
+  position,
   onSelect,
 }: {
   label: string;
@@ -110,14 +111,17 @@ function EvidenceButton({
   quote: string;
   clauseId: string;
   showQuote: boolean;
+  /** Which quote this is when there are several for one answer, so they can be told apart by ear. */
+  position?: { index: number; total: number };
   onSelect: (citation: ActiveCitation) => void;
 }) {
   const pageText = page === null ? "Page" : `Page ${page}`;
+  const which = position && position.total > 1 ? `, quote ${position.index + 1} of ${position.total}` : "";
   return (
     <button
       type="button"
       title="Show this in the document"
-      aria-label={`Show "${label}" in the document, ${pageText.toLowerCase()}`}
+      aria-label={`Show "${label}" in the document, ${pageText.toLowerCase()}${which}`}
       onClick={() => onSelect({ clauseId, quote })}
       className="block w-full rounded-md border-l-2 border-primary px-3 py-1.5 text-left text-muted-foreground transition-colors outline-none hover:bg-accent hover:text-accent-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
     >
@@ -180,9 +184,10 @@ function KeyTermCard({
         {term.label}
       </p>
       <p className="text-sm font-medium text-card-foreground">{term.value}</p>
-      {term.evidence.map((item) => (
+      {term.evidence.map((item, index) => (
         <EvidenceButton
           key={`${item.clause_id}-${item.quote}`}
+          position={{ index, total: term.evidence.length }}
           label={term.label}
           page={item.page_number}
           quote={item.quote}
