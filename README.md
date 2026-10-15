@@ -137,8 +137,10 @@ What is not done yet, so nobody assumes it is:
 - **No audit trail and no retention rule.** Nothing records who opened what, and documents are kept
   until their owner deletes them.
 - **Encryption at rest** depends on the hosts. Confirm it for the database when it is deployed.
-- **Build and lint tools** have two known high severity reports in their own dependencies. They are not
-  part of what ships, and the scan above covers only what does.
+- **Build and lint tools** have one known high severity report left (October 15): `braces`, used by the
+  linter and the shadcn command line tool, can be made to use a lot of memory by a deeply nested pattern. No
+  fixed version exists yet (3.0.3 is the newest). It is not part of what ships, nobody outside the project can
+  hand it a pattern, and the scan above covers only what does ship, which has no known problems.
 
 ## Limits and what a failed read says
 
