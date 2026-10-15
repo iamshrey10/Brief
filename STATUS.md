@@ -98,9 +98,10 @@ These are estimates, not promises. I will say so in the update log if they move.
 - **The test sets are small.** The 24 search questions, the 32 answer questions, and the key-terms
   check are all short, clean examples. The scores on them (96% right clause first, 24 of 24 cited
   correctly, 8 of 8 correctly declined) are not a claim about contracts in general.
-- **Real documents are messier.** Key terms still cannot rest on several separate passages the way the
-  must-ask answers can, so a fact spread over two lines can show as not mentioned. I have not yet
-  confirmed which terms a real lease genuinely lacks, because that needs me to read the whole lease.
+- **Real documents are messier.** Key terms can now rest on up to three checked quotes, so a fact spread
+  over two sentences (a deposit amount and its refund rule) is no longer dropped. On my sample lease the
+  deposit is now found, 8 of 12 terms instead of 7. That is one lease, and I have not yet confirmed which
+  terms a real lease genuinely lacks, because that needs me to read the whole lease.
 - **Steadier is not the same as more accurate.** On three real leases, the voted key terms changed 0, 0
   and 2 fields between runs, where one unseeded read changed 4, 5 and 5, so voting helps but did not
   fully steady the longest lease (286 pieces). The voted questions gave the same answers in every run on

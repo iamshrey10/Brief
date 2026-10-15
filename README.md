@@ -28,6 +28,12 @@ The text of an uploaded contract is treated as text to read, never as instructio
 terms such as the interest rate or the late fee go through the same checks, and every number in a
 term must also appear in its quote.
 
+A key term may rest on up to three quotes, each checked word for word against its own clause, because a
+fact such as a deposit can be split across two sentences: the amount in one and the refund rule in the next.
+Every number in the value must appear in one of the checked quotes, so a number from nowhere is still
+rejected. The site shows one button per quote, and each jumps to its clause. A term saved with one quote
+before this change still loads as before.
+
 The key terms and the "Before you sign" questions are each read three times with fixed seeds and
 kept by vote: a term or answer stays only if most of the reads found it. The same contract read twice
 by a model can come out differently, and this makes the result steadier. The second check on the
