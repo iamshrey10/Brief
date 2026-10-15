@@ -89,3 +89,24 @@ def test_importing_the_app_sets_logging_up_in_a_fresh_interpreter():
     )
 
     assert result.stdout.split()[-2:] == [str(logging.INFO), "1"], result.stderr
+
+
+def test_a_line_written_while_handling_a_request_carries_that_requests_id(clean_app_logger, capsys):
+    from app import request_id
+
+    configure_logging()
+    token = request_id.current.set("req-abc12345")
+    try:
+        logging.getLogger("app.qa").info("answering")
+    finally:
+        request_id.current.reset(token)
+
+    assert "req-abc12345" in capsys.readouterr().err
+
+
+def test_a_line_written_outside_any_request_shows_a_dash_instead_of_an_id(clean_app_logger, capsys):
+    configure_logging()
+
+    logging.getLogger("app.qa").info("starting up")
+
+    assert "[-]" in capsys.readouterr().err

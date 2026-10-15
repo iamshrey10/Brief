@@ -1,5 +1,15 @@
 import logging
 
+from app import request_id
+
+
+class _AddRequestId(logging.Filter):
+    """Stamps each line with the id of the request being handled, or a dash when there is none."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        record.request_id = request_id.current.get()
+        return True
+
 
 def configure_logging() -> None:
     """Makes the app's own INFO lines visible, which the server does not do by itself: it sets up only
@@ -13,5 +23,8 @@ def configure_logging() -> None:
     logger.setLevel(logging.INFO)
     if not logger.handlers:
         handler = logging.StreamHandler()
-        handler.setFormatter(logging.Formatter("%(levelname)s:     %(name)s: %(message)s"))
+        handler.addFilter(_AddRequestId())
+        handler.setFormatter(
+            logging.Formatter("%(levelname)s:     [%(request_id)s] %(name)s: %(message)s")
+        )
         logger.addHandler(handler)
