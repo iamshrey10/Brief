@@ -117,6 +117,11 @@ Brief holds private documents, so each layer limits what it can reach. What is i
   with a kind from a short fixed list, whether it worked, and how long it took, and nothing of what was
   sent or received, not even an error message. A log line may carry only a fixed message and ids. A test reads every logging call and fails
   if one could carry the text of a document, a question, an answer or a file name.
+- **Following one request.** The website gives every call to the API a request id and the API puts the same
+  id in every log line it writes while handling that call, shown as `[id]`, or `[-]` outside a request. Both
+  hand the id back in an `X-Request-ID` header, so when something fails a person can quote the id and the
+  whole path can be found in the logs. An id sent from outside is kept only if it is 8 to 64 letters, digits
+  and dashes, so it cannot be used to forge a log line.
 - **Dependencies.** A scan of the libraries that ship runs on every push and every Monday, and the
   build fails on a known high severity problem.
 
