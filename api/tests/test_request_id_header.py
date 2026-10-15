@@ -37,3 +37,32 @@ async def test_it_replaces_an_id_that_could_forge_a_log_line(client):
 
     assert response.headers["x-request-id"] != "abcdefgh ERROR: forged"
     assert len(response.headers["x-request-id"]) == 32
+
+
+async def test_a_log_line_written_deep_inside_a_request_carries_the_id_it_arrived_with(
+    client, monkeypatch, capsys
+):
+    import logging
+
+    import app.main as main
+    from app.logging_setup import configure_logging
+
+    app_logger = logging.getLogger("app")
+    handlers = list(app_logger.handlers)
+    app_logger.handlers.clear()  # the one made at startup writes to the real stderr, not the captured one
+    configure_logging()
+
+    async def checking(_session):
+        logging.getLogger("app.readiness").info("checking")
+        return {"database": "ok", "migrations": "current"}
+
+    monkeypatch.setattr(main, "check_ready", checking)
+    sent = "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d"
+
+    try:
+        await client.get("/health/ready", headers={"X-Request-ID": sent})
+        written = capsys.readouterr().err
+    finally:
+        app_logger.handlers[:] = handlers
+
+    assert f"[{sent}] app.readiness: checking" in written
