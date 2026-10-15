@@ -1,14 +1,13 @@
-import { requireSession } from "@/lib/require-session";
+import { proxyPost } from "@/lib/proxy";
 
-const backendUrl = process.env.BACKEND_URL ?? "http://localhost:8000";
-
+/**
+ * Asks a question about one document. The shared proxy checks the session, survives a slow or
+ * unreachable backend with a clean JSON error, and tags the request so it can be found in the logs.
+ */
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const result = await requireSession();
-  if ("error" in result) return result.error;
-
   const { id } = await params;
 
   let body: unknown;
@@ -18,23 +17,5 @@ export async function POST(
     return Response.json({ detail: "invalid request" }, { status: 400 });
   }
 
-  // This call waits on an LLM, so unlike the other proxy routes it has to survive the
-  // backend being slow or unreachable and still hand the browser a clean JSON error.
-  try {
-    const res = await fetch(`${backendUrl}/documents/${id}/ask`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${result.token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-    });
-    const data = await res.json();
-    return Response.json(data, { status: res.status });
-  } catch {
-    return Response.json(
-      { detail: "could not reach the answering service" },
-      { status: 502 },
-    );
-  }
+  return proxyPost(`/documents/${encodeURIComponent(id)}/ask`, body);
 }
