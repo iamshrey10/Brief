@@ -40,4 +40,11 @@ test.describe("someone who is not signed in", () => {
 
     expect(response.status()).toBe(401);
   });
+
+  test("is still given a request id to quote when refused", async ({ request }) => {
+    const response = await request.get("/api/backend/documents");
+
+    expect(response.status()).toBe(401);
+    expect(response.headers()["x-request-id"]).toMatch(/^[0-9a-f-]{36}$/);
+  });
 });
