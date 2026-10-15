@@ -1,18 +1,8 @@
-import { proxyDelete } from "@/lib/proxy";
-import { requireSession } from "@/lib/require-session";
+import { proxyDelete, proxyGet } from "@/lib/proxy";
 
+/** Who is signed in. */
 export async function GET() {
-  const result = await requireSession();
-  if ("error" in result) return result.error;
-
-  const backendUrl = process.env.BACKEND_URL ?? "http://localhost:8000";
-
-  const res = await fetch(`${backendUrl}/me`, {
-    headers: { Authorization: `Bearer ${result.token}` },
-  });
-  const data = await res.json();
-
-  return Response.json(data, { status: res.status });
+  return proxyGet("/me");
 }
 
 /** Deletes the signed-in account and every document in it. */

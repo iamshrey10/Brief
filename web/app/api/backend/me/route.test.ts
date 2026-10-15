@@ -1,12 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/lib/proxy", () => ({ proxyDelete: vi.fn() }));
+vi.mock("@/lib/proxy", () => ({ proxyDelete: vi.fn(), proxyGet: vi.fn() }));
 vi.mock("@/lib/require-session", () => ({ requireSession: vi.fn() }));
 
-import { proxyDelete } from "@/lib/proxy";
-import { DELETE } from "./route";
+import { proxyDelete, proxyGet } from "@/lib/proxy";
+import { DELETE, GET } from "./route";
 
 const proxyMock = vi.mocked(proxyDelete);
+const getMock = vi.mocked(proxyGet);
 
 beforeEach(() => {
   proxyMock.mockReset();
@@ -33,5 +34,17 @@ describe("DELETE /api/backend/me", () => {
     const res = await DELETE();
 
     expect(res.status).toBe(204);
+  });
+});
+
+describe("GET /api/backend/me", () => {
+  it("asks the backend who is signed in through the shared proxy, and nothing else", async () => {
+    getMock.mockResolvedValue(Response.json({ id: "u1", email: "reader@example.com" }));
+
+    const res = await GET();
+
+    expect(getMock).toHaveBeenCalledTimes(1);
+    expect(getMock).toHaveBeenCalledWith("/me");
+    expect(await res.json()).toEqual({ id: "u1", email: "reader@example.com" });
   });
 });
