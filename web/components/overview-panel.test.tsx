@@ -355,6 +355,30 @@ describe("OverviewPanel when something fails", () => {
     expect(await within(checklist).findByText("What is the interest rate?")).toBeInTheDocument();
   });
 
+  it("shows the reference code in the alert, so a person can quote it", async () => {
+    keyTermsMock.mockResolvedValue({
+      ok: false,
+      message: "I couldn't read this document just now.",
+      reference: "3f2b8c1e",
+    });
+    checklistMock.mockResolvedValue({ ok: true, result: CHECKLIST });
+
+    render(<OverviewPanel documentId="doc-1" onCitationSelect={vi.fn()} />);
+
+    const keyTerms = await screen.findByRole("region", { name: "Key terms" });
+    expect(await within(keyTerms).findByRole("alert")).toHaveTextContent("Reference: 3f2b8c1e");
+  });
+
+  it("shows no reference line when the failure has no code", async () => {
+    keyTermsMock.mockResolvedValue({ ok: false, message: "I couldn't read this document just now." });
+    checklistMock.mockResolvedValue({ ok: true, result: CHECKLIST });
+
+    render(<OverviewPanel documentId="doc-1" onCitationSelect={vi.fn()} />);
+
+    const keyTerms = await screen.findByRole("region", { name: "Key terms" });
+    expect(await within(keyTerms).findByRole("alert")).not.toHaveTextContent(/reference/i);
+  });
+
   it("tries again when asked, for only the section that failed", async () => {
     keyTermsMock.mockResolvedValueOnce({ ok: false, message: "Try later." });
     keyTermsMock.mockResolvedValueOnce({ ok: true, result: KEY_TERMS });

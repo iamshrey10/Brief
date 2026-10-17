@@ -18,7 +18,7 @@ import {
 
 type LoadState<T> =
   | { status: "loading" }
-  | { status: "error"; message: string }
+  | { status: "error"; message: string; reference?: string }
   | { status: "ready"; result: T };
 
 /**
@@ -46,7 +46,7 @@ function useLoad<T>(documentId: string, fetcher: (id: string) => Promise<LoadOut
       ? { status: "loading" }
       : loaded.outcome.ok
         ? { status: "ready", result: loaded.outcome.result }
-        : { status: "error", message: loaded.outcome.message };
+        : { status: "error", message: loaded.outcome.message, reference: loaded.outcome.reference };
 
   const retry = useCallback(() => setAttempt((n) => n + 1), []);
   return { state, retry };
@@ -74,13 +74,22 @@ function LoadingBlock({ label }: { label: string }) {
   );
 }
 
-function ErrorBlock({ message, onRetry }: { message: string; onRetry: () => void }) {
+function ErrorBlock({
+  message,
+  reference,
+  onRetry,
+}: {
+  message: string;
+  reference?: string;
+  onRetry: () => void;
+}) {
   return (
     <div
       role="alert"
       className="flex flex-col items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
     >
       <p>{message}</p>
+      {reference && <p className="text-xs opacity-80">Reference: {reference}</p>}
       <Button type="button" variant="outline" size="sm" onClick={onRetry}>
         Try again
       </Button>
@@ -223,7 +232,7 @@ function KeyTermsSection({
       {state.status === "loading" && (
         <LoadingBlock label="Reading your document. The first time takes a few seconds." />
       )}
-      {state.status === "error" && <ErrorBlock message={state.message} onRetry={retry} />}
+      {state.status === "error" && <ErrorBlock message={state.message} reference={state.reference} onRetry={retry} />}
       {state.status === "ready" && <KeyTermsBody result={state.result} onSelect={onSelect} />}
     </section>
   );
@@ -347,7 +356,7 @@ function ChecklistSection({
       {state.status === "loading" && (
         <LoadingBlock label="Checking the questions people most often miss." />
       )}
-      {state.status === "error" && <ErrorBlock message={state.message} onRetry={retry} />}
+      {state.status === "error" && <ErrorBlock message={state.message} reference={state.reference} onRetry={retry} />}
       {state.status === "ready" && <ChecklistBody result={state.result} onSelect={onSelect} />}
     </section>
   );
