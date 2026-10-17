@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth import get_current_user
 from app.checklist import ChecklistGenerationError, ChecklistResult, get_checklist, load_checklist
 from app.db import get_session
-from app.housekeeping import remove_abandoned_uploads
+from app.housekeeping import remove_abandoned_uploads, remove_old_traces
 from app.ingestion import ingest_document
 from app.logging_setup import configure_logging
 from app.readiness import check_ready
@@ -212,6 +212,7 @@ async def create_upload(
     # Uploads this person started and never confirmed would otherwise hold a slot for ever. Cleared only
     # now that the request is known to be valid, so a refused request changes nothing.
     await remove_abandoned_uploads(session, user.id)
+    await remove_old_traces(session, user.id)
     kept = await session.scalar(
         select(func.count()).select_from(Document).where(Document.user_id == user.id)
     )

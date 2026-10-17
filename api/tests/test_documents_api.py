@@ -2476,6 +2476,54 @@ async def test_abandoned_uploads_do_not_hold_a_slot_against_the_document_limit(
     assert len((await client.get("/documents")).json()) == 1  # only the new one is left
 
 
+async def _trace_of_age(db_session, user, document, days):
+    from datetime import datetime, timedelta, timezone
+
+    trace = AnswerTrace(
+        user_id=user.id,
+        document_id=document.id,
+        request_id=f"request-{uuid.uuid4().hex[:8]}",
+        kind="ask",
+        outcome="answered",
+        retrieved=[],
+        cited=[],
+        elapsed_ms=1,
+        created_at=datetime.now(timezone.utc) - timedelta(days=days),
+    )
+    db_session.add(trace)
+    await db_session.commit()
+    return trace.id
+
+
+async def test_starting_an_upload_clears_this_persons_old_answer_traces_and_keeps_recent_ones(
+    client, db_session, test_user, monkeypatch
+):
+    _removed_files(monkeypatch)
+    document = await _ready_document(db_session, test_user)
+    old = await _trace_of_age(db_session, test_user, document, days=45)
+    recent = await _trace_of_age(db_session, test_user, document, days=2)
+
+    response = await client.post("/documents", json=_upload_body())
+
+    assert response.status_code == 200
+    remaining = set((await db_session.execute(select(AnswerTrace.id))).scalars().all())
+    assert remaining == {recent}
+    assert old not in remaining
+
+
+async def test_a_refused_upload_start_leaves_old_answer_traces_alone(
+    client, db_session, test_user, monkeypatch
+):
+    _removed_files(monkeypatch)
+    document = await _ready_document(db_session, test_user)
+    old = await _trace_of_age(db_session, test_user, document, days=45)
+
+    response = await client.post("/documents", json={**_upload_body(), "doc_type": "nonsense"})
+
+    assert response.status_code in (400, 422)
+    assert (await db_session.execute(select(AnswerTrace.id))).scalars().all() == [old]
+
+
 async def test_an_upload_that_may_still_be_in_progress_still_counts_towards_the_limit(
     client, db_session, test_user, monkeypatch
 ):
