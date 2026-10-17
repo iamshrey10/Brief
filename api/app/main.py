@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import re
+import time
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -20,10 +21,11 @@ from app.readiness import check_ready
 from app import request_id
 from app.key_terms import KeyTermsGenerationError, KeyTermsResult, get_key_terms, load_key_terms
 from app.models import ChecklistAnswerRow, Clause, Document, Extraction, User
-from app.qa import AnswerGenerationError, AnswerResult, answer_question
+from app.qa import AnswerGenerationError, AnswerResult, answer_with_path
 from app.retrieval import hybrid_search, reranked_search
 from app import usage
 from app.telemetry import describe_failure
+from app.traces import record_trace
 from app.storage import (
     ALLOWED_CONTENT_TYPES,
     MAX_FILE_SIZE_BYTES,
@@ -39,6 +41,10 @@ configure_logging()
 logger = logging.getLogger(__name__)
 
 SEARCHABLE_STATUSES = {"ready", "needs_retake"}
+
+
+def _elapsed_ms(started: float) -> int:
+    return int((time.monotonic() - started) * 1000)
 
 # How many documents one person can keep at a time. Every document costs storage and a read on
 # a metered service, so this keeps one account from running up the bill. Deleting frees a slot.
@@ -572,13 +578,35 @@ async def ask_document(
         raise HTTPException(status_code=400, detail="question cannot be empty")
 
     await _spend_or_refuse(session, user, "ask")
+    started = time.monotonic()
     try:
-        return await answer_question(session, document.id, body.question)
+        result, path = await answer_with_path(session, document.id, body.question)
     except (AnswerGenerationError, genai_errors.APIError) as exc:
         logger.warning("model call failed: %s", describe_failure(exc))
+        await record_trace(
+            session,
+            user_id=user.id,
+            document_id=document.id,
+            kind="ask",
+            outcome="failed",
+            retrieved=[],
+            cited=[],
+            elapsed_ms=_elapsed_ms(started),
+        )
         raise HTTPException(
             status_code=502, detail="the answering service is unavailable, try again"
         ) from exc
+    await record_trace(
+        session,
+        user_id=user.id,
+        document_id=document.id,
+        kind="ask",
+        outcome=path.outcome,
+        retrieved=path.retrieved,
+        cited=path.cited,
+        elapsed_ms=_elapsed_ms(started),
+    )
+    return result
 
 
 class ClauseOut(BaseModel):

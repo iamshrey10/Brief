@@ -2,6 +2,7 @@ import uuid
 
 import pytest
 import pytest_asyncio
+from sqlalchemy import select
 from httpx import ASGITransport, AsyncClient
 
 import app.main as main_module
@@ -20,8 +21,8 @@ from app.key_terms import (
     KeyTermsGenerationError,
 )
 from app.main import app
-from app.models import EMBEDDING_DIM, Clause, Document, Embedding, User
-from app.qa import AnswerGenerationError, AnswerResult, CitedClause
+from app.models import EMBEDDING_DIM, AnswerTrace, Clause, Document, Embedding, User
+from app.qa import AnswerGenerationError, AnswerPath, AnswerResult, CitedClause
 from app.storage import MAX_FILE_SIZE_BYTES, UploadInfo, UploadMissingError
 
 
@@ -424,20 +425,23 @@ async def test_search_document_rejects_an_out_of_range_limit(client, db_session,
 
 async def test_ask_document_returns_the_grounded_answer(client, db_session, test_user, monkeypatch):
     async def fake_answer(session, document_id, question):
-        return AnswerResult(
-            found=True,
-            answer="Yes, with no penalty.",
-            citations=[
-                CitedClause(
-                    clause_id=str(uuid.uuid4()),
-                    page_number=2,
-                    clause_text="The borrower may prepay at any time without penalty.",
-                    quote="without penalty",
-                )
-            ],
+        return (
+            AnswerResult(
+                found=True,
+                answer="Yes, with no penalty.",
+                citations=[
+                    CitedClause(
+                        clause_id=str(uuid.uuid4()),
+                        page_number=2,
+                        clause_text="The borrower may prepay at any time without penalty.",
+                        quote="without penalty",
+                    )
+                ],
+            ),
+            AnswerPath(outcome="answered", retrieved=[], cited=[]),
         )
 
-    monkeypatch.setattr(main_module, "answer_question", fake_answer)
+    monkeypatch.setattr(main_module, "answer_with_path", fake_answer)
     document = await _ready_document(db_session, test_user)
 
     response = await client.post(
@@ -515,12 +519,69 @@ async def test_ask_document_returns_502_when_the_model_gives_nothing_usable(
     async def failing_answer(session, document_id, question):
         raise AnswerGenerationError("model did not return a valid structured answer")
 
-    monkeypatch.setattr(main_module, "answer_question", failing_answer)
+    monkeypatch.setattr(main_module, "answer_with_path", failing_answer)
     document = await _ready_document(db_session, test_user)
 
     response = await client.post(f"/documents/{document.id}/ask", json={"question": "Anything?"})
 
     assert response.status_code == 502
+
+
+async def test_ask_document_records_what_the_answer_used(client, db_session, test_user, monkeypatch):
+    clause_a, clause_b = str(uuid.uuid4()), str(uuid.uuid4())
+
+    async def fake_answer(session, document_id, question):
+        return (
+            AnswerResult(found=False, answer="", citations=[]),
+            AnswerPath(outcome="withheld", retrieved=[clause_a, clause_b], cited=[]),
+        )
+
+    monkeypatch.setattr(main_module, "answer_with_path", fake_answer)
+    document = await _ready_document(db_session, test_user)
+
+    response = await client.post(
+        f"/documents/{document.id}/ask",
+        json={"question": "Can I pay early?"},
+        headers={"X-Request-ID": "3f2b8c1e-9d4a-4e07-8a55-0c1d2e3f4a5b"},
+    )
+
+    assert response.status_code == 200
+    row = await db_session.scalar(select(AnswerTrace))
+    assert (row.kind, row.outcome) == ("ask", "withheld")
+    assert row.retrieved == [clause_a, clause_b] and row.cited == []
+    assert row.request_id == "3f2b8c1e-9d4a-4e07-8a55-0c1d2e3f4a5b"
+    assert (row.user_id, row.document_id) == (test_user.id, document.id)
+    assert row.elapsed_ms >= 0
+
+
+async def test_ask_document_records_a_failed_trace_when_the_model_gives_nothing_usable(
+    client, db_session, test_user, monkeypatch
+):
+    async def failing_answer(session, document_id, question):
+        raise AnswerGenerationError("model did not return a valid structured answer")
+
+    monkeypatch.setattr(main_module, "answer_with_path", failing_answer)
+    document = await _ready_document(db_session, test_user)
+
+    response = await client.post(f"/documents/{document.id}/ask", json={"question": "Anything?"})
+
+    assert response.status_code == 502
+    row = await db_session.scalar(select(AnswerTrace))
+    assert (row.kind, row.outcome, row.retrieved, row.cited) == ("ask", "failed", [], [])
+
+
+async def test_a_question_refused_for_the_daily_limit_leaves_no_trace(
+    client, db_session, test_user, monkeypatch
+):
+    from app import usage
+
+    monkeypatch.setattr(usage, "DAILY_LIMITS", {"ask": 0, "read": 2, "analyze": 2})
+    document = await _ready_document(db_session, test_user)
+
+    response = await client.post(f"/documents/{document.id}/ask", json={"question": "Anything?"})
+
+    assert response.status_code == 429
+    assert (await db_session.execute(select(AnswerTrace))).first() is None
 
 
 # --- GET /documents/{id} and GET /documents/{id}/clauses ---
@@ -2091,9 +2152,12 @@ def _counting_answers(monkeypatch) -> list[str]:
 
     async def fake_answer(session, document_id, question):
         asked.append(question)
-        return AnswerResult(found=False, answer="", citations=[])
+        return (
+            AnswerResult(found=False, answer="", citations=[]),
+            AnswerPath(outcome="not_found", retrieved=[], cited=[]),
+        )
 
-    monkeypatch.setattr(main_module, "answer_question", fake_answer)
+    monkeypatch.setattr(main_module, "answer_with_path", fake_answer)
     return asked
 
 
@@ -2566,7 +2630,7 @@ async def test_a_failed_question_is_logged_with_its_type_and_code_and_no_text(
     async def failing(session, document_id, question):
         raise AnswerGenerationError("model did not return a valid structured answer about Jane Doe")
 
-    monkeypatch.setattr(main_module, "answer_question", failing)
+    monkeypatch.setattr(main_module, "answer_with_path", failing)
     document = await _ready_document(db_session, test_user)
 
     with caplog.at_level(logging.WARNING):
