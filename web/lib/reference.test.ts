@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { referenceFrom } from "./reference";
+import { referenceFrom, withReference } from "./reference";
 
 const answer = (id: string | null) =>
   new Response("{}", { status: 502, headers: id === null ? {} : { "X-Request-ID": id } });
@@ -24,4 +24,16 @@ describe("referenceFrom", () => {
       expect(referenceFrom(answer(odd))).toBeUndefined();
     },
   );
+});
+
+describe("withReference", () => {
+  it("adds the reference after the message", () => {
+    expect(withReference("I couldn't do that just now.", "3f2b8c1e")).toBe(
+      "I couldn't do that just now. Reference: 3f2b8c1e",
+    );
+  });
+
+  it("leaves the message alone when there is no reference", () => {
+    expect(withReference("I couldn't do that just now.", undefined)).toBe("I couldn't do that just now.");
+  });
 });

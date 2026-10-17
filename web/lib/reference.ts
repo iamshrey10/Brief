@@ -10,3 +10,8 @@ export function referenceFrom(response: Response): string | undefined {
   if (!id || !LOOKS_LIKE_AN_ID.test(id)) return undefined;
   return id.slice(0, 8);
 }
+
+/** The message with the reference after it, for a place that shows only a line of text. */
+export function withReference(message: string, reference: string | undefined): string {
+  return reference ? `${message} Reference: ${reference}` : message;
+}
