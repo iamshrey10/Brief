@@ -1,4 +1,5 @@
 import { dailyLimitMessage } from "@/lib/daily-limit";
+import { referenceFrom } from "@/lib/reference";
 
 export type AskCitation = {
   clause_id: string;
@@ -13,7 +14,9 @@ export type AskResult = {
   citations: AskCitation[];
 };
 
-export type AskOutcome = { ok: true; result: AskResult } | { ok: false; message: string };
+export type AskOutcome =
+  | { ok: true; result: AskResult }
+  | { ok: false; message: string; /** A short code to quote, when the server answered. */ reference?: string };
 
 export const MAX_QUESTION_LENGTH = 1000;
 
@@ -49,7 +52,12 @@ export async function askQuestion(documentId: string, question: string): Promise
       signal: controller.signal,
     });
     if (!res.ok) {
-      return { ok: false, message: (await dailyLimitMessage(res)) ?? messageForFailure(res.status) };
+      const reference = referenceFrom(res);
+      return {
+        ok: false,
+        message: (await dailyLimitMessage(res)) ?? messageForFailure(res.status),
+        ...(reference ? { reference } : {}),
+      };
     }
     return { ok: true, result: (await res.json()) as AskResult };
   } catch (error) {

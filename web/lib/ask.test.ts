@@ -14,10 +14,10 @@ const answer: AskResult = {
   ],
 };
 
-function jsonResponse(body: unknown, status = 200): Response {
+function jsonResponse(body: unknown, status = 200, headers: Record<string, string> = {}): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...headers },
   });
 }
 
@@ -47,6 +47,45 @@ describe("messageForFailure", () => {
 
   it("states the real question length limit", () => {
     expect(messageForFailure(422)).toContain(String(MAX_QUESTION_LENGTH));
+  });
+});
+
+describe("the reference on a failed question", () => {
+  const ID = { "X-Request-ID": "3f2b8c1e-9d4a-4e07-8a55-0c1d2e3f4a5b" };
+  const fetchMock = vi.fn();
+
+  afterEach(() => fetchMock.mockReset());
+
+  it("is the short code of the request id when the server answers with an error", async () => {
+    vi.stubGlobal("fetch", fetchMock);
+    fetchMock.mockResolvedValue(jsonResponse({ detail: "boom" }, 502, ID));
+
+    expect(await askQuestion("doc-1", "What is the rent?")).toEqual({
+      ok: false,
+      message: messageForFailure(502),
+      reference: "3f2b8c1e",
+    });
+  });
+
+  it("is on a daily limit refusal too", async () => {
+    vi.stubGlobal("fetch", fetchMock);
+    fetchMock.mockResolvedValue(
+      jsonResponse({ detail: "You have used all of today's questions." }, 429, ID),
+    );
+
+    expect(await askQuestion("doc-1", "x")).toMatchObject({ ok: false, reference: "3f2b8c1e" });
+  });
+
+  it("is left out when the server sent no id or nothing reached the server", async () => {
+    vi.stubGlobal("fetch", fetchMock);
+    fetchMock.mockResolvedValueOnce(jsonResponse({ detail: "boom" }, 502));
+    fetchMock.mockRejectedValueOnce(new TypeError("fetch failed"));
+
+    const noId = await askQuestion("doc-1", "x");
+    const unreachable = await askQuestion("doc-1", "x");
+
+    expect("reference" in noId).toBe(false);
+    expect("reference" in unreachable).toBe(false);
   });
 });
 
