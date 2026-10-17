@@ -1,3 +1,5 @@
+import { referenceFrom, withReference } from "@/lib/reference";
+
 export type AccountDeleteOutcome = { ok: true } | { ok: false; message: string };
 
 /** Plain-language messages for each way deleting an account can fail, never a raw status. */
@@ -19,7 +21,10 @@ export async function deleteAccount(): Promise<AccountDeleteOutcome> {
   try {
     const res = await fetch("/api/backend/me", { method: "DELETE" });
     if (res.status === 204) return { ok: true };
-    return { ok: false, message: messageForAccountDeleteFailure(res.status) };
+    return {
+      ok: false,
+      message: withReference(messageForAccountDeleteFailure(res.status), referenceFrom(res)),
+    };
   } catch {
     return { ok: false, message: messageForAccountDeleteFailure(0) };
   }

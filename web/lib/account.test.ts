@@ -12,8 +12,32 @@ afterEach(() => {
   fetchMock.mockReset();
 });
 
-const response = (status: number, body: unknown = {}) =>
-  ({ ok: status >= 200 && status < 300, status, json: async () => body }) as Response;
+const response = (status: number, body: unknown = {}, headers: Record<string, string> = {}) =>
+  ({
+    ok: status >= 200 && status < 300,
+    status,
+    headers: new Headers(headers),
+    json: async () => body,
+  }) as Response;
+
+describe("the reference on a failed account delete", () => {
+  it("is added after the message when the server answers with an error", async () => {
+    fetchMock.mockResolvedValue(
+      response(502, {}, { "X-Request-ID": "3f2b8c1e-9d4a-4e07-8a55-0c1d2e3f4a5b" }),
+    );
+
+    expect(await deleteAccount()).toEqual({
+      ok: false,
+      message: `${messageForAccountDeleteFailure(502)} Reference: 3f2b8c1e`,
+    });
+  });
+
+  it("is left out when the server sent no id", async () => {
+    fetchMock.mockResolvedValue(response(502));
+
+    expect(await deleteAccount()).toEqual({ ok: false, message: messageForAccountDeleteFailure(502) });
+  });
+});
 
 describe("deleteAccount", () => {
   it("sends a DELETE to the account route and says it worked on a 204", async () => {
