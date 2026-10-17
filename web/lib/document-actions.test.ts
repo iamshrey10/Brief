@@ -17,8 +17,32 @@ afterEach(() => {
   fetchMock.mockReset();
 });
 
-const response = (body: unknown, status = 200) =>
-  ({ ok: status >= 200 && status < 300, status, json: async () => body }) as Response;
+const response = (body: unknown, status = 200, headers: Record<string, string> = {}) =>
+  ({
+    ok: status >= 200 && status < 300,
+    status,
+    headers: new Headers(headers),
+    json: async () => body,
+  }) as Response;
+
+const ID = { "X-Request-ID": "3f2b8c1e-9d4a-4e07-8a55-0c1d2e3f4a5b" };
+
+describe("the reference on a failed delete", () => {
+  it("is added after the message when the server answers with an error", async () => {
+    fetchMock.mockResolvedValue(response({ detail: "boom" }, 502, ID));
+
+    expect(await deleteDocument("d1")).toEqual({
+      ok: false,
+      message: `${messageForDeleteFailure(502)} Reference: 3f2b8c1e`,
+    });
+  });
+
+  it("is left out when the server sent no id", async () => {
+    fetchMock.mockResolvedValue(response({ detail: "boom" }, 502));
+
+    expect(await deleteDocument("d1")).toEqual({ ok: false, message: messageForDeleteFailure(502) });
+  });
+});
 
 describe("deleteDocument", () => {
   it("sends a DELETE to that document's route", async () => {

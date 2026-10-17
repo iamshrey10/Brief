@@ -1,4 +1,5 @@
 import type { DocumentSummary } from "@/lib/documents";
+import { referenceFrom, withReference } from "@/lib/reference";
 
 export type ActionOutcome<T> = { ok: true; result: T } | { ok: false; message: string };
 
@@ -42,7 +43,7 @@ export async function deleteDocument(documentId: string): Promise<ActionOutcome<
     });
     // A 404 means it is already gone, which is what was asked for, so it counts as done.
     if (res.status === 204 || res.status === 404) return { ok: true, result: null };
-    return { ok: false, message: messageForDeleteFailure(res.status) };
+    return { ok: false, message: withReference(messageForDeleteFailure(res.status), referenceFrom(res)) };
   } catch {
     return { ok: false, message: messageForDeleteFailure(0) };
   }
