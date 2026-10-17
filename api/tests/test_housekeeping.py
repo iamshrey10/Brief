@@ -5,8 +5,8 @@ import pytest
 from sqlalchemy import select
 
 from app import housekeeping
-from app.housekeeping import ABANDONED_AFTER, remove_abandoned_uploads
-from app.models import Document, User
+from app.housekeeping import ABANDONED_AFTER, TRACES_KEPT_FOR, remove_abandoned_uploads, remove_old_traces
+from app.models import AnswerTrace, Document, User
 
 NOW = datetime(2026, 10, 12, 12, 0, tzinfo=timezone.utc)
 
@@ -142,3 +142,71 @@ def test_the_allowed_time_is_longer_than_an_upload_link_lives():
     from app.storage import PRESIGNED_URL_EXPIRY_SECONDS
 
     assert ABANDONED_AFTER.total_seconds() > 3 * PRESIGNED_URL_EXPIRY_SECONDS
+
+
+# --- old answer traces ---
+
+
+async def make_trace(db_session, user, document, age):
+    trace = AnswerTrace(
+        user_id=user.id,
+        document_id=document.id,
+        request_id=f"request-{uuid.uuid4().hex[:8]}",
+        kind="ask",
+        outcome="answered",
+        retrieved=[],
+        cited=[],
+        elapsed_ms=1,
+        created_at=NOW - age,
+    )
+    db_session.add(trace)
+    await db_session.commit()
+    await db_session.refresh(trace)
+    return trace
+
+
+async def remaining_traces(db_session) -> set[uuid.UUID]:
+    return set((await db_session.execute(select(AnswerTrace.id))).scalars().all())
+
+
+async def test_a_trace_older_than_the_kept_time_is_removed_and_a_newer_one_stays(db_session, test_user):
+    document = await make_document(db_session, test_user, status="ready", age=timedelta(days=60))
+    old = await make_trace(db_session, test_user, document, TRACES_KEPT_FOR + timedelta(days=1))
+    recent = await make_trace(db_session, test_user, document, TRACES_KEPT_FOR - timedelta(days=1))
+
+    removed = await remove_old_traces(db_session, test_user.id, now=NOW)
+
+    assert removed == 1
+    assert await remaining_traces(db_session) == {recent.id}
+    assert old.id not in await remaining_traces(db_session)
+
+
+async def test_a_trace_exactly_at_the_kept_time_stays(db_session, test_user):
+    document = await make_document(db_session, test_user, status="ready", age=timedelta(days=60))
+    edge = await make_trace(db_session, test_user, document, TRACES_KEPT_FOR)
+
+    assert await remove_old_traces(db_session, test_user.id, now=NOW) == 0
+    assert await remaining_traces(db_session) == {edge.id}
+
+
+async def test_only_this_persons_old_traces_are_removed(db_session, test_user):
+    other = User(email="someone-else-traces@example.com")
+    db_session.add(other)
+    await db_session.commit()
+    mine_document = await make_document(db_session, test_user, status="ready", age=timedelta(days=60))
+    their_document = await make_document(db_session, other, status="ready", age=timedelta(days=60))
+    await make_trace(db_session, test_user, mine_document, timedelta(days=90))
+    theirs = await make_trace(db_session, other, their_document, timedelta(days=90))
+
+    removed = await remove_old_traces(db_session, test_user.id, now=NOW)
+
+    assert removed == 1
+    assert await remaining_traces(db_session) == {theirs.id}
+
+
+async def test_nothing_to_remove_is_not_an_error(db_session, test_user):
+    assert await remove_old_traces(db_session, test_user.id, now=NOW) == 0
+
+
+def test_traces_are_kept_for_thirty_days():
+    assert TRACES_KEPT_FOR == timedelta(days=30)
