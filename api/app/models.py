@@ -185,3 +185,27 @@ class Usage(Base):
     day: Mapped[dt.date] = mapped_column(Date, primary_key=True)
     kind: Mapped[str] = mapped_column(String(50), primary_key=True)
     count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+
+
+class AnswerTrace(Base):
+    """What one answer used, so a failure or a surprising answer can be traced later from the reference code
+    a person was shown. It holds ids, counts and times only, never the question, the answer or any text of
+    the document, the same rule as the logs. It goes when its document or its person goes."""
+
+    __tablename__ = "answer_traces"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    document_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("documents.id", ondelete="CASCADE"), index=True
+    )
+    # the request id the website sent, whose first eight characters are the reference code
+    request_id: Mapped[str] = mapped_column(String(64), index=True)
+    kind: Mapped[str] = mapped_column(String(50))
+    # answered, not_found, withheld, nothing_to_search or failed
+    outcome: Mapped[str] = mapped_column(String(50))
+    # the ids of the clauses the model was shown, best match first, and of the ones its answer cited
+    retrieved: Mapped[list[str]] = mapped_column(JSONB, default=list)
+    cited: Mapped[list[str]] = mapped_column(JSONB, default=list)
+    elapsed_ms: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
