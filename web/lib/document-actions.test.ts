@@ -44,6 +44,26 @@ describe("the reference on a failed delete", () => {
   });
 });
 
+describe("the reference on a failed rename or change", () => {
+  it("is added after the message when the server answers with an error", async () => {
+    fetchMock.mockResolvedValue(response({ detail: "boom" }, 502, ID));
+
+    expect(await updateDocument("d1", { filename: "New.pdf" })).toEqual({
+      ok: false,
+      message: `${messageForUpdateFailure(502)} Reference: 3f2b8c1e`,
+    });
+  });
+
+  it("is left out when the server sent no id", async () => {
+    fetchMock.mockResolvedValue(response({ detail: "boom" }, 502));
+
+    expect(await updateDocument("d1", { filename: "New.pdf" })).toEqual({
+      ok: false,
+      message: messageForUpdateFailure(502),
+    });
+  });
+});
+
 describe("deleteDocument", () => {
   it("sends a DELETE to that document's route", async () => {
     fetchMock.mockResolvedValue({ ok: true, status: 204 } as Response);

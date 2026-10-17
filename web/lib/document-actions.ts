@@ -62,7 +62,9 @@ export async function updateDocument(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(changes),
     });
-    if (!res.ok) return { ok: false, message: messageForUpdateFailure(res.status) };
+    if (!res.ok) {
+      return { ok: false, message: withReference(messageForUpdateFailure(res.status), referenceFrom(res)) };
+    }
     return { ok: true, result: (await res.json()) as DocumentSummary };
   } catch {
     return { ok: false, message: messageForUpdateFailure(0) };
