@@ -120,6 +120,30 @@ describe("ChatPanel", () => {
     expect(await screen.findByText(/asking faster than I can answer/i)).toBeInTheDocument();
   });
 
+  it("shows the reference code under the failure message, so a person can quote it", async () => {
+    askMock.mockResolvedValue({
+      ok: false,
+      message: "Something went wrong getting an answer. Try again in a moment.",
+      reference: "3f2b8c1e",
+    });
+    const { user, box } = renderPanel();
+
+    await user.type(box, "Anything?{Enter}");
+
+    expect(await screen.findByText("Reference: 3f2b8c1e")).toBeInTheDocument();
+    expect(screen.getByText(/Something went wrong getting an answer/)).toBeInTheDocument();
+  });
+
+  it("shows no reference line when the failure has no code", async () => {
+    askMock.mockResolvedValue({ ok: false, message: "Something went wrong getting an answer." });
+    const { user, box } = renderPanel();
+
+    await user.type(box, "Anything?{Enter}");
+
+    expect(await screen.findByText(/Something went wrong getting an answer/)).toBeInTheDocument();
+    expect(screen.queryByText(/Reference:/)).not.toBeInTheDocument();
+  });
+
   it("will not send a second question while one is still being answered", async () => {
     let resolveAsk!: (outcome: AskOutcome) => void;
     askMock.mockReturnValue(

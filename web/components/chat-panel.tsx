@@ -8,7 +8,7 @@ import { fetchUsage, questionsLeftNote } from "@/lib/usage";
 type Message =
   | { id: number; kind: "question"; text: string }
   | { id: number; kind: "answer"; result: AskResult }
-  | { id: number; kind: "error"; text: string };
+  | { id: number; kind: "error"; text: string; reference?: string };
 
 function AnswerBubble({
   result,
@@ -96,7 +96,7 @@ export function ChatPanel({
     const outcome = await askQuestion(documentId, question);
     const reply: Message = outcome.ok
       ? { id: nextId.current++, kind: "answer", result: outcome.result }
-      : { id: nextId.current++, kind: "error", text: outcome.message };
+      : { id: nextId.current++, kind: "error", text: outcome.message, reference: outcome.reference };
     setMessages((previous) => [...previous, reply]);
     setPending(false);
 
@@ -154,7 +154,8 @@ export function ChatPanel({
               key={message.id}
               className="max-w-[90%] rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
             >
-              {message.text}
+              <p>{message.text}</p>
+              {message.reference && <p className="mt-1 text-xs opacity-80">Reference: {message.reference}</p>}
             </div>
           );
         })}
