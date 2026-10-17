@@ -21,8 +21,13 @@ afterEach(() => {
   fetchMock.mockReset();
 });
 
-function jsonResponse(body: unknown, status = 200) {
-  return { ok: status >= 200 && status < 300, status, json: async () => body } as Response;
+function jsonResponse(body: unknown, status = 200, headers: Record<string, string> = {}) {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    headers: new Headers(headers),
+    json: async () => body,
+  } as Response;
 }
 
 describe("messageForFailure", () => {
@@ -40,6 +45,51 @@ describe("messageForFailure", () => {
     for (const status of [401, 409, 429, 500, 502, 0]) {
       expect(messageForFailure(status)).not.toMatch(/\b(401|409|429|500|502)\b/);
     }
+  });
+});
+
+describe("the reference on a failure", () => {
+  const ID = { "X-Request-ID": "3f2b8c1e-9d4a-4e07-8a55-0c1d2e3f4a5b" };
+
+  it("is the short code of the request id when the server answers with an error", async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ detail: "boom" }, 502, ID));
+
+    expect(await fetchKeyTerms("doc-ref-1")).toEqual({
+      ok: false,
+      message: messageForFailure(502),
+      reference: "3f2b8c1e",
+    });
+  });
+
+  it("is on a checklist failure too", async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ detail: "boom" }, 409, ID));
+
+    expect(await fetchChecklist("doc-ref-2")).toMatchObject({ ok: false, reference: "3f2b8c1e" });
+  });
+
+  it("is on a daily limit refusal too", async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse({ detail: "You have read as many documents as you can today." }, 429, ID),
+    );
+
+    expect(await fetchKeyTerms("doc-ref-3")).toMatchObject({ ok: false, reference: "3f2b8c1e" });
+  });
+
+  it("is left out when the server sent no id", async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ detail: "boom" }, 502));
+
+    const outcome = await fetchKeyTerms("doc-ref-4");
+
+    expect(outcome).toEqual({ ok: false, message: messageForFailure(502) });
+    expect("reference" in outcome).toBe(false);
+  });
+
+  it("is left out when nothing reached the server at all", async () => {
+    fetchMock.mockRejectedValue(new TypeError("fetch failed"));
+
+    const outcome = await fetchKeyTerms("doc-ref-5");
+
+    expect("reference" in outcome).toBe(false);
   });
 });
 

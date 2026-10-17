@@ -1,4 +1,5 @@
 import { dailyLimitMessage } from "@/lib/daily-limit";
+import { referenceFrom } from "@/lib/reference";
 
 export type KeyTerm = {
   name: string;
@@ -31,7 +32,9 @@ export type ChecklistAnswer = {
 
 export type ChecklistResult = { answers: ChecklistAnswer[]; truncated: boolean };
 
-export type LoadOutcome<T> = { ok: true; result: T } | { ok: false; message: string };
+export type LoadOutcome<T> =
+  | { ok: true; result: T }
+  | { ok: false; message: string; /** A short code to quote, when the server answered. */ reference?: string };
 
 // The first request for a document reads all of it with a model, a few seconds and
 // occasionally much longer, so the browser gives up rather than showing a skeleton forever.
@@ -65,7 +68,12 @@ async function request<T>(documentId: string, kind: string): Promise<LoadOutcome
       signal: controller.signal,
     });
     if (!res.ok) {
-      return { ok: false, message: (await dailyLimitMessage(res)) ?? messageForFailure(res.status) };
+      const reference = referenceFrom(res);
+      return {
+        ok: false,
+        message: (await dailyLimitMessage(res)) ?? messageForFailure(res.status),
+        ...(reference ? { reference } : {}),
+      };
     }
     return { ok: true, result: (await res.json()) as T };
   } catch (error) {
