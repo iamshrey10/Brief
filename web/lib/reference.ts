@@ -5,8 +5,8 @@ const LOOKS_LIKE_AN_ID = /^[A-Za-z0-9-]{8,64}$/;
  * Every log line for that request starts with the same id, so the code finds it. Nothing is returned
  * for a missing or odd-looking id, so text that did not come from us is never shown to anyone.
  */
-export function referenceFrom(response: Response): string | undefined {
-  const id = response.headers.get("X-Request-ID");
+export function referenceFrom(response: { headers?: Pick<Headers, "get"> }): string | undefined {
+  const id = response.headers?.get("X-Request-ID");
   if (!id || !LOOKS_LIKE_AN_ID.test(id)) return undefined;
   return id.slice(0, 8);
 }

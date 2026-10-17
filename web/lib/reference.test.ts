@@ -26,6 +26,18 @@ describe("referenceFrom", () => {
   );
 });
 
+describe("referenceFrom with a response that has no headers", () => {
+  it("is nothing instead of failing", () => {
+    expect(referenceFrom({ headers: undefined })).toBeUndefined();
+  });
+
+  it("still reads the id from anything that has headers", () => {
+    expect(referenceFrom({ headers: new Headers({ "X-Request-ID": "3f2b8c1e-9d4a-4e07" }) })).toBe(
+      "3f2b8c1e",
+    );
+  });
+});
+
 describe("withReference", () => {
   it("adds the reference after the message", () => {
     expect(withReference("I couldn't do that just now.", "3f2b8c1e")).toBe(
