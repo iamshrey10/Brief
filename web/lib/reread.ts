@@ -1,4 +1,5 @@
 import { dailyLimitMessage } from "@/lib/daily-limit";
+import { referenceFrom, withReference } from "@/lib/reference";
 import type { DocumentSummary } from "@/lib/documents";
 
 export type RereadOutcome = { ok: true; document: DocumentSummary } | { ok: false; message: string };
@@ -26,7 +27,8 @@ export async function rereadDocument(documentId: string): Promise<RereadOutcome>
       method: "POST",
     });
     if (!res.ok) {
-      return { ok: false, message: (await dailyLimitMessage(res)) ?? messageForRereadFailure(res.status) };
+      const message = (await dailyLimitMessage(res)) ?? messageForRereadFailure(res.status);
+      return { ok: false, message: withReference(message, referenceFrom(res)) };
     }
     return { ok: true, document: (await res.json()) as DocumentSummary };
   } catch {
