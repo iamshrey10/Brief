@@ -1,6 +1,8 @@
 import logging
+import re
 import uuid
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import request_id
@@ -50,3 +52,23 @@ async def record_trace(
     except Exception:
         await session.rollback()
         logger.warning("could not record an answer trace")
+
+
+# What a reference code can be. Narrow on purpose: nothing that could act as a wildcard in a search, and
+# long enough that a search cannot match the whole table.
+_REFERENCE = re.compile(r"[A-Za-z0-9-]{6,64}")
+
+MAX_FOUND = 20
+
+
+async def find_traces(session: AsyncSession, reference: str) -> list[AnswerTrace]:
+    """The traces whose request id starts with `reference`, newest first, for tracing a reported failure."""
+    if not _REFERENCE.fullmatch(reference):
+        raise ValueError("not a reference code")
+    result = await session.execute(
+        select(AnswerTrace)
+        .where(AnswerTrace.request_id.startswith(reference, autoescape=True))
+        .order_by(AnswerTrace.created_at.desc())
+        .limit(MAX_FOUND)
+    )
+    return list(result.scalars().all())

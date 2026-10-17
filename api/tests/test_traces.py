@@ -5,7 +5,7 @@ from sqlalchemy import select
 
 from app import request_id
 from app.models import AnswerTrace, Document
-from app.traces import record_trace
+from app.traces import find_traces, record_trace
 
 
 @pytest.fixture
@@ -116,3 +116,55 @@ async def test_a_failure_to_save_never_breaks_the_answer_and_logs_no_details(cap
     assert broken.rolled_back
     assert [record.getMessage() for record in caplog.records] == ["could not record an answer trace"]
     assert "private words" not in caplog.text
+
+
+# --- finding a trace from the reference code a person was shown ---
+
+
+async def _saved(db_session, user, document, request, **overrides):
+    token = request_id.current.set(request)
+    try:
+        await _record(db_session, user, document, **overrides)
+    finally:
+        request_id.current.reset(token)
+
+
+async def test_a_trace_is_found_from_the_first_eight_characters_of_its_request_id(
+    db_session, test_user, document
+):
+    await _saved(db_session, test_user, document, "3f2b8c1e-9d4a-4e07-8a55-0c1d2e3f4a5b", outcome="withheld")
+    await _saved(db_session, test_user, document, "99999999-9d4a-4e07-8a55-0c1d2e3f4a5b")
+
+    found = await find_traces(db_session, "3f2b8c1e")
+
+    assert [(row.request_id, row.outcome) for row in found] == [
+        ("3f2b8c1e-9d4a-4e07-8a55-0c1d2e3f4a5b", "withheld")
+    ]
+
+
+async def test_the_whole_id_finds_it_too(db_session, test_user, document):
+    await _saved(db_session, test_user, document, "3f2b8c1e-9d4a-4e07-8a55-0c1d2e3f4a5b")
+
+    assert len(await find_traces(db_session, "3f2b8c1e-9d4a-4e07-8a55-0c1d2e3f4a5b")) == 1
+
+
+async def test_nothing_matching_gives_an_empty_list(db_session, test_user, document):
+    await _saved(db_session, test_user, document, "3f2b8c1e-9d4a-4e07-8a55-0c1d2e3f4a5b")
+
+    assert await find_traces(db_session, "deadbeef") == []
+
+
+async def test_the_newest_come_first_and_no_more_than_twenty(db_session, test_user, document):
+    for number in range(25):
+        await _saved(db_session, test_user, document, f"aaaaaaaa-0000-0000-0000-{number:012d}")
+
+    found = await find_traces(db_session, "aaaaaaaa")
+
+    assert len(found) == 20
+    assert found[0].created_at >= found[-1].created_at
+
+
+@pytest.mark.parametrize("bad", ["", "abc", "12345", "%", "%%%%%%%%", "abcdef_h", "abcd efgh", "x" * 65])
+async def test_a_reference_that_is_too_short_or_could_act_as_a_wildcard_is_refused(db_session, bad):
+    with pytest.raises(ValueError):
+        await find_traces(db_session, bad)
