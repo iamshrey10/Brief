@@ -1,4 +1,5 @@
 import { dailyLimitMessage } from "@/lib/daily-limit";
+import { referenceFrom, withReference } from "@/lib/reference";
 
 const GENERIC_START_FAILURE = "could not start the upload";
 
@@ -12,8 +13,15 @@ const GENERIC_START_FAILURE = "could not start the upload";
  * per minute limit.
  */
 export async function startFailureMessage(
-  response: Pick<Response, "status" | "json">,
+  response: Pick<Response, "status" | "json"> & { headers?: Headers },
   fallback: string = GENERIC_START_FAILURE,
+): Promise<string> {
+  return withReference(await explain(response, fallback), referenceFrom(response));
+}
+
+async function explain(
+  response: Pick<Response, "status" | "json">,
+  fallback: string,
 ): Promise<string> {
   if (response.status === 429) return (await dailyLimitMessage(response)) ?? fallback;
   if (response.status < 400 || response.status >= 500 || response.status === 401) return fallback;

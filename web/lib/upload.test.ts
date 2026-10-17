@@ -3,8 +3,12 @@ import { startFailureMessage } from "./upload";
 
 const GENERIC = "could not start the upload";
 
-function refusal(status: number, body: unknown): Pick<Response, "status" | "json"> {
-  return { status, json: async () => body };
+function refusal(
+  status: number,
+  body: unknown,
+  headers?: Record<string, string>,
+): Pick<Response, "status" | "json"> & { headers?: Headers } {
+  return { status, json: async () => body, ...(headers ? { headers: new Headers(headers) } : {}) };
 }
 
 describe("startFailureMessage", () => {
@@ -84,5 +88,35 @@ describe("startFailureMessage when the daily limit is reached", () => {
 
   it("still gives the generic line for a 401 that carries a sentence", async () => {
     expect(await startFailureMessage(refusal(401, { detail }))).toBe(GENERIC);
+  });
+});
+
+describe("the reference on a failed upload step", () => {
+  const ID = { "X-Request-ID": "3f2b8c1e-9d4a-4e07-8a55-0c1d2e3f4a5b" };
+
+  it("is added after the generic line", async () => {
+    expect(await startFailureMessage(refusal(502, {}, ID))).toBe(`${GENERIC} Reference: 3f2b8c1e`);
+  });
+
+  it("is added after the server's own sentence", async () => {
+    const detail = "You can keep up to 25 documents. Delete one you no longer need to upload another.";
+
+    expect(await startFailureMessage(refusal(409, { detail }, ID))).toBe(`${detail} Reference: 3f2b8c1e`);
+  });
+
+  it("is added after a daily limit sentence", async () => {
+    expect(
+      await startFailureMessage(refusal(429, { detail: "That is all the uploads for today." }, ID)),
+    ).toBe("That is all the uploads for today. Reference: 3f2b8c1e");
+  });
+
+  it("is added after the line for another step too", async () => {
+    expect(await startFailureMessage(refusal(500, {}, ID), "could not confirm the upload")).toBe(
+      "could not confirm the upload Reference: 3f2b8c1e",
+    );
+  });
+
+  it("is left out when the server sent no id", async () => {
+    expect(await startFailureMessage(refusal(502, {}))).toBe(GENERIC);
   });
 });
