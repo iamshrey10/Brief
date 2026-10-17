@@ -1,5 +1,6 @@
 import asyncio
 import uuid
+from dataclasses import dataclass
 
 from google.genai import types
 from pydantic import BaseModel
@@ -102,10 +103,28 @@ class AnswerResult(BaseModel):
     citations: list[CitedClause]
 
 
+@dataclass
+class AnswerPath:
+    """How one answer was reached, as ids only: how it ended, which clauses the model was shown (best match
+    first) and which of them its answer cited. It is what an answer trace records."""
+
+    outcome: str
+    retrieved: list[str]
+    cited: list[str]
+
+
 async def answer_question(
     session: AsyncSession, document_id: uuid.UUID, question: str
 ) -> AnswerResult:
-    """Answers `question` from the document, citing the exact clauses it relied on.
+    """Answers `question` from the document, citing the exact clauses it relied on."""
+    result, _path = await answer_with_path(session, document_id, question)
+    return result
+
+
+async def answer_with_path(
+    session: AsyncSession, document_id: uuid.UUID, question: str
+) -> tuple[AnswerResult, AnswerPath]:
+    """Answers `question` from the document, citing the exact clauses it relied on, and also says how.
 
     The model's output is never taken on trust: each citation must name a clause it was
     actually shown and quote it verbatim. If it claims an answer but none of its
@@ -113,14 +132,21 @@ async def answer_question(
     """
     clauses = await hybrid_search(session, document_id, question, limit=CONTEXT_CLAUSES)
     if not clauses:
-        return AnswerResult(found=False, answer=NOT_FOUND_ANSWER, citations=[])
+        return (
+            AnswerResult(found=False, answer=NOT_FOUND_ANSWER, citations=[]),
+            AnswerPath(outcome="nothing_to_search", retrieved=[], cited=[]),
+        )
 
+    retrieved = [str(clause.id) for clause in clauses]
     labeled = [(f"C{position}", clause.text) for position, clause in enumerate(clauses, start=1)]
     clause_by_label = {label: clause for (label, _text), clause in zip(labeled, clauses, strict=True)}
 
     generated = await asyncio.to_thread(generate_answer, question, labeled)
     if not generated.found:
-        return AnswerResult(found=False, answer=NOT_FOUND_ANSWER, citations=[])
+        return (
+            AnswerResult(found=False, answer=NOT_FOUND_ANSWER, citations=[]),
+            AnswerPath(outcome="not_found", retrieved=retrieved, cited=[]),
+        )
 
     verified: list[CitedClause] = []
     for citation in generated.citations:
@@ -136,6 +162,13 @@ async def answer_question(
             )
 
     if not verified:
-        return AnswerResult(found=False, answer=UNVERIFIED_ANSWER, citations=[])
+        return (
+            AnswerResult(found=False, answer=UNVERIFIED_ANSWER, citations=[]),
+            AnswerPath(outcome="withheld", retrieved=retrieved, cited=[]),
+        )
 
-    return AnswerResult(found=True, answer=generated.answer, citations=verified)
+    cited = list(dict.fromkeys(item.clause_id for item in verified))
+    return (
+        AnswerResult(found=True, answer=generated.answer, citations=verified),
+        AnswerPath(outcome="answered", retrieved=retrieved, cited=cited),
+    )

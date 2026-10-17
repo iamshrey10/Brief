@@ -9,6 +9,7 @@ from app.qa import (
     Citation,
     GroundedAnswer,
     answer_question,
+    answer_with_path,
     build_prompt,
     generate_answer,
 )
@@ -387,3 +388,103 @@ def test_a_refused_question_waits_and_is_answered_instead_of_failing(monkeypatch
 
     assert generate_answer("Can I pay early?", [("C1", "The borrower may prepay.")]) == expected
     assert client.calls == 2
+
+
+# --- answer_with_path: the same answer, plus which clauses it used and how it ended ---
+
+
+async def test_the_path_of_a_verified_answer_names_the_clauses_shown_and_the_one_cited(
+    db_session, test_user, monkeypatch
+):
+    document, clauses = await _document_with_two_clauses(db_session, test_user, monkeypatch)
+    _fake_model(
+        monkeypatch,
+        lambda shown: GroundedAnswer(
+            found=True,
+            answer="Yes.",
+            citations=[Citation(clause_ref=_label_of(shown, "prepay"), quote="at any time without penalty")],
+        ),
+    )
+
+    result, path = await answer_with_path(db_session, document.id, "Can I pay early?")
+
+    assert result.found is True
+    assert path.outcome == "answered"
+    assert set(path.retrieved) == {str(clauses["prepay"].id), str(clauses["late"].id)}
+    assert path.cited == [str(clauses["prepay"].id)]
+
+
+async def test_the_path_says_not_found_when_the_model_says_the_document_does_not_cover_it(
+    db_session, test_user, monkeypatch
+):
+    document, _ = await _document_with_two_clauses(db_session, test_user, monkeypatch)
+    _fake_model(monkeypatch, lambda shown: GroundedAnswer(found=False, answer="n/a", citations=[]))
+
+    result, path = await answer_with_path(db_session, document.id, "What is the maximum loan?")
+
+    assert result.answer == NOT_FOUND_ANSWER
+    assert path.outcome == "not_found"
+    assert len(path.retrieved) == 2
+    assert path.cited == []
+
+
+async def test_the_path_says_withheld_when_no_citation_checked_out(db_session, test_user, monkeypatch):
+    document, _ = await _document_with_two_clauses(db_session, test_user, monkeypatch)
+    _fake_model(
+        monkeypatch,
+        lambda shown: GroundedAnswer(
+            found=True,
+            answer="Made up.",
+            citations=[Citation(clause_ref=_label_of(shown, "prepay"), quote="words that are not there")],
+        ),
+    )
+
+    result, path = await answer_with_path(db_session, document.id, "Can I pay early?")
+
+    assert result.answer == UNVERIFIED_ANSWER
+    assert path.outcome == "withheld"
+    assert len(path.retrieved) == 2
+    assert path.cited == []
+
+
+async def test_the_path_says_nothing_to_search_for_a_document_with_no_clauses(
+    db_session, test_user, monkeypatch
+):
+    document = Document(
+        user_id=test_user.id,
+        filename="empty.pdf",
+        doc_type="loan",
+        status="ready",
+        storage_key="fake/key.pdf",
+        file_size_bytes=1024,
+    )
+    db_session.add(document)
+    await db_session.commit()
+    monkeypatch.setattr("app.retrieval.embed_query", lambda query: _unit_vector(0))
+
+    result, path = await answer_with_path(db_session, document.id, "Anything?")
+
+    assert result.answer == NOT_FOUND_ANSWER
+    assert (path.outcome, path.retrieved, path.cited) == ("nothing_to_search", [], [])
+
+
+async def test_two_citations_of_the_same_clause_are_listed_once_in_the_path(
+    db_session, test_user, monkeypatch
+):
+    document, clauses = await _document_with_two_clauses(db_session, test_user, monkeypatch)
+    _fake_model(
+        monkeypatch,
+        lambda shown: GroundedAnswer(
+            found=True,
+            answer="Yes.",
+            citations=[
+                Citation(clause_ref=_label_of(shown, "prepay"), quote="at any time without penalty"),
+                Citation(clause_ref=_label_of(shown, "prepay"), quote="at any time"),
+            ],
+        ),
+    )
+
+    result, path = await answer_with_path(db_session, document.id, "Can I pay early?")
+
+    assert len(result.citations) == 2
+    assert path.cited == [str(clauses["prepay"].id)]
