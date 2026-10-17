@@ -122,6 +122,9 @@ Brief holds private documents, so each layer limits what it can reach. What is i
   hand the id back in an `X-Request-ID` header, so when something fails a person can quote the id and the
   whole path can be found in the logs. An id sent from outside is kept only if it is 8 to 64 letters, digits
   and dashes, so it cannot be used to forge a log line.
+  When a question, a read, a retry, a rename or a delete fails, the message ends with `Reference: 3f2b8c1e`,
+  the first eight characters of that id. Searching the API log for `[3f2b8c1e` finds every line of that
+  request. Nothing is shown when the server sent no id or one that does not look like an id.
 - **Dependencies.** A scan of the libraries that ship runs on every push and every Monday, and the
   build fails on a known high severity problem.
 
