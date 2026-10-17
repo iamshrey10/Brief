@@ -1,4 +1,5 @@
 import { dailyLimitMessage } from "@/lib/daily-limit";
+import { referenceFrom, withReference } from "@/lib/reference";
 import type { DocumentSummary } from "@/lib/documents";
 
 export type RetryOutcome = { ok: true; document: DocumentSummary } | { ok: false; message: string };
@@ -26,7 +27,8 @@ export async function retryDocument(documentId: string): Promise<RetryOutcome> {
       method: "POST",
     });
     if (!res.ok) {
-      return { ok: false, message: (await dailyLimitMessage(res)) ?? messageForRetryFailure(res.status) };
+      const message = (await dailyLimitMessage(res)) ?? messageForRetryFailure(res.status);
+      return { ok: false, message: withReference(message, referenceFrom(res)) };
     }
     return { ok: true, document: (await res.json()) as DocumentSummary };
   } catch {

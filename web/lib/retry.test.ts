@@ -12,8 +12,13 @@ afterEach(() => {
   fetchMock.mockReset();
 });
 
-const response = (body: unknown, status = 200) =>
-  ({ ok: status >= 200 && status < 300, status, json: async () => body }) as Response;
+const response = (body: unknown, status = 200, headers: Record<string, string> = {}) =>
+  ({
+    ok: status >= 200 && status < 300,
+    status,
+    headers: new Headers(headers),
+    json: async () => body,
+  }) as Response;
 
 describe("retryDocument", () => {
   it("posts to that document's retry route and returns the updated document", async () => {
@@ -77,5 +82,33 @@ describe("retryDocument when the daily limit is reached", () => {
     const outcome = await retryDocument("d1");
 
     expect(outcome.ok === false && outcome.message).toMatch(/few seconds/i);
+  });
+});
+
+describe("the reference on a failed retry", () => {
+  const ID = { "X-Request-ID": "3f2b8c1e-9d4a-4e07-8a55-0c1d2e3f4a5b" };
+
+  it("is added after the message when the server answers with an error", async () => {
+    fetchMock.mockResolvedValue(response({ detail: "boom" }, 502, ID));
+
+    expect(await retryDocument("d1")).toEqual({
+      ok: false,
+      message: `${messageForRetryFailure(502)} Reference: 3f2b8c1e`,
+    });
+  });
+
+  it("is added after a daily limit message too", async () => {
+    fetchMock.mockResolvedValue(response({ detail: "That is all for today." }, 429, ID));
+
+    expect(await retryDocument("d1")).toEqual({
+      ok: false,
+      message: "That is all for today. Reference: 3f2b8c1e",
+    });
+  });
+
+  it("is left out when the server sent no id", async () => {
+    fetchMock.mockResolvedValue(response({ detail: "boom" }, 502));
+
+    expect(await retryDocument("d1")).toEqual({ ok: false, message: messageForRetryFailure(502) });
   });
 });
