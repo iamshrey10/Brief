@@ -125,6 +125,12 @@ Brief holds private documents, so each layer limits what it can reach. What is i
   When a question, an upload, a read, a retry, a rename or a delete of a document or of the account fails, the message ends with `Reference: 3f2b8c1e`,
   the first eight characters of that id. Searching the API log for `[3f2b8c1e` finds every line of that
   request. Nothing is shown when the server sent no id or one that does not look like an id.
+  Every question also saves an answer trace: how it ended (`answered`, `not_found`, `withheld`,
+  `nothing_to_search` or `failed`), how long it took, and the ids of the clauses the model was shown and the
+  ones it cited. Run `python -m scripts.find_request 3f2b8c1e` from `api/` to print the trace for a reference
+  code. A trace holds ids only, never the question, the answer or any text of a document, and a test checks
+  that no text column can be added. Traces are removed after 30 days, when the person next starts an upload,
+  and with their document or account. Failing to save a trace never turns an answer into an error.
 - **Dependencies.** A scan of the libraries that ship runs on every push and every Monday, and the
   build fails on a known high severity problem.
 
