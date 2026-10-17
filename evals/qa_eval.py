@@ -102,7 +102,8 @@ def render_report(outcomes: list[Outcome]) -> str:
         f"{len(answerable)} answerable and {len(unanswerable)} unanswerable questions over the "
         "17-clause mixed loan and lease fixture. Real Gemini, real Postgres, and the real "
         "citation check. Questions were written before any results were seen and not tuned "
-        "afterward.",
+        "afterward, except one near miss question replaced on October 17 after it proved "
+        "ambiguous, which the note at the top of qa_fixture.py describes.",
         "",
         "## Answerable questions",
         "",

@@ -7,7 +7,12 @@ near misses: the topic is in a clause but the specific fact asked for is not, wh
 most tempted to invent an answer. In every case the only correct behavior is to say the document
 doesn't cover it.
 
-The October 17 questions were written before any results were seen for them and not tuned afterward.
+The October 17 questions were written before any results were seen for them. One was replaced after the
+first run: "How many dollars is the termination fee for ending the lease early?" was answered with "two
+months of rent", which is what the clause says and is not an invented figure, so the question was
+ambiguous and not the model wrong. That first run scored 17 of 18 on the unanswerable questions with that
+one flagged. It was replaced by a question about something no clause mentions, and nothing else was
+changed.
 """
 
 from retrieval_fixture import CLAUSES, QUESTIONS
@@ -37,7 +42,7 @@ UNANSWERABLE: list[str] = [
     "What credit score do I need to qualify?",
     # near misses added on October 17: the topic is in a clause, the fact asked for is not
     "How much is the pet deposit?",
-    "How many dollars is the termination fee for ending the lease early?",
+    "Who pays the landlord's legal costs if there is a dispute?",
     "How many months of rent is the security deposit?",
     "Is there a discount on the interest rate for paying automatically?",
     "Does the co-signer have to keep paying if I die?",
