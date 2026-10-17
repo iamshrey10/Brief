@@ -98,9 +98,12 @@ These are estimates, not promises. I will say so in the update log if they move.
 
 ## Where I am unsure
 
-- **The test sets are small.** The 24 search questions, the 32 answer questions, and the key-terms
-  check are all short, clean examples. The scores on them (96% right clause first, 24 of 24 cited
-  correctly, 8 of 8 correctly declined) are not a claim about contracts in general.
+- **The test sets are small.** The 24 search questions, the 50 answer questions (32 with an answer, 18
+  without), and the key-terms check are all short, clean examples on a 17 clause fixture. The scores on them
+  (96% right clause first, 32 of 32 cited correctly, 18 of 18 correctly declined) are not a claim about
+  contracts in general. The 18 include ten near misses, where the topic is in a clause but the fact asked for
+  is not. One of those was replaced after the first run because I had written it ambiguously: the model
+  answered with the fact the clause does state, which was not wrong. That first run scored 17 of 18.
 - **Real documents are messier.** Key terms can now rest on up to three checked quotes, so a fact spread
   over two sentences (a deposit amount and its refund rule) is no longer dropped. On my sample lease the
   deposit is now found, 8 of 12 terms instead of 7. That is one lease, and I have not yet confirmed which
