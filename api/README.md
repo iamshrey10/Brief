@@ -17,6 +17,14 @@ Open http://localhost:8000/health and http://localhost:8000/health/db
 `/health` says the process is up. `/health/db` checks the database connection. `/health/ready` is the one for a
 load balancer: 200 only when the database answers and its migrations are current, 503 otherwise.
 
+## API documentation
+
+While running locally, open http://localhost:8000/docs for the interactive documentation (or `/redoc` to read
+it). Every route has a group, a plain summary, a description, and the error answers it can give. A test fails
+if a route is added without those, and another checks that the documented errors are the ones its code can
+really raise. Production serves none of these pages (`/docs`, `/redoc` and `/openapi.json` all return 404),
+because they are a free map of every route.
+
 ## Database
 
 Schema is managed with SQLAlchemy models (`app/models.py`) and Alembic migrations
