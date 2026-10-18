@@ -29,7 +29,7 @@ Open http://localhost:3000
 These run a real browser against the site on port 3100 and cover what anyone can do without signing in:
 the landing page, being turned away from the dashboard and the data routes, the light and dark mode button,
 the phone layout, and an automatic accessibility scan of the landing page in both color modes (axe). The scan
-only finds what a machine can detect, which is roughly a third of accessibility problems, and it cannot see
+only finds what a machine can detect, which is only part of the problems, and it cannot see
 the pages behind sign in, so those still need a person to check them with a keyboard and a screen reader. Real Google sign in cannot be automated, so everything behind it is covered by the
 component tests (`pnpm test`). The server is started for you with stand-in secrets and never reaches Google
 or the API. In CI the same tests run as their own job and keep their traces when one fails.
