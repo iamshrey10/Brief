@@ -72,6 +72,22 @@ app = FastAPI(
 )
 
 
+# What each error answer means, for the API documentation. A test checks that every route documents the
+# errors its code can really give, and no others.
+_ERROR_MEANINGS = {
+    400: "The request is not valid: the message says what is wrong.",
+    401: "Not signed in, or the token has expired.",
+    404: "There is no such document, or it belongs to someone else.",
+    409: "Not allowed in the document's current state, or a limit on how much a person can keep was reached.",
+    429: "A daily limit was reached: the message says which one.",
+    502: "A service the server relies on had a problem: try again in a moment.",
+}
+
+
+def _errors(*codes: int) -> dict[int | str, dict[str, str]]:
+    return {code: {"description": _ERROR_MEANINGS[code]} for code in codes}
+
+
 @app.middleware("http")
 async def tag_with_request_id(request: Request, call_next):
     """Gives every request an id, handed back in X-Request-ID, so one request can be followed through the logs."""
@@ -142,6 +158,7 @@ async def health_ready(
     description=(
         "Returns the id and email of the signed-in person."
     ),
+    responses=_errors(401),
 )
 async def me(user: User = Depends(get_current_user)) -> dict[str, str]:
     return {"id": str(user.id), "email": user.email}
@@ -154,6 +171,7 @@ async def me(user: User = Depends(get_current_user)) -> dict[str, str]:
     description=(
         "Returns, for questions, document reads and overviews, how many were used today (UTC), the limit, and how many are left."
     ),
+    responses=_errors(401),
 )
 async def my_usage(
     user: User = Depends(get_current_user),
@@ -172,6 +190,7 @@ async def my_usage(
     description=(
         "Permanently removes the signed-in person's documents, their stored files and everything read from them, then the account itself. Files go first and the account last, so a failure part way leaves something that can be tried again."
     ),
+    responses=_errors(401, 502),
 )
 async def delete_my_account(
     user: User = Depends(get_current_user),
@@ -256,6 +275,7 @@ class CreateUploadResponse(BaseModel):
     description=(
         "Checks the name, kind and size, clears this person's abandoned uploads, enforces the document limit and the daily limit, and returns a short-lived address to send the file to. Nothing is read until the upload is confirmed."
     ),
+    responses=_errors(400, 401, 409, 429),
 )
 async def create_upload(
     body: CreateUploadRequest,
@@ -369,6 +389,7 @@ async def _get_owned_document(
     description=(
         "Reads the real size and first bytes from storage and refuses a file that is missing, empty, too large or not the kind it claims, then starts reading it. A repeat confirm is refused."
     ),
+    responses=_errors(400, 401, 404, 409, 502),
 )
 async def confirm_upload(
     document_id: str,
@@ -426,6 +447,7 @@ async def confirm_upload(
     description=(
         "Starts another read of a document whose read failed or was stuck. Counts against the daily limit on document reads."
     ),
+    responses=_errors(401, 404, 409, 429),
 )
 async def retry_document(
     document_id: str,
@@ -472,6 +494,7 @@ async def retry_document(
     description=(
         "Clears what was read from the document, its key terms and its checklist answers, and reads the file again. Counts against the daily limit on document reads."
     ),
+    responses=_errors(401, 404, 409, 429),
 )
 async def reread_document(
     document_id: str,
@@ -538,6 +561,7 @@ class UpdateDocumentRequest(BaseModel):
     description=(
         "Changes the file name and, or, the kind. Changing the kind clears the saved key terms and checklist, because their fields depend on the kind."
     ),
+    responses=_errors(401, 404),
 )
 async def update_document(
     document_id: str,
@@ -574,6 +598,7 @@ async def update_document(
     description=(
         "Removes the stored file first and then the document and everything read from it. Deleting something already gone is not an error."
     ),
+    responses=_errors(401, 404, 502),
 )
 async def delete_document(
     document_id: str,
@@ -608,6 +633,7 @@ async def delete_document(
     description=(
         "Returns the signed-in person's documents, newest first, with their status and read progress."
     ),
+    responses=_errors(401),
 )
 async def list_documents(
     user: User = Depends(get_current_user),
@@ -644,6 +670,7 @@ class SearchResult(BaseModel):
     description=(
         "Finds the clauses that best match a query, mixing keyword and meaning-based search. Returns clauses, not an answer."
     ),
+    responses=_errors(400, 401, 404, 409),
 )
 async def search_document(
     document_id: str,
@@ -685,6 +712,7 @@ class AskRequest(BaseModel):
     description=(
         "Answers from the document's own words, with citations whose quotes are checked word for word. If the document does not say, the answer says so. Counts against the daily limit on questions, and each call saves an answer trace."
     ),
+    responses=_errors(400, 401, 404, 409, 429, 502),
 )
 async def ask_document(
     document_id: str,
@@ -745,6 +773,7 @@ class ClauseOut(BaseModel):
     description=(
         "Returns one document of the signed-in person, with its status, kind and read progress."
     ),
+    responses=_errors(401, 404),
 )
 async def get_document(
     document_id: str,
@@ -763,6 +792,7 @@ async def get_document(
     description=(
         "Returns the clauses a document was split into, in order, with their page numbers and text."
     ),
+    responses=_errors(401, 404),
 )
 async def list_clauses(
     document_id: str,
@@ -812,6 +842,7 @@ async def _get_readable_document(
     description=(
         "Returns the facts worth knowing for this kind of document, each with the checked quotes behind it, or marked as not mentioned. Read once and saved."
     ),
+    responses=_errors(401, 404, 409, 429, 502),
 )
 async def document_key_terms(
     document_id: str,
@@ -843,6 +874,7 @@ async def document_key_terms(
     description=(
         "Returns the must-ask questions for this kind of document, each answered with checked quotes or flagged as a gap with wording for asking the other side. Read once and saved."
     ),
+    responses=_errors(401, 404, 409, 429, 502),
 )
 async def document_checklist(
     document_id: str,
