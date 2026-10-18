@@ -12,6 +12,8 @@ from sqlalchemy import delete, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import get_current_user
+from app.config import settings
+from app.docs_urls import docs_urls
 from app.checklist import ChecklistGenerationError, ChecklistResult, get_checklist, load_checklist
 from app.db import get_session
 from app.housekeeping import remove_abandoned_uploads, remove_old_traces
@@ -69,6 +71,7 @@ app = FastAPI(
         {"name": "documents", "description": "Uploading, reading, renaming and deleting documents."},
         {"name": "answers", "description": "Questions, search, key terms and the questions to ask before signing."},
     ],
+    **docs_urls(settings.environment),
 )
 
 
