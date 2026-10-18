@@ -55,7 +55,21 @@ MAX_DOCUMENTS_PER_USER = 25
 # plenty of room before anyone can start a second read.
 STUCK_AFTER = timedelta(minutes=15)
 
-app = FastAPI(title="Brief API")
+app = FastAPI(
+    title="Brief API",
+    description=(
+        "The API behind Brief, which explains a contract and shows the exact words behind every answer. "
+        "Every route except the health checks needs a signed-in person's short-lived token, and every "
+        "document belongs to exactly one person. Answers carry checked quotes, and when the document does "
+        "not say, the answer says so."
+    ),
+    openapi_tags=[
+        {"name": "health", "description": "Is the server up, and can it do real work."},
+        {"name": "account", "description": "The signed-in person: who they are, their daily limits, deleting the account."},
+        {"name": "documents", "description": "Uploading, reading, renaming and deleting documents."},
+        {"name": "answers", "description": "Questions, search, key terms and the questions to ask before signing."},
+    ],
+)
 
 
 @app.middleware("http")
@@ -74,18 +88,39 @@ async def tag_with_request_id(request: Request, call_next):
 DOC_TYPES = {"loan", "lease", "offer", "other"}
 
 
-@app.get("/health")
+@app.get(
+    "/health",
+    tags=["health"],
+    summary="Check that the server is running",
+    description=(
+        "Says only that the process is up and answering. Use it to decide whether to restart the container, not whether to send it traffic."
+    ),
+)
 def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
-@app.get("/health/db")
+@app.get(
+    "/health/db",
+    tags=["health"],
+    summary="Check the database connection",
+    description=(
+        "Runs a trivial query to show the database accepts connections. It does not check that the tables are up to date, which /health/ready does."
+    ),
+)
 async def health_db(session: AsyncSession = Depends(get_session)) -> dict[str, str]:
     await session.execute(text("SELECT 1"))
     return {"status": "ok"}
 
 
-@app.get("/health/ready")
+@app.get(
+    "/health/ready",
+    tags=["health"],
+    summary="Check that the server can do real work",
+    description=(
+        "Answers 200 only when the database responds and is on the migration this code expects, and 503 otherwise. Use it to decide whether to send traffic. The answer never includes an error message."
+    ),
+)
 async def health_ready(
     response: Response, session: AsyncSession = Depends(get_session)
 ) -> dict[str, str | bool]:
@@ -100,12 +135,26 @@ async def health_ready(
     return {"ready": ready, **status}
 
 
-@app.get("/me")
+@app.get(
+    "/me",
+    tags=["account"],
+    summary="Show who is signed in",
+    description=(
+        "Returns the id and email of the signed-in person."
+    ),
+)
 async def me(user: User = Depends(get_current_user)) -> dict[str, str]:
     return {"id": str(user.id), "email": user.email}
 
 
-@app.get("/me/usage")
+@app.get(
+    "/me/usage",
+    tags=["account"],
+    summary="Show how much of today's limits are used",
+    description=(
+        "Returns, for questions, document reads and overviews, how many were used today (UTC), the limit, and how many are left."
+    ),
+)
 async def my_usage(
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
@@ -115,7 +164,15 @@ async def my_usage(
     return await usage.usage_today(session, user.id)
 
 
-@app.delete("/me", status_code=204)
+@app.delete(
+    "/me",
+    status_code=204,
+    tags=["account"],
+    summary="Delete the account and everything in it",
+    description=(
+        "Permanently removes the signed-in person's documents, their stored files and everything read from them, then the account itself. Files go first and the account last, so a failure part way leaves something that can be tried again."
+    ),
+)
 async def delete_my_account(
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
@@ -192,7 +249,14 @@ class CreateUploadResponse(BaseModel):
     upload_url: str
 
 
-@app.post("/documents")
+@app.post(
+    "/documents",
+    tags=["documents"],
+    summary="Start an upload",
+    description=(
+        "Checks the name, kind and size, clears this person's abandoned uploads, enforces the document limit and the daily limit, and returns a short-lived address to send the file to. Nothing is read until the upload is confirmed."
+    ),
+)
 async def create_upload(
     body: CreateUploadRequest,
     user: User = Depends(get_current_user),
@@ -298,7 +362,14 @@ async def _get_owned_document(
     return document
 
 
-@app.patch("/documents/{document_id}/confirm")
+@app.patch(
+    "/documents/{document_id}/confirm",
+    tags=["documents"],
+    summary="Confirm that the file has arrived",
+    description=(
+        "Reads the real size and first bytes from storage and refuses a file that is missing, empty, too large or not the kind it claims, then starts reading it. A repeat confirm is refused."
+    ),
+)
 async def confirm_upload(
     document_id: str,
     background_tasks: BackgroundTasks,
@@ -348,7 +419,14 @@ async def confirm_upload(
     return DocumentSummary.from_document(document)
 
 
-@app.post("/documents/{document_id}/retry")
+@app.post(
+    "/documents/{document_id}/retry",
+    tags=["documents"],
+    summary="Try reading a failed document again",
+    description=(
+        "Starts another read of a document whose read failed or was stuck. Counts against the daily limit on document reads."
+    ),
+)
 async def retry_document(
     document_id: str,
     background_tasks: BackgroundTasks,
@@ -387,7 +465,14 @@ async def retry_document(
     return DocumentSummary.from_document(document)
 
 
-@app.post("/documents/{document_id}/reread")
+@app.post(
+    "/documents/{document_id}/reread",
+    tags=["documents"],
+    summary="Read an already read document again",
+    description=(
+        "Clears what was read from the document, its key terms and its checklist answers, and reads the file again. Counts against the daily limit on document reads."
+    ),
+)
 async def reread_document(
     document_id: str,
     background_tasks: BackgroundTasks,
@@ -446,7 +531,14 @@ class UpdateDocumentRequest(BaseModel):
         return self
 
 
-@app.patch("/documents/{document_id}")
+@app.patch(
+    "/documents/{document_id}",
+    tags=["documents"],
+    summary="Rename a document or change its kind",
+    description=(
+        "Changes the file name and, or, the kind. Changing the kind clears the saved key terms and checklist, because their fields depend on the kind."
+    ),
+)
 async def update_document(
     document_id: str,
     body: UpdateDocumentRequest,
@@ -474,7 +566,15 @@ async def update_document(
     return DocumentSummary.from_document(document)
 
 
-@app.delete("/documents/{document_id}", status_code=204)
+@app.delete(
+    "/documents/{document_id}",
+    status_code=204,
+    tags=["documents"],
+    summary="Delete a document",
+    description=(
+        "Removes the stored file first and then the document and everything read from it. Deleting something already gone is not an error."
+    ),
+)
 async def delete_document(
     document_id: str,
     user: User = Depends(get_current_user),
@@ -501,7 +601,14 @@ async def delete_document(
     return Response(status_code=204)
 
 
-@app.get("/documents")
+@app.get(
+    "/documents",
+    tags=["documents"],
+    summary="List your documents",
+    description=(
+        "Returns the signed-in person's documents, newest first, with their status and read progress."
+    ),
+)
 async def list_documents(
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
@@ -530,7 +637,14 @@ class SearchResult(BaseModel):
     clause_index: int
 
 
-@app.post("/documents/{document_id}/search")
+@app.post(
+    "/documents/{document_id}/search",
+    tags=["answers"],
+    summary="Search a document",
+    description=(
+        "Finds the clauses that best match a query, mixing keyword and meaning-based search. Returns clauses, not an answer."
+    ),
+)
 async def search_document(
     document_id: str,
     body: SearchRequest,
@@ -564,7 +678,14 @@ class AskRequest(BaseModel):
     question: str = Field(max_length=1000)
 
 
-@app.post("/documents/{document_id}/ask")
+@app.post(
+    "/documents/{document_id}/ask",
+    tags=["answers"],
+    summary="Ask a question about a document",
+    description=(
+        "Answers from the document's own words, with citations whose quotes are checked word for word. If the document does not say, the answer says so. Counts against the daily limit on questions, and each call saves an answer trace."
+    ),
+)
 async def ask_document(
     document_id: str,
     body: AskRequest,
@@ -617,7 +738,14 @@ class ClauseOut(BaseModel):
     text: str
 
 
-@app.get("/documents/{document_id}")
+@app.get(
+    "/documents/{document_id}",
+    tags=["documents"],
+    summary="Show one document",
+    description=(
+        "Returns one document of the signed-in person, with its status, kind and read progress."
+    ),
+)
 async def get_document(
     document_id: str,
     user: User = Depends(get_current_user),
@@ -628,7 +756,14 @@ async def get_document(
     return DocumentSummary.from_document(document)
 
 
-@app.get("/documents/{document_id}/clauses")
+@app.get(
+    "/documents/{document_id}/clauses",
+    tags=["documents"],
+    summary="List the clauses of a document",
+    description=(
+        "Returns the clauses a document was split into, in order, with their page numbers and text."
+    ),
+)
 async def list_clauses(
     document_id: str,
     user: User = Depends(get_current_user),
@@ -670,7 +805,14 @@ async def _get_readable_document(
     return document
 
 
-@app.get("/documents/{document_id}/key-terms")
+@app.get(
+    "/documents/{document_id}/key-terms",
+    tags=["answers"],
+    summary="Show the key terms of a document",
+    description=(
+        "Returns the facts worth knowing for this kind of document, each with the checked quotes behind it, or marked as not mentioned. Read once and saved."
+    ),
+)
 async def document_key_terms(
     document_id: str,
     user: User = Depends(get_current_user),
@@ -694,7 +836,14 @@ async def document_key_terms(
         ) from exc
 
 
-@app.get("/documents/{document_id}/checklist")
+@app.get(
+    "/documents/{document_id}/checklist",
+    tags=["answers"],
+    summary="Show the questions to ask before signing",
+    description=(
+        "Returns the must-ask questions for this kind of document, each answered with checked quotes or flagged as a gap with wording for asking the other side. Read once and saved."
+    ),
+)
 async def document_checklist(
     document_id: str,
     user: User = Depends(get_current_user),
