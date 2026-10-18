@@ -70,8 +70,9 @@ address on one command line, including `http://localhost:3000` if local developm
 
 ## 9. Rolling back
 
-Keep the previous image tag. `alembic downgrade -1` undoes the newest migration, and every migration so far has
-been applied, undone and applied again. With the old image running against a newer database `/health/ready` says
+Keep the previous image tag. `alembic downgrade -1` undoes the newest migration. Only the newest one
+(`a7d3e5b19c42`, the answer traces table) has been checked by applying it, undoing it and applying it again, so
+try a downgrade on a copy of the data before relying on it for an older one. With the old image running against a newer database `/health/ready` says
 `different`, so roll the database back with the image.
 
 ## 10. Not set up yet
