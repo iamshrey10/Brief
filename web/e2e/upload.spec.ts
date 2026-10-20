@@ -40,3 +40,17 @@ test("a file of the wrong kind is turned away on the spot, and nothing is sent a
   expect((await callsMade(page)).filter((call) => call.method === "POST")).toEqual([]);
   expect(await uploadsReceived(page)).toEqual([]);
 });
+
+test("a refusal for the document limit shows the server's own sentence and a reference code, and adds nothing to the list", async ({
+  page,
+}) => {
+  await choose(page, { ...PDF, name: "limit-lease.pdf" });
+  await page.getByRole("button", { name: "Upload", exact: true }).click();
+
+  const alert = page.locator("form").getByRole("alert");
+  await expect(alert).toContainText("You can keep up to 25 documents. Delete one you no longer need to upload another.");
+  await expect(alert).toContainText(/Reference: [0-9a-f]{8}$/);
+  const documents = page.getByRole("region", { name: "Your documents" });
+  await expect(documents.getByRole("listitem")).toHaveCount(2);
+  expect(await uploadsReceived(page)).toEqual([]);
+});
