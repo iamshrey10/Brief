@@ -7,7 +7,7 @@ vi.mock("next-auth/providers/google", () => ({
   default: (options: unknown) => ({ id: "google", options }),
 }));
 vi.mock("next-auth/providers/credentials", () => ({
-  default: (options: { id: string; authorize: () => unknown }) => ({
+  default: (options: { id: string; authorize: (credentials?: { email?: unknown }) => unknown }) => ({
     id: options.id,
     type: "credentials",
     authorize: options.authorize,
@@ -60,7 +60,10 @@ describe("the test only sign in", () => {
     vi.resetModules();
     for (const [name, value] of Object.entries(env)) vi.stubEnv(name, value);
     const { authConfig: fresh } = await import("./auth");
-    return fresh.providers as unknown as { id: string; authorize?: () => unknown }[];
+    return fresh.providers as unknown as {
+      id: string;
+      authorize?: (credentials?: { email?: unknown }) => unknown;
+    }[];
   }
 
   it("is not there by default, so a real run offers Google and nothing else", async () => {
@@ -74,6 +77,16 @@ describe("the test only sign in", () => {
 
     expect(providers.map((provider) => provider.id)).toEqual(["google", "e2e"]);
     expect(await providers[1].authorize!()).toMatchObject({ email: "e2e-reader@example.invalid" });
+  });
+
+  it("signs in as the address a test asks for on the reserved domain, and refuses any other", async () => {
+    const providers = await providersWith({ E2E_AUTH: "true", NODE_ENV: "development" });
+    const authorize = providers[1].authorize!;
+
+    expect(await authorize({ email: "reader-7@example.invalid" })).toMatchObject({
+      email: "reader-7@example.invalid",
+    });
+    expect(await authorize({ email: "someone@gmail.com" })).toBeNull();
   });
 
   it("is never added in production, even when it was asked for", async () => {
