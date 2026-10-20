@@ -72,6 +72,13 @@ function allowWebsite(request, response) {
   return true;
 }
 
+// What the API shows of a document: everything except the fake's own bookkeeping.
+function visible(document) {
+  const shown = { ...document };
+  delete shown.looksLeft;
+  return shown;
+}
+
 const DOC_TYPES = new Set(["loan", "lease", "offer", "other"]);
 
 function send(response, status, body) {
@@ -141,7 +148,7 @@ const server = createServer(async (request, response) => {
         document.progress_done = document.progress_total = null;
       }
     }
-    return send(response, 200, state.documents.map(({ looksLeft, ...visible }) => visible));
+    return send(response, 200, state.documents.map(visible));
   }
   if (method === "POST" && path === "/documents") {
     const { filename = "", doc_type: kind = "", content_type: contentType = "", file_size_bytes: size = 0 } = await readJson(request);
@@ -159,8 +166,7 @@ const server = createServer(async (request, response) => {
     const document = state.documents.find((candidate) => candidate.id === confirm[1]);
     if (!document) return send(response, 404, { detail: "document not found" });
     Object.assign(document, { status: "processing", progress_done: 3, progress_total: 10, looksLeft: 1 });
-    const { looksLeft, ...visible } = document;
-    return send(response, 200, visible);
+    return send(response, 200, visible(document));
   }
   if (method === "GET" && path === "/me/usage") return send(response, 200, USAGE);
   if (method === "GET" && path === "/me") return send(response, 200, { id: "e2e-reader", email: "e2e-reader@example.invalid" });
