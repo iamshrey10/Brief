@@ -184,6 +184,13 @@ const server = createServer(async (request, response) => {
     if (method === "GET" && part === "clauses") return send(response, 200, CLAUSES);
     if (method === "GET" && part === "key-terms") return send(response, 200, KEY_TERMS);
     if (method === "GET" && part === "checklist") return send(response, 200, CHECKLIST);
+    if (method === "PATCH" && !part) {
+      const { filename, doc_type: kind } = await readJson(request);
+      if (typeof filename === "string" && /boom/i.test(filename)) return send(response, 502, { detail: "could not save the change" });
+      if (typeof filename === "string") document.filename = filename;
+      if (typeof kind === "string" && DOC_TYPES.has(kind)) document.doc_type = kind;
+      return send(response, 200, visible(document));
+    }
     if (method === "DELETE" && !part) {
       state.documents = state.documents.filter((candidate) => candidate.id !== id);
       return send(response, 204);
