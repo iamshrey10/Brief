@@ -34,3 +34,8 @@ export async function uploadsReceived(page: Page): Promise<{ id: string; content
 export async function callsMade(page: Page): Promise<{ method: string; path: string; requestId: string | null }[]> {
   return (await page.request.get(`${FAKE_API}/__requests`)).json();
 }
+
+/** Adds a document whose read failed, so the failure message and Try again can be tested. */
+export async function seedFailedDocument(page: Page): Promise<void> {
+  expect((await page.request.post(`${FAKE_API}/__seed-failed`)).status()).toBe(204);
+}

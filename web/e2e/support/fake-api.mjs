@@ -107,6 +107,10 @@ const server = createServer(async (request, response) => {
     return send(response, 204);
   }
   if (path === "/__requests") return send(response, 200, state.requests);
+  if (path === "/__seed-failed" && method === "POST") {
+    state.documents.push({ id: "doc-broken", filename: "broken-scan.pdf", doc_type: "other", status: "failed", failure_reason: "no_text", ocr_confidence: null, created_at: "2026-10-03T12:00:00Z", status_changed_at: "2026-10-03T12:01:00Z" });
+    return send(response, 204);
+  }
   if (path === "/__account-deleted") return send(response, 200, { deleted: state.accountDeleted });
 
   // Where a browser sends the file itself: storage, not the API, so it needs no token but does need permission.
@@ -184,6 +188,12 @@ const server = createServer(async (request, response) => {
     if (method === "GET" && part === "clauses") return send(response, 200, CLAUSES);
     if (method === "GET" && part === "key-terms") return send(response, 200, KEY_TERMS);
     if (method === "GET" && part === "checklist") return send(response, 200, CHECKLIST);
+    if (method === "POST" && (part === "reread" || part === "retry")) {
+      // One document always hits the daily limit, so a test can see the refusal.
+      if (document.id === "doc-loan") return send(response, 429, { detail: "You have reached today's limit of 30 document reads. Try again tomorrow." });
+      Object.assign(document, { status: "processing", progress_done: 2, progress_total: 8, looksLeft: 1, failure_reason: null });
+      return send(response, 200, visible(document));
+    }
     if (method === "PATCH" && !part) {
       const { filename, doc_type: kind } = await readJson(request);
       if (typeof filename === "string" && /boom/i.test(filename)) return send(response, 502, { detail: "could not save the change" });
