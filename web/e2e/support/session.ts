@@ -29,3 +29,8 @@ export async function resetFakeApi(page: Page): Promise<void> {
 export async function uploadsReceived(page: Page): Promise<{ id: string; contentType: string | null; bytes: number }[]> {
   return (await page.request.get(`${FAKE_API}/__uploads`)).json();
 }
+
+/** The calls the fake API received, in order, with the request id each carried. */
+export async function callsMade(page: Page): Promise<{ method: string; path: string; requestId: string | null }[]> {
+  return (await page.request.get(`${FAKE_API}/__requests`)).json();
+}

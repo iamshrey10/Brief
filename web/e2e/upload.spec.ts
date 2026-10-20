@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { resetFakeApi, signInAsTestReader, uploadsReceived } from "./support/session";
+import { callsMade, resetFakeApi, signInAsTestReader, uploadsReceived } from "./support/session";
 
 test.beforeEach(async ({ page }) => {
   await resetFakeApi(page);
@@ -18,7 +18,7 @@ test("uploading a PDF sends it to storage, and the document goes from Processing
   await choose(page, PDF);
   await expect(page.getByText("new-lease.pdf")).toBeVisible();
   await page.getByText("Lease", { exact: true }).click();
-  await page.getByRole("button", { name: "Upload" }).click();
+  await page.getByRole("button", { name: "Upload", exact: true }).click();
 
   const documents = page.getByRole("region", { name: "Your documents" });
   const row = documents.getByRole("listitem").filter({ hasText: "new-lease.pdf" });
@@ -30,4 +30,13 @@ test("uploading a PDF sends it to storage, and the document goes from Processing
   expect(await uploadsReceived(page)).toEqual([
     { id: "doc-new-1", contentType: "application/pdf", bytes: PDF.buffer.length },
   ]);
+});
+
+test("a file of the wrong kind is turned away on the spot, and nothing is sent anywhere", async ({ page }) => {
+  await choose(page, { name: "notes.txt", mimeType: "text/plain", buffer: Buffer.from("just some notes") });
+
+  await expect(page.locator("form").getByRole("alert")).toHaveText("That kind of file isn't supported. Use a PDF, JPG, PNG, or HEIC.");
+  await expect(page.getByRole("button", { name: "Upload", exact: true })).toBeDisabled();
+  expect((await callsMade(page)).filter((call) => call.method === "POST")).toEqual([]);
+  expect(await uploadsReceived(page)).toEqual([]);
 });
