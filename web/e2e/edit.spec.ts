@@ -57,3 +57,14 @@ test("pressing Escape closes the form without saving anything", async ({ page })
   await expect(page.getByText("never-saved.pdf")).toHaveCount(0);
   expect((await callsMade(page)).filter((call) => call.method === "PATCH")).toEqual([]);
 });
+
+test("a save that fails says so with a reference code, and keeps the form open with what was typed", async ({ page }) => {
+  await page.getByLabel("Name").fill("boom-lease.pdf");
+  await page.getByRole("button", { name: "Save" }).click();
+
+  const form = page.getByRole("form", { name: "Edit sample-lease.pdf" });
+  await expect(form.getByRole("alert")).toContainText("Couldn't save that just now. Try again in a moment.");
+  await expect(form.getByRole("alert")).toContainText(/Reference: [0-9a-f]{8}$/);
+  await expect(page.getByLabel("Name")).toHaveValue("boom-lease.pdf");
+  await expect(page.getByRole("button", { name: "Save" })).toBeEnabled();
+});
