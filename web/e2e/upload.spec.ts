@@ -54,3 +54,15 @@ test("a refusal for the document limit shows the server's own sentence and a ref
   await expect(documents.getByRole("listitem")).toHaveCount(2);
   expect(await uploadsReceived(page)).toEqual([]);
 });
+
+test("a refusal for the daily limit says so in the API's own words, so the person knows to come back tomorrow", async ({
+  page,
+}) => {
+  await choose(page, { ...PDF, name: "daily-lease.pdf" });
+  await page.getByRole("button", { name: "Upload", exact: true }).click();
+
+  await expect(page.locator("form").getByRole("alert")).toContainText(
+    "You have reached today's limit of 30 document reads. Try again tomorrow.",
+  );
+  expect(await uploadsReceived(page)).toEqual([]);
+});
