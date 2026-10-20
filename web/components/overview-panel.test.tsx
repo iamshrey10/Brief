@@ -234,6 +234,21 @@ describe("OverviewPanel checklist", () => {
     });
   });
 
+  it("names a button that shows a quote with the words it shows first, so the name contains what is on the button", async () => {
+    checklistMock.mockResolvedValue({ ok: true, result: { answers: [ANSWERED], truncated: false } });
+    keyTermsMock.mockResolvedValue({ ok: true, result: KEY_TERMS });
+
+    render(<OverviewPanel documentId="doc-1" onCitationSelect={vi.fn()} />);
+
+    const button = await screen.findByRole("button", {
+      name: /^Page 1 .variable annual rate equal to the 30-day average SOFR/,
+    });
+    expect(button).toHaveAccessibleName(
+      'Page 1 \u201cvariable annual rate equal to the 30-day average SOFR\u201d. Show "What is the interest rate?" in the document',
+    );
+    expect(button).toHaveTextContent("variable annual rate equal to the 30-day average SOFR");
+  });
+
   it("does not number the quote when a key term has only one", async () => {
     keyTermsMock.mockResolvedValue({ ok: true, result: { terms: [FOUND_TERM("late_fee", "Late fee", "4%")], truncated: false } });
     checklistMock.mockResolvedValue({ ok: true, result: { answers: [], truncated: false } });

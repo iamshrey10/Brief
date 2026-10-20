@@ -232,7 +232,7 @@ describe("DocumentWorkspace jumping to the document from the overview", () => {
   it("highlights the clause and quote behind a checklist answer", async () => {
     const user = renderWorkspace();
 
-    await user.click(await screen.findByRole("button", { name: /Can I pay this off early.*page 2/i }));
+    await user.click(await screen.findByRole("button", { name: /^Page 2 .without penalty.*Can I pay this off early/i }));
 
     expect(clauseElement("clause-b")).toHaveAttribute("aria-current", "true");
     expect(within(clauseElement("clause-b")).getByText("without penalty").tagName).toBe("MARK");

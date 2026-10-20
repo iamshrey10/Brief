@@ -130,7 +130,12 @@ function EvidenceButton({
     <button
       type="button"
       title="Show this in the document"
-      aria-label={`Show "${label}" in the document, ${pageText.toLowerCase()}${which}`}
+      aria-label={
+        showQuote
+          ? // The name has to start with the words the button shows, so what is read aloud contains what is on it.
+            `${pageText} \u201c${quote}\u201d. Show "${label}" in the document`
+          : `Show "${label}" in the document, ${pageText.toLowerCase()}${which}`
+      }
       onClick={() => onSelect({ clauseId, quote })}
       className="block w-full rounded-md border-l-2 border-primary px-3 py-1.5 text-left text-muted-foreground transition-colors outline-none hover:bg-accent hover:text-accent-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
     >
