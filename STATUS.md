@@ -73,12 +73,12 @@ heavier on polish and proof than the first.
 | Steadier results | 0.5 day | Voted reads help on three real leases but not fully on the longest, and I still cannot say whether the voted questions are right |
 | An agent step that retries a weak search or checks a term against typical terms | 2 to 3 days | Not started |
 | A larger test set, with a build that fails if quality drops | 1 day | The build already fails on a drop; the test set is still small |
-| An automatic click-through test of the screens in a real browser | 0.5 day | Done for pages anyone can reach (16 tests); the signed in screens need a stand-in for Google sign in |
+| An automatic click-through test of the screens in a real browser | done | 40 browser tests, signed in too, using a sign in that exists only outside production and a fake API; still not the real API or Google |
 | Tracing, so every answer can be inspected afterwards | 0.75 day | Started: request ids and reference codes exist, the record of what each answer used does not |
 | Putting the backend online | 2 days | Not started; the images and a readiness check are ready |
 | Hardening: a browser test of delete account and upload checks, then a security pass once it is online | 0.5 day | Mostly done (limits, delete, upload checks, secrets, dependency scan) |
 | README, diagrams, and a short demo | 1.75 days | README kept current as I go; diagrams and demo not started |
-| **Core total still to go** | **about 9 days** (range 8 to 13) | |
+| **Core total still to go** | **about 8.5 days** (range 8 to 13) | |
 | Word (.docx) files | 1 day | Last |
 | Several files in one upload | 2 days | Last |
 | Sharper handling of low quality photos | 1 day | Last |
