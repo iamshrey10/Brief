@@ -17,7 +17,9 @@ const fresh = () => ({
     { id: "doc-loan", filename: "sample-loan.pdf", doc_type: "loan", status: "ready", ocr_confidence: null, created_at: "2026-10-02T12:00:00Z", status_changed_at: "2026-10-02T12:01:00Z" },
   ],
   requests: [],
+  uploads: [],
   accountDeleted: false,
+  created: 0,
 });
 let state = fresh();
 
@@ -59,6 +61,19 @@ const CHECKLIST = {
 
 const USAGE = { ask: { used: 3, limit: 100, left: 97 }, read: { used: 1, limit: 30, left: 29 }, analyze: { used: 2, limit: 60, left: 58 } };
 
+// The same rule the real bucket gets from scripts/set_bucket_cors.py: only the website's own address may PUT a file
+// with a Content-Type. Anything else is not given permission, so the browser refuses to send the file.
+const WEBSITE = process.env.FAKE_API_WEBSITE ?? "http://localhost:3100";
+
+function allowWebsite(request, response) {
+  if (request.headers.origin !== WEBSITE) return false;
+  response.setHeader("Access-Control-Allow-Origin", WEBSITE);
+  response.setHeader("Vary", "Origin");
+  return true;
+}
+
+const DOC_TYPES = new Set(["loan", "lease", "offer", "other"]);
+
 function send(response, status, body) {
   response.writeHead(status, { "Content-Type": "application/json" });
   response.end(body === undefined ? undefined : JSON.stringify(body));
@@ -87,12 +102,66 @@ const server = createServer(async (request, response) => {
   if (path === "/__requests") return send(response, 200, state.requests);
   if (path === "/__account-deleted") return send(response, 200, { deleted: state.accountDeleted });
 
+  // Where a browser sends the file itself: storage, not the API, so it needs no token but does need permission.
+  const upload = /^\/__upload\/([^/]+)$/.exec(path);
+  if (upload) {
+    if (method === "OPTIONS") {
+      const wanted = String(request.headers["access-control-request-headers"] ?? "").toLowerCase();
+      if (!allowWebsite(request, response) || request.headers["access-control-request-method"] !== "PUT" || !wanted.includes("content-type")) {
+        response.writeHead(403);
+        return response.end();
+      }
+      response.setHeader("Access-Control-Allow-Methods", "PUT");
+      response.setHeader("Access-Control-Allow-Headers", "Content-Type");
+      response.setHeader("Access-Control-Max-Age", "3600");
+      response.writeHead(204);
+      return response.end();
+    }
+    if (method === "PUT") {
+      allowWebsite(request, response);
+      const chunks = [];
+      for await (const chunk of request) chunks.push(chunk);
+      if (upload[1] === "broken") return send(response, 500, { detail: "storage is unavailable" });
+      state.uploads.push({ id: upload[1], contentType: request.headers["content-type"] ?? null, bytes: Buffer.concat(chunks).length });
+      return send(response, 200);
+    }
+  }
+  if (path === "/__uploads") return send(response, 200, state.uploads);
+
   // Like the real API, nothing else is answered without a signed token.
   const bearer = /^Bearer ([^.]+\.[^.]+\.[^.]+)$/.exec(request.headers.authorization ?? "");
   if (!bearer) return send(response, 401, { detail: "not signed in" });
   state.requests.push({ method, path, requestId: request.headers["x-request-id"] ?? null });
 
-  if (method === "GET" && path === "/documents") return send(response, 200, state.documents);
+  if (method === "GET" && path === "/documents") {
+    // A document being read finishes after one more look, as a real one does while the page polls.
+    for (const document of state.documents) {
+      if (document.status === "processing" && document.looksLeft-- <= 0) {
+        document.status = "ready";
+        document.progress_done = document.progress_total = null;
+      }
+    }
+    return send(response, 200, state.documents.map(({ looksLeft, ...visible }) => visible));
+  }
+  if (method === "POST" && path === "/documents") {
+    const { filename = "", doc_type: kind = "", content_type: contentType = "", file_size_bytes: size = 0 } = await readJson(request);
+    if (!DOC_TYPES.has(kind) || !contentType || size <= 0) return send(response, 400, { detail: "unsupported file type" });
+    if (/limit/i.test(filename)) return send(response, 409, { detail: "You can keep up to 25 documents. Delete one you no longer need to upload another." });
+    if (/daily/i.test(filename)) return send(response, 429, { detail: "You have reached today's limit of 30 document reads. Try again tomorrow." });
+    state.created += 1;
+    const id = `doc-new-${state.created}`;
+    state.documents.unshift({ id, filename, doc_type: kind, status: "pending", ocr_confidence: null, created_at: new Date().toISOString(), status_changed_at: new Date().toISOString() });
+    const target = /storagefail/i.test(filename) ? "broken" : id;
+    return send(response, 200, { document_id: id, upload_url: `http://localhost:${PORT}/__upload/${target}` });
+  }
+  const confirm = /^\/documents\/([^/]+)\/confirm$/.exec(path);
+  if (method === "PATCH" && confirm) {
+    const document = state.documents.find((candidate) => candidate.id === confirm[1]);
+    if (!document) return send(response, 404, { detail: "document not found" });
+    Object.assign(document, { status: "processing", progress_done: 3, progress_total: 10, looksLeft: 1 });
+    const { looksLeft, ...visible } = document;
+    return send(response, 200, visible);
+  }
   if (method === "GET" && path === "/me/usage") return send(response, 200, USAGE);
   if (method === "GET" && path === "/me") return send(response, 200, { id: "e2e-reader", email: "e2e-reader@example.invalid" });
   if (method === "DELETE" && path === "/me") {

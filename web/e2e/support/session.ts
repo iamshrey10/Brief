@@ -24,3 +24,8 @@ export async function resetFakeApi(page: Page): Promise<void> {
   const response = await page.request.post(`${FAKE_API}/__reset`);
   expect(response.status()).toBe(204);
 }
+
+/** What the fake storage received: the file's id, its Content-Type and its size in bytes. */
+export async function uploadsReceived(page: Page): Promise<{ id: string; contentType: string | null; bytes: number }[]> {
+  return (await page.request.get(`${FAKE_API}/__uploads`)).json();
+}
