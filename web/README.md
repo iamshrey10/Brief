@@ -26,12 +26,15 @@ Open http://localhost:3000
     pnpm exec playwright install chromium   # once
     pnpm e2e
 
-These run a real browser against the site on port 3100, one test at a time (40 tests, about 20 seconds). They
+These run a real browser against the site on port 3100, one test at a time (57 tests, about a minute). They
 cover the pages anyone can reach (the landing page, being turned away from the dashboard and the data routes,
 the light and dark mode button, the phone layout) and, signed in, the dashboard (listing, delete with confirm,
 cancel and Escape), the document page (clauses, a key term with two numbered quote buttons, a gap with wording
 to ask the other side, request ids), asking (an answer, a failed question with a reference code that matches the
-request id the API was sent, an empty question), the same screens at phone width, and an automatic
+request id the API was sent, an empty question), uploading (a file sent to a fake storage that enforces the same
+browser rules as the real bucket, a wrong kind of file, the document limit, the daily limit, a storage failure),
+renaming and changing the kind, Read again and Try again, signing out, deleting the account, the same screens at
+phone width, and an automatic
 accessibility scan (axe) of the landing page, the dashboard, the Overview and the Ask tab in both color modes.
 
 Real Google sign in cannot be automated, so signed in tests use a sign in that exists only when `E2E_AUTH=true`
