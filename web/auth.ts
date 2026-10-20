@@ -1,5 +1,8 @@
 import NextAuth from "next-auth";
+import Credentials from "next-auth/providers/credentials";
 import Google from "next-auth/providers/google";
+
+import { E2E_USER, e2eSignInEnabled } from "@/lib/e2e-auth";
 
 /**
  * Google is the only way in. `authorized` is what the middleware asks for every protected page:
@@ -9,7 +12,13 @@ import Google from "next-auth/providers/google";
  * sign straight back in as whoever Google remembers.
  */
 export const authConfig = {
-  providers: [Google({ authorization: { params: { prompt: "select_account" } } })],
+  providers: [
+    Google({ authorization: { params: { prompt: "select_account" } } }),
+    // Only for the browser tests, and only outside production: see lib/e2e-auth.ts.
+    ...(e2eSignInEnabled(process.env)
+      ? [Credentials({ id: "e2e", credentials: {}, authorize: async () => E2E_USER })]
+      : []),
+  ],
   pages: { signIn: "/" },
   callbacks: {
     authorized: ({ auth }: { auth: { user?: { email?: string | null } | null } | null }) =>
