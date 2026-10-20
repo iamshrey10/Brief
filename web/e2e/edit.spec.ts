@@ -23,3 +23,14 @@ test("renaming a document changes its name in the list and the new name is still
   await expect(page.getByText("renamed-lease.pdf")).toBeVisible();
   await expect(page.getByText("sample-loan.pdf")).toBeVisible();
 });
+
+test("changing the kind of a document shows the new kind in the list, and it is kept after a reload", async ({ page }) => {
+  const row = page.getByRole("region", { name: "Your documents" }).getByRole("listitem");
+  await page.getByLabel("Kind").selectOption({ label: "Job offer" });
+  await page.getByRole("button", { name: "Save" }).click();
+
+  await expect(row.filter({ hasText: "sample-lease.pdf" }).getByText(/^Job offer/)).toBeVisible();
+  await page.reload();
+  await expect(row.filter({ hasText: "sample-lease.pdf" }).getByText(/^Job offer/)).toBeVisible();
+  await expect(row.filter({ hasText: "sample-loan.pdf" }).getByText(/^Education loan/)).toBeVisible();
+});
