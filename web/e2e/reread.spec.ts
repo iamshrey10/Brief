@@ -36,3 +36,18 @@ test("cancelling Read again changes nothing", async ({ page }) => {
   await expect(page.getByRole("group", { name: "Read sample-lease.pdf again" })).toHaveCount(0);
   await expect(rowFor(page, "sample-lease.pdf").getByText("Ready")).toBeVisible();
 });
+
+test("Read again refused for the daily limit says so in the API's own words with a reference code, and the document stays Ready", async ({
+  page,
+}) => {
+  await page.getByRole("button", { name: "Read sample-loan.pdf again" }).click();
+  const confirmation = page.getByRole("group", { name: "Read sample-loan.pdf again" });
+  await confirmation.getByRole("button", { name: "Read again", exact: true }).click();
+
+  await expect(confirmation.getByRole("alert")).toContainText(
+    "You have reached today's limit of 30 document reads. Try again tomorrow.",
+  );
+  await expect(confirmation.getByRole("alert")).toContainText(/Reference: [0-9a-f]{8}$/);
+  await confirmation.getByRole("button", { name: "Cancel" }).click();
+  await expect(rowFor(page, "sample-loan.pdf").getByText("Ready")).toBeVisible();
+});
