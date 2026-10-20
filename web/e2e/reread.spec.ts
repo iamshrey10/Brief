@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { callsMade, resetFakeApi, signInAsTestReader } from "./support/session";
+import { callsMade, resetFakeApi, seedFailedDocument, signInAsTestReader } from "./support/session";
 
 test.beforeEach(async ({ page }) => {
   await resetFakeApi(page);
@@ -50,4 +50,23 @@ test("Read again refused for the daily limit says so in the API's own words with
   await expect(confirmation.getByRole("alert")).toContainText(/Reference: [0-9a-f]{8}$/);
   await confirmation.getByRole("button", { name: "Cancel" }).click();
   await expect(rowFor(page, "sample-loan.pdf").getByText("Ready")).toBeVisible();
+});
+
+test("a document that could not be read says why in plain words, and Try again reads it by itself", async ({ page }) => {
+  await seedFailedDocument(page);
+  await page.reload();
+  const row = rowFor(page, "broken-scan.pdf");
+
+  await expect(row.getByText("Couldn't read")).toBeVisible();
+  await expect(row.getByText("No text could be found in this file. A clearer scan or a text based PDF should work.")).toBeVisible();
+  await row.getByRole("button", { name: "Try reading broken-scan.pdf again" }).click();
+
+  await expect(row.getByText("Processing")).toBeVisible();
+  await expect(row.getByText("Ready")).toBeVisible({ timeout: 15_000 });
+  await expect(row.getByRole("button", { name: "Try reading broken-scan.pdf again" })).toHaveCount(0);
+
+  const calls = await callsMade(page);
+  expect(calls.filter((call) => call.method === "POST").map((call) => call.path)).toEqual([
+    "/documents/doc-broken/retry",
+  ]);
 });
