@@ -66,3 +66,16 @@ test("a refusal for the daily limit says so in the API's own words, so the perso
   );
   expect(await uploadsReceived(page)).toEqual([]);
 });
+
+test("when storage fails the person is told, keeps their chosen file to try again, and the API is never told it arrived", async ({
+  page,
+}) => {
+  await choose(page, { ...PDF, name: "storagefail-lease.pdf" });
+  await page.getByRole("button", { name: "Upload", exact: true }).click();
+
+  await expect(page.locator("form").getByRole("alert")).toHaveText("the file upload failed");
+  await expect(page.getByText("storagefail-lease.pdf")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Upload", exact: true })).toBeEnabled();
+  expect((await callsMade(page)).filter((call) => call.path.endsWith("/confirm"))).toEqual([]);
+  expect(await uploadsReceived(page)).toEqual([]);
+});
