@@ -10,7 +10,10 @@ const port = 3100;
  */
 export default defineConfig({
   testDir: "./e2e",
-  fullyParallel: true,
+  // One test at a time: the fake API keeps its documents and the calls it received in one place, so tests
+  // running side by side would reset each other's data. The whole suite takes about ten seconds.
+  fullyParallel: false,
+  workers: 1,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? "github" : "list",
