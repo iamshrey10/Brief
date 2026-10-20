@@ -45,6 +45,7 @@ export function ClauseViewer({
 
   return (
     <section aria-label="Document text" className="flex flex-col gap-6">
+      <h2 className="sr-only">Document text</h2>
       {groupByPage(clauses).map(({ pageNumber, clauses: pageClauses }) => (
         <div key={pageNumber} className="flex flex-col gap-2">
           <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">

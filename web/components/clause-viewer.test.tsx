@@ -143,3 +143,25 @@ describe("ClauseViewer", () => {
     expect(scrollIntoView).not.toHaveBeenCalled();
   });
 });
+
+describe("ClauseViewer headings", () => {
+  beforeEach(() => stubReducedMotion(false));
+
+  it("puts a level 2 heading for the document text before the level 3 page headings, so the outline has no gap", () => {
+    render(<ClauseViewer clauses={CLAUSES} />);
+
+    const headings = screen.getAllByRole("heading").map((heading) => [heading.tagName, heading.textContent]);
+
+    expect(headings).toEqual([
+      ["H2", "Document text"],
+      ["H3", "Page 1"],
+      ["H3", "Page 2"],
+    ]);
+  });
+
+  it("keeps that heading out of sight, since the section is already labeled on screen by its pages", () => {
+    render(<ClauseViewer clauses={CLAUSES} />);
+
+    expect(screen.getByRole("heading", { level: 2, name: "Document text" })).toHaveClass("sr-only");
+  });
+});
