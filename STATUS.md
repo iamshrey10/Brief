@@ -3,29 +3,29 @@
 A plain account of what works today, what is still missing, and how long the rest should take. I
 update it every week, so you can hold my pace against my promises.
 
-**Last updated:** October 16, 2026 (day 27 of building)
+**Last updated:** October 21, 2026 (day 32 of building)
 
 ## The short version
 
-Brief is about **75% of the way** to a finished first version, counting working days: 27 done and about
-9 to go. You can upload a contract, see its key terms and the questions it leaves unanswered on one
+Brief is about **80% of the way** to a finished first version, counting working days: 32 done and about
+7 to go. You can upload a contract, see its key terms and the questions it leaves unanswered on one
 screen, ask questions, and get an answer with a checked quote. The parts still ahead are putting it
-online, a bigger test set, tracing every answer, and a step that retries a weak search.
+online, a step that retries a weak search, a bigger test set, and a demo.
 
-**Expected finish for the core product: around October 30**, with a realistic window of October 26 to
-November 5. The extras (Word files, several files at once, sharper photo handling) would add about 4
+**Expected finish for the core product: around November 3**, with a realistic window of October 28 to
+November 9. **That is four days later than I said last week, and the reason is in the calendar section.** The extras (Word files, several files at once, sharper photo handling) would add about 4
 more working days.
 
 ## By the numbers
 
 | | |
 |---|---|
-| Working days so far | 27 |
-| Commits | 240 |
-| Tests | 1,377 (718 backend, 643 frontend, 16 in a real browser), run on every push |
-| Lines of code vs lines of tests | about 6,900 vs 16,600 (tests count the evaluation scripts) |
+| Working days so far | 32 |
+| Commits | 313 |
+| Tests | 1,588 (805 backend, 695 frontend, 88 in a real browser), run on every push |
+| Lines of code vs lines of tests | about 7,300 vs 19,200 (tests count the evaluation scripts and the browser test helpers) |
 | API endpoints | 19 |
-| Database tables | 7 |
+| Database tables | 8 |
 | Evaluations | 5 (search, question answering, key terms, must-ask checklist, steadiness) |
 | Documents it can read | text PDFs and phone photos or scans (JPG, PNG, HEIC) |
 | Limits | 50 MB a file, 25 documents a person, 100 pages a document |
@@ -56,8 +56,17 @@ more working days.
 - **Steadier results.** The key terms and the questions are each read three times with fixed seeds and
   kept by vote, because the same contract read twice used to come out differently.
 - **Easier to debug.** Every call carries a request id that appears in every log line it causes, and a failure
-  message ends with a short `Reference` code that finds it. A health check says whether the server can do real
-  work, not just whether it is running. Browser tests check what a visitor who is not signed in can reach.
+  message ends with a short `Reference` code that finds it. Each question also saves what it used (which clauses
+  the model saw and which it cited, ids only, never text), and one command prints it for a reference code. A
+  health check says whether the server can do real work, not just whether it is running.
+- **Checked in a real browser.** 88 automatic browser tests cover the pages anyone can reach and, signed in
+  with a sign in that exists only outside production, uploading, renaming, Read again, Try again, delete,
+  sign out, asking and clicking a source, at phone width too, and an accessibility scan of every main screen
+  and of the states with something open or an error showing. They found and fixed a missing main landmark,
+  button names that did not contain their visible words, error text that was too faint in light mode, and a
+  heading level that was skipped.
+- **The API describes itself.** Every route has a group, a plain summary and the errors it can give, checked by
+  a test against the code, at `/docs` while building and not on a live server.
 - **Security basics.** Uploads are checked against what the file really is, tokens must expire, the
   servers refuse weak secrets in production, you can delete your account and everything in it, and a
   scan of the libraries runs weekly. The README's Security section lists what is and is not covered.
@@ -72,13 +81,13 @@ heavier on polish and proof than the first.
 | Key terms, must-ask questions, the Overview screen, the dashboard, delete and edit, limits | done | Finished Oct 5 to 8 |
 | Steadier results | 0.5 day | Voted reads help on three real leases but not fully on the longest, and I still cannot say whether the voted questions are right |
 | An agent step that retries a weak search or checks a term against typical terms | 2 to 3 days | Not started |
-| A larger test set, with a build that fails if quality drops | 1 day | The build already fails on a drop; the test set is still small |
+| A larger test set, with a build that fails if quality drops | 0.5 day | The build already fails on a drop and the question set grew to 50, ten of them near misses; it is still one short fixture |
 | An automatic click-through test of the screens in a real browser | done | 57 browser tests, signed in too, covering upload, rename, Read again, Try again, delete and sign out, using a sign in that exists only outside production and a fake API; still not the real API or Google |
-| Tracing, so every answer can be inspected afterwards | 0.75 day | Started: request ids and reference codes exist, the record of what each answer used does not |
-| Putting the backend online | 2 days | Not started; the images and a readiness check are ready |
+| Tracing, so every answer can be inspected afterwards | 0.25 day | Mostly done: request ids, reference codes and a saved record of what each question used, found by a script. Not built: a screen for looking at it |
+| Putting the backend online | 1.75 days | Not started. Ready: the images, a readiness check, example settings files, a script for the storage rules, and a checklist. Needs your choice of host and whether to pay for Gemini |
 | Hardening: a browser test of delete account and upload checks, then a security pass once it is online | 0.5 day | Mostly done (limits, delete, upload checks, secrets, dependency scan) |
-| README, diagrams, and a short demo | 1.75 days | README kept current as I go; diagrams and demo not started |
-| **Core total still to go** | **about 8.5 days** (range 8 to 13) | |
+| README, diagrams, and a short demo | 1.5 days | README kept current as I go; diagrams and demo not started |
+| **Core total still to go** | **about 7 days** (range 6 to 11) | |
 | Word (.docx) files | 1 day | Last |
 | Several files in one upload | 2 days | Last |
 | Sharper handling of low quality photos | 1 day | Last |
@@ -86,13 +95,18 @@ heavier on polish and proof than the first.
 
 ## How long, in calendar time
 
-At five working days a week, 9 days from Monday October 19 would end around October 29. I add a
-quarter on top for the things that always go wrong, which lands around October 30, so call it **about
-October 30**. A fast run at six days a week could finish near October 26, and a slow one at four days a
-week would reach November 5. A first version people can try, which only needs the backend online, could be
-up around October 22. Adding the extras moves each of those by about a week. The date did not move since
-last time: the days I spent on work that was not in the list, such as daily limits, the readiness check,
-request ids, and browser tests, were partly the tracing and click-through items under another name.
+At five working days a week, 7 days from Thursday October 22 would end around October 30. I add a quarter on
+top for the things that always go wrong, which lands around November 3, so call it **about November 3**. A
+fast run at six days a week could finish near October 29, and a slow one at four days a week would reach
+November 9. Adding the extras moves each of those by about a week. A first version people can try only needs
+the backend online, which is about two days of work once you have chosen a host and decided about paying for
+Gemini, so it could be up around October 26.
+
+**Why the date moved.** Last week I said October 30. Since then five working days went on things that were not
+in the list: an accessibility pass over every screen (it found real problems), documentation of the API that is
+checked against the code, deployment preparation, and many more browser tests than I planned. I counted those
+days as done, which is why the percentage rose faster than the list shrank, and the finish moved by about as
+many days as they took. The list of what is left did not grow.
 
 These are estimates, not promises. I will say so in the update log if they move.
 
@@ -127,9 +141,11 @@ These are estimates, not promises. I will say so in the update log if they move.
 - **Nothing is online yet.** The container images build and the readiness check works against my local
   database, but I have not run any of it on a real host. Real hosting usually surfaces surprises, so that part
   of the estimate is the least certain.
-- **Phone layout** was checked by hand on October 13 on the dashboard, the Overview and Ask, and an automatic
-  test now checks the landing page. The newer failure messages with a reference code were tested in code, not
-  yet looked at on a phone.
+- **The browser tests use a fake API.** It checks tokens like the real one and refuses what the real one
+  would, but it is not the real one, so they show the website behaves correctly given those answers, not that
+  the real API gives them. The accessibility scans find what a machine can detect, which is only part of the
+  problems, so a person should still try the screens with a keyboard and a screen reader. I have not yet
+  looked at the newest screens on a real phone.
 - **Build tools** have one known high severity report with no fixed version yet. It is not part of what
   ships.
 
@@ -142,5 +158,6 @@ These are estimates, not promises. I will say so in the update log if they move.
 | Oct 8 | The Overview screen and a real dashboard shipped, with delete, edit, read again, reasons a read fails, limits, and read progress. Key terms and questions are now read three times and kept by vote, which made them steadier but not more accurate. 116 commits, 810 tests. The finish stays about October 30. |
 | Oct 10 | Security work: uploads are checked against what the file really is, tokens must expire, both servers refuse weak secrets in production, a dependency scan found and fixed 10 real vulnerabilities and now runs weekly, and you can delete your account and everything in it. Steadiness was measured on two more real leases. 152 commits, 1,003 tests. The finish stays about October 30. |
 | Oct 16 | Daily limits, abandoned upload cleanup, timing of every model call, and a build that fails if a recorded quality score drops (Oct 11 to 12). A browser test of the whole app by hand found a rate limit failure with nothing in the log, a deposit missing from key terms, and one tap sign in; each was fixed, and a key term can now rest on up to three checked quotes (Oct 13). Browser tests of the pages anyone can reach, a health check that says whether the server can do real work, request ids, and a short reference code on failure messages (Oct 14 to 16). 240 commits, 1,377 tests. About 75 percent, finish still around October 30. |
+| Oct 21 | Answer traces (what each question used, ids only, found from a reference code), documentation of every route checked against the code, example settings files, a script for the storage upload rules, a deployment checklist, and a test-only sign in with a fake API that lets the signed in screens be tested in a real browser: 88 browser tests, accessibility scans of every main screen and state, and four real problems they found fixed. 313 commits, 1,588 tests. About 80 percent, and the finish moved from about October 30 to about November 3 for the reason given above. |
 
 Thanks for reading. If something here looks wrong or unclear, please open an issue.
