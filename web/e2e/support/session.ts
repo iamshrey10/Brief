@@ -7,10 +7,12 @@ export const FAKE_API = "http://localhost:3101";
 /**
  * Signs the page in as a test reader of its own, through the sign in that exists only outside production.
  * Each call uses a new address on the reserved domain, so every test has its own rate limit counter and
- * one test cannot use up another's allowance.
+ * one test cannot use up another's allowance. `kind` becomes the start of the address, which the fake API reads to
+ * choose a scenario.
  */
-export async function signInAsTestReader(page: Page): Promise<string> {
-  const email = `reader-${randomUUID()}@example.invalid`;
+export async function signInAsTestReader(page: Page, kind = "reader"): Promise<string> {
+  // The start of the address picks a scenario in the fake API, for example "low-quota" or "no-quota".
+  const email = `${kind}-${randomUUID()}@example.invalid`;
   const { csrfToken } = await (await page.request.get("/api/auth/csrf")).json();
   const response = await page.request.post("/api/auth/callback/e2e", {
     form: { csrfToken, callbackUrl: "/dashboard", json: "true", email },

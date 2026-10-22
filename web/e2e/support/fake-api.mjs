@@ -86,6 +86,14 @@ const CHECKLIST = {
 
 const USAGE = { ask: { used: 3, limit: 100, left: 97 }, read: { used: 1, limit: 30, left: 29 }, analyze: { used: 2, limit: 60, left: 58 } };
 
+// A reader whose address starts with one of these has used up all or most of today's questions, so a test
+// can see the note and the refusal without asking a hundred questions.
+function usageFor(reader) {
+  if (reader.startsWith("low-quota-")) return { ...USAGE, ask: { used: 98, limit: 100, left: 2 } };
+  if (reader.startsWith("no-quota-")) return { ...USAGE, ask: { used: 100, limit: 100, left: 0 } };
+  return USAGE;
+}
+
 // The same rule the real bucket gets from scripts/set_bucket_cors.py: only the website's own address may PUT a file
 // with a Content-Type. Anything else is not given permission, so the browser refuses to send the file.
 const WEBSITE = process.env.FAKE_API_WEBSITE ?? "http://localhost:3100";
@@ -197,7 +205,7 @@ const server = createServer(async (request, response) => {
     Object.assign(document, { status: "processing", progress_done: 3, progress_total: 10, looksLeft: 1 });
     return send(response, 200, visible(document));
   }
-  if (method === "GET" && path === "/me/usage") return send(response, 200, USAGE);
+  if (method === "GET" && path === "/me/usage") return send(response, 200, usageFor(reader));
   if (method === "GET" && path === "/me") return send(response, 200, { id: "e2e-reader", email: "e2e-reader@example.invalid" });
   if (method === "DELETE" && path === "/me") {
     state.accountDeleted = true;
@@ -231,6 +239,7 @@ const server = createServer(async (request, response) => {
       return send(response, 204);
     }
     if (method === "POST" && part === "ask") {
+      if (usageFor(reader).ask.left === 0) return send(response, 429, { detail: "You have reached today's limit of 100 questions. Try again tomorrow." });
       const { question = "" } = await readJson(request);
       if (/\bfail\b/i.test(question)) return send(response, 502, { detail: "the answering service is unavailable, try again" });
       return send(response, 200, {
