@@ -43,6 +43,7 @@ const fresh = () => ({
   ],
   requests: [],
   uploads: [],
+  flakyServed: [],
   accountDeleted: false,
   created: 0,
 });
@@ -219,7 +220,14 @@ const server = createServer(async (request, response) => {
     if (!document) return send(response, method === "DELETE" ? 204 : 404, method === "DELETE" ? undefined : { detail: "document not found" });
     if (method === "GET" && !part) return send(response, 200, document);
     if (method === "GET" && part === "clauses") return send(response, 200, CLAUSES);
-    if (method === "GET" && part === "key-terms") return send(response, 200, KEY_TERMS);
+    if (method === "GET" && part === "key-terms") {
+      // A "flaky" reader's first key terms read fails and the next one works, so a test can Try again.
+      if (reader.startsWith("flaky-") && !state.flakyServed.includes(reader)) {
+        state.flakyServed.push(reader);
+        return send(response, 502, { detail: "the reading service is unavailable, try again" });
+      }
+      return send(response, 200, KEY_TERMS);
+    }
     if (method === "GET" && part === "checklist") return send(response, 200, CHECKLIST);
     if (method === "POST" && (part === "reread" || part === "retry")) {
       // One document always hits the daily limit, so a test can see the refusal.
