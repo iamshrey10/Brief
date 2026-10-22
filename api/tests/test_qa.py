@@ -90,6 +90,17 @@ def test_generate_answer_tells_the_model_to_treat_clauses_as_data_not_instructio
     assert "ONLY" in instruction
 
 
+def test_generate_answer_tells_the_model_to_answer_the_question_asked_and_not_a_nearby_one(monkeypatch):
+    client = _install_fake_client(monkeypatch, GroundedAnswer(found=False, answer="n/a", citations=[]))
+
+    generate_answer("Which days can I work from home?", [("C1", "up to three days a week")])
+    instruction = client.models.calls[0]["config"].system_instruction
+
+    assert "Answer the question that was asked, not a nearby one" in instruction
+    assert "only a related fact and not the specific detail" in instruction
+    assert "set found to false" in instruction
+
+
 def test_generate_answer_raises_when_the_model_returns_nothing_usable(monkeypatch):
     _install_fake_client(monkeypatch, None)
 
