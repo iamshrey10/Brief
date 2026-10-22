@@ -49,6 +49,21 @@ with no token, and remembers deletes. Each test signs in as its own address on t
 `example.invalid`, so each gets its own rate limit counter, which uses a real Redis (`docker compose up -d`).
 The server is started for you with stand-in secrets and never reaches Google, the real API or a model.
 
+### Going through the browser tests yourself
+
+Start Redis once (`docker compose up -d` from the repository root). The tests start the website and the fake API
+for you, so nothing else needs to be running, and they never touch your real data or your real sign in.
+
+    pnpm e2e:ui        # Playwright's own window: pick a test, watch it run, step back and forth through it
+    pnpm e2e:headed    # runs them all with a visible browser, one test at a time
+    pnpm e2e           # runs them all quietly, which is what CI does
+    pnpm e2e:report    # opens the report of the last run, with a trace of any test that failed
+
+To run just the tests whose name contains a word: `pnpm e2e -g "delete"`. To run one file:
+`pnpm e2e e2e/upload.spec.ts`. The tests are in `web/e2e/`, one file for each part of the app, and the fake API is
+`web/e2e/support/fake-api.mjs`. If the browser is missing (it can vanish after a Playwright update), run
+`pnpm exec playwright install chromium`. Playwright keeps a trace for a failed test in `web/test-results/`.
+
 What this does not prove: the fake API is not the real one, so these tests show the website behaves correctly
 given those answers, not that the real API gives them (the API's own tests do that). The accessibility scan only
 finds what a machine can detect, which is only part of the problems, so a person should still check the screens
