@@ -29,6 +29,23 @@ the model under test can be swapped, and the report records which one it measure
 
     cd api && QA_EVAL_MODEL=gemini-3.5-flash-lite PYTHONPATH=. python ../evals/qa_eval.py
 
+It runs over one of two labeled documents, chosen with `QA_EVAL_FIXTURE` (see `eval_fixtures.py`). Each has questions
+the document answers and questions it does not, including near misses where the topic is in a clause but the fact asked
+for is not, and each writes its own report:
+
+    cd api && QA_EVAL_FIXTURE=offer QA_EVAL_MODEL=gemini-3.5-flash-lite PYTHONPATH=. python ../evals/qa_eval.py
+
+| Fixture | Document | Answerable | Unanswerable | Report |
+|---|---|---|---|---|
+| `loan-lease` (the default) | 17 clauses of a mixed loan and lease | 32 | 18 | `results/qa-<date>.md` |
+| `offer` | 17 clauses of a job offer | 25 | 18 | `results/qa-offer-<date>.md` |
+
+The quality gate holds both to the same limits. Questions are written before any result is seen for them. If a question
+turns out to be ambiguous it is replaced in the open: the note at the top of the fixture and the report say so, and the
+first result is kept. Twice now a near miss question asking for one specific detail was answered with the nearest
+related fact; the second time the question was left as written and the answering instruction was changed instead (see
+`qa-offer-2026-10-22.md`).
+
 ## Key-terms evaluation
 
 Runs key-term extraction over a loan document and a lease document built from the same fixture,
