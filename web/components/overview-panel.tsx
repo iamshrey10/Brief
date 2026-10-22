@@ -89,7 +89,7 @@ function ErrorBlock({
       className="flex flex-col items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
     >
       <p>{message}</p>
-      {reference && <p className="text-xs opacity-80">Reference: {reference}</p>}
+      {reference && <p className="text-xs">Reference: {reference}</p>}
       <Button type="button" variant="outline" size="sm" onClick={onRetry}>
         Try again
       </Button>

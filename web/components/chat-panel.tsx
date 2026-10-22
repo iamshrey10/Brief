@@ -155,7 +155,7 @@ export function ChatPanel({
               className="max-w-[90%] rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
             >
               <p>{message.text}</p>
-              {message.reference && <p className="mt-1 text-xs opacity-80">Reference: {message.reference}</p>}
+              {message.reference && <p className="mt-1 text-xs">Reference: {message.reference}</p>}
             </div>
           );
         })}
