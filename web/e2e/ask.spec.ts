@@ -50,3 +50,18 @@ test("the question box refuses an empty question", async ({ page }) => {
   await page.getByRole("textbox", { name: "Your question" }).fill("   ");
   await expect(page.getByRole("button", { name: "Ask" }).last()).toBeDisabled();
 });
+
+test("clicking the source under an answer highlights the quoted words in the clause and keeps the conversation", async ({
+  page,
+}) => {
+  await ask(page, "What is the security deposit?");
+  const conversation = page.getByRole("log", { name: "Conversation" });
+  await expect(conversation.getByText("From the document")).toBeVisible();
+
+  await conversation.getByRole("button", { name: /^Page 1 .security deposit of \$1,450\.00/ }).click();
+
+  await expect(page.locator("mark")).toHaveText("security deposit of $1,450.00");
+  await expect(page.locator("#clause-c-deposit")).toHaveAttribute("aria-current", "true");
+  await expect(conversation.getByText("What is the security deposit?")).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Ask" })).toHaveAttribute("aria-selected", "true");
+});
