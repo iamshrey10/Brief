@@ -69,3 +69,52 @@ erDiagram
 
 Deleting a document removes the stored file first and then its rows, one document at a time, and the account last, so a
 failure part way leaves something that can be tried again (`api/app/main.py`).
+
+## From a file to a document that can be asked about
+
+```mermaid
+sequenceDiagram
+    actor Person
+    participant Browser
+    participant Web as Website proxy
+    participant API
+    participant R2 as Storage (R2)
+    participant DB as Postgres
+    participant Model as Gemini
+
+    Person->>Browser: choose a file and its kind
+    Note over Browser: wrong kind or over 50 MB is turned away here
+    Browser->>Web: POST /api/backend/documents
+    Web->>API: token + request id
+    API->>DB: clear this person's abandoned uploads and old traces, check the 25 document limit and the daily limit
+    API->>DB: save the document as pending
+    API-->>Browser: a storage address that works for five minutes
+    Browser->>R2: PUT the file (allowed only from the website's own address)
+    Browser->>Web: PATCH .../confirm
+    Web->>API: token + request id
+    API->>R2: read the real size and first bytes
+    Note over API: empty, over 50 MB or not the kind it claims: the file is deleted and the upload refused
+    API->>DB: status uploaded, then processing
+    API-->>Browser: the document, now processing
+    Note over API: reading continues in the background
+    API->>API: text from the PDF, or OCR for a photo
+    API->>API: split into numbered clauses
+    API->>Model: embed the clauses in batches
+    API->>DB: save progress after each batch
+    API->>DB: save clauses and embeddings, status ready, needs_retake or failed with a reason
+    loop every 3 seconds while processing
+        Browser->>Web: GET /api/backend/documents
+        Web->>API: token + request id
+        API-->>Browser: the list, with progress
+    end
+```
+
+What each step guards against:
+
+| Step | Guard |
+|---|---|
+| Starting the upload | A name that is too long or tries to climb folders, a kind that does not exist, too many documents, the daily limit. Nothing is read until the upload is confirmed. |
+| The file's real nature | The size and first bytes are read from storage, not taken from what the browser said, so a text file renamed `.pdf` is refused and its file deleted. A repeat confirm is refused. |
+| Abandoned uploads | One started and never confirmed is removed after an hour when its owner starts the next, so it cannot fill their document limit. |
+| Reading | A document over 100 pages, with no text, or password protected ends as `failed` with a plain reason, and the person can try again. A blurry scan ends as `needs_retake` and is still usable. |
+| The free tier | Embedding waits out Gemini's per minute limit and reports progress, so a long document shows "Reading part N of M" and never freezes the server. |
