@@ -95,7 +95,13 @@ def summarize(ranks: list[int | None]) -> tuple[float, float, float]:
     return hit1, hit3, mrr
 
 
-async def build_document(session: AsyncSession) -> tuple[Document, User, dict]:
+async def build_document(
+    session: AsyncSession,
+    clauses: dict[str, str] = CLAUSES,
+    label: str = "retrieval",
+    doc_type: str = "other",
+) -> tuple[Document, User, dict]:
+    """A temporary ready document of `clauses` with real embeddings. By default the loan and lease fixture."""
     user = (await session.execute(select(User).where(User.email == EVAL_EMAIL))).scalar_one_or_none()
     if user is None:
         user = User(email=EVAL_EMAIL)
@@ -104,18 +110,18 @@ async def build_document(session: AsyncSession) -> tuple[Document, User, dict]:
 
     document = Document(
         user_id=user.id,
-        filename="retrieval-eval.pdf",
-        doc_type="other",
+        filename=f"{label}-eval.pdf",
+        doc_type=doc_type,
         status="ready",
-        storage_key="eval/retrieval.pdf",
+        storage_key=f"eval/{label}.pdf",
         file_size_bytes=0,
         content_type="application/pdf",
     )
     session.add(document)
     await session.flush()
 
-    keys = list(CLAUSES)
-    vectors = embed_texts([CLAUSES[key] for key in keys])
+    keys = list(clauses)
+    vectors = embed_texts([clauses[key] for key in keys])
     key_to_id = {}
     for index, (key, vector) in enumerate(zip(keys, vectors, strict=True)):
         clause = Clause(
@@ -123,8 +129,8 @@ async def build_document(session: AsyncSession) -> tuple[Document, User, dict]:
             clause_index=index,
             page_number=1,
             char_start=0,
-            char_end=len(CLAUSES[key]),
-            text=CLAUSES[key],
+            char_end=len(clauses[key]),
+            text=clauses[key],
         )
         session.add(clause)
         await session.flush()

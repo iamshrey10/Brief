@@ -1,13 +1,14 @@
 """Grounded Q&A evaluation: does the full pipeline cite the right clause, and does it say
 "I couldn't find this" when the document genuinely doesn't cover a question?
 
-Runs the real pipeline, retrieval, Gemini, and the citation check, over the questions in
-qa_fixture.py against a temporary document, then writes a dated markdown report to
+Runs the real pipeline, retrieval, Gemini, and the citation check, over the questions of a labeled
+fixture (see eval_fixtures.py) against a temporary document, then writes a dated markdown report to
 evals/results/. Makes one Gemini call per question, so it takes several minutes.
 
 Needs Postgres running and a real GEMINI_API_KEY in api/.env. Run from the repo root:
 
-    cd api && PYTHONPATH=. python ../evals/qa_eval.py
+    cd api && PYTHONPATH=. python ../evals/qa_eval.py                          # loan and lease fixture
+    cd api && QA_EVAL_FIXTURE=offer PYTHONPATH=. python ../evals/qa_eval.py    # job offer fixture
 """
 
 import asyncio
@@ -17,7 +18,7 @@ import time
 from dataclasses import dataclass
 
 from google.genai import errors as genai_errors
-from qa_fixture import ANSWERABLE, UNANSWERABLE
+from eval_fixtures import Fixture, pick
 
 # Importing retrieval_eval also installs its cached query embedder, so each question is
 # embedded once even though the pipeline asks for it.
@@ -32,6 +33,9 @@ from app.qa import NOT_FOUND_ANSWER, UNVERIFIED_ANSWER, AnswerResult, answer_que
 # QA_EVAL_MODEL. Left unset it measures whatever the app itself uses.
 MODEL = os.environ.get("QA_EVAL_MODEL", qa_module.ANSWER_MODEL)
 qa_module.ANSWER_MODEL = MODEL
+
+# Which labeled document the questions run over: loan-lease (the default) or offer. Each writes its own report.
+FIXTURE = pick(os.environ.get("QA_EVAL_FIXTURE"))
 
 # The free Gemini tier caps requests per minute, so a rate-limit error is retried
 # patiently here instead of failing the whole run. Production code does not retry.
@@ -81,7 +85,7 @@ def percent(part: int, total: int) -> str:
     return f"{part / total:.0%} ({part}/{total})" if total else "n/a"
 
 
-def render_report(outcomes: list[Outcome]) -> str:
+def render_report(outcomes: list[Outcome], fixture: Fixture = FIXTURE) -> str:
     today = datetime.date.today().isoformat()
     answerable = [o for o in outcomes if o.kind == "answerable"]
     unanswerable = [o for o in outcomes if o.kind == "unanswerable"]
@@ -95,15 +99,13 @@ def render_report(outcomes: list[Outcome]) -> str:
     slowest = max(o.seconds for o in outcomes)
 
     lines = [
-        f"# Grounded Q&A evaluation, {today}",
+        f"# Grounded Q&A evaluation, {today}" + ("" if fixture.name == "loan-lease" else f" ({fixture.name})"),
         "",
         f"Model under test: `{MODEL}`.",
         "",
         f"{len(answerable)} answerable and {len(unanswerable)} unanswerable questions over the "
-        "17-clause mixed loan and lease fixture. Real Gemini, real Postgres, and the real "
-        "citation check. Questions were written before any results were seen and not tuned "
-        "afterward, except one near miss question replaced on October 17 after it proved "
-        "ambiguous, which the note at the top of qa_fixture.py describes.",
+        f"{fixture.description}. Real Gemini, real Postgres, and the real citation check. "
+        f"{fixture.provenance}",
         "",
         "## Answerable questions",
         "",
@@ -158,13 +160,15 @@ def render_report(outcomes: list[Outcome]) -> str:
 
 async def main() -> None:
     async with async_session() as session:
-        document, user, key_to_id = await build_document(session)
+        document, user, key_to_id = await build_document(
+            session, FIXTURE.clauses, label=FIXTURE.report_prefix, doc_type=FIXTURE.doc_type
+        )
         key_by_clause_id = {str(clause_id): key for key, clause_id in key_to_id.items()}
 
         try:
             outcomes: list[Outcome] = []
-            work = [(q, "answerable", d, k) for q, k, d in ANSWERABLE] + [
-                (q, "unanswerable", "n/a", None) for q in UNANSWERABLE
+            work = [(q, "answerable", d, k) for q, k, d in FIXTURE.answerable] + [
+                (q, "unanswerable", "n/a", None) for q in FIXTURE.unanswerable
             ]
 
             for question, kind, difficulty, expected_key in work:
@@ -185,7 +189,7 @@ async def main() -> None:
             report = render_report(outcomes)
             print("\n" + report)
             RESULTS_DIR.mkdir(exist_ok=True)
-            (RESULTS_DIR / f"qa-{datetime.date.today().isoformat()}.md").write_text(report)
+            (RESULTS_DIR / f"{FIXTURE.report_prefix}-{datetime.date.today().isoformat()}.md").write_text(report)
         finally:
             await delete_document(session, document, user)
 

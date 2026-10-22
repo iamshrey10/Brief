@@ -58,3 +58,41 @@ def test_the_job_offer_fixture_is_the_size_it_says_it_is():
     assert len(offer_fixture.CLAUSES) == 17
     assert len(offer_fixture.ANSWERABLE) == 25
     assert len(offer_fixture.UNANSWERABLE) == 18
+
+
+# --- choosing which fixture an evaluation runs over ---
+
+fixtures_module = importlib.import_module("eval_fixtures")
+
+
+def test_with_no_name_the_evaluation_runs_over_the_loan_and_lease_fixture():
+    chosen = fixtures_module.pick(None)
+
+    assert chosen.name == "loan-lease"
+    assert chosen.report_prefix == "qa"
+    assert len(chosen.clauses) == 17
+    assert len(chosen.answerable) == 32 and len(chosen.unanswerable) == 18
+
+
+def test_the_job_offer_fixture_has_its_own_kind_of_document_and_its_own_report_name():
+    chosen = fixtures_module.pick("offer")
+
+    assert (chosen.name, chosen.doc_type, chosen.report_prefix) == ("offer", "offer", "qa-offer")
+    assert chosen.clauses is offer_fixture.CLAUSES
+    assert len(chosen.answerable) == 25 and len(chosen.unanswerable) == 18
+
+
+def test_an_unknown_name_is_refused_and_the_message_lists_the_real_ones():
+    with pytest.raises(ValueError, match="loan-lease.*offer|offer.*loan-lease"):
+        fixtures_module.pick("lease-only")
+
+
+def test_no_two_fixtures_write_to_the_same_report_name():
+    prefixes = [fixture.report_prefix for fixture in fixtures_module.FIXTURES.values()]
+
+    assert len(prefixes) == len(set(prefixes))
+
+
+def test_each_fixture_says_how_its_questions_were_written():
+    for fixture in fixtures_module.FIXTURES.values():
+        assert "before any results" in fixture.provenance
