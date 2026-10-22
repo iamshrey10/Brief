@@ -145,6 +145,11 @@ const server = createServer(async (request, response) => {
     state.documents.push({ id: "doc-broken", filename: "broken-scan.pdf", doc_type: "other", status: "failed", failure_reason: "no_text", ocr_confidence: null, created_at: "2026-10-03T12:00:00Z", status_changed_at: "2026-10-03T12:01:00Z" });
     return send(response, 204);
   }
+  if (path === "/__seed-document" && method === "POST") {
+    const seeded = await readJson(request);
+    state.documents.push({ ocr_confidence: null, created_at: "2026-10-04T12:00:00Z", status_changed_at: "2026-10-04T12:01:00Z", ...seeded });
+    return send(response, 204);
+  }
   if (path === "/__account-deleted") return send(response, 200, { deleted: state.accountDeleted });
 
   // Where a browser sends the file itself: storage, not the API, so it needs no token but does need permission.
@@ -218,8 +223,11 @@ const server = createServer(async (request, response) => {
     const [, id, part] = match;
     const document = state.documents.find((candidate) => candidate.id === id);
     if (!document) return send(response, method === "DELETE" ? 204 : 404, method === "DELETE" ? undefined : { detail: "document not found" });
-    if (method === "GET" && !part) return send(response, 200, document);
-    if (method === "GET" && part === "clauses") return send(response, 200, CLAUSES);
+    if (method === "GET" && !part) {
+      if (document.id === "doc-down") return send(response, 500, { detail: "the database is unavailable" });
+      return send(response, 200, visible(document));
+    }
+    if (method === "GET" && part === "clauses") return send(response, 200, document.id === "doc-empty" ? [] : CLAUSES);
     if (method === "GET" && part === "key-terms") {
       // A "flaky" reader's first key terms read fails and the next one works, so a test can Try again.
       if (reader.startsWith("flaky-") && !state.flakyServed.includes(reader)) {

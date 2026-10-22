@@ -41,3 +41,8 @@ export async function callsMade(page: Page): Promise<{ method: string; path: str
 export async function seedFailedDocument(page: Page): Promise<void> {
   expect((await page.request.post(`${FAKE_API}/__seed-failed`)).status()).toBe(204);
 }
+
+/** Adds a document with the given fields, so the page for a document in that state can be seen. */
+export async function seedDocument(page: Page, document: Record<string, unknown>): Promise<void> {
+  expect((await page.request.post(`${FAKE_API}/__seed-document`, { data: document })).status()).toBe(204);
+}
