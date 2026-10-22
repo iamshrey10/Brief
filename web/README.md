@@ -26,16 +26,21 @@ Open http://localhost:3000
     pnpm exec playwright install chromium   # once
     pnpm e2e
 
-These run a real browser against the site on port 3100, one test at a time (57 tests, about a minute). They
+These run a real browser against the site on port 3100, one test at a time (88 tests, a little over a minute). They
 cover the pages anyone can reach (the landing page, being turned away from the dashboard and the data routes,
 the light and dark mode button, the phone layout) and, signed in, the dashboard (listing, delete with confirm,
 cancel and Escape), the document page (clauses, a key term with two numbered quote buttons, a gap with wording
 to ask the other side, request ids), asking (an answer, a failed question with a reference code that matches the
 request id the API was sent, an empty question), uploading (a file sent to a fake storage that enforces the same
 browser rules as the real bucket, a wrong kind of file, the document limit, the daily limit, a storage failure),
-renaming and changing the kind, Read again and Try again, signing out, deleting the account, the same screens at
-phone width, and an automatic
-accessibility scan (axe) of the landing page, the dashboard, the Overview and the Ask tab in both color modes.
+renaming and changing the kind, Read again and Try again, signing out, deleting the account, how many questions are
+left today and what happens at none, a failing Overview section recovering with Try again, the page for a document
+that failed, is still being read, is a hard to read scan, has no text or cannot be loaded, where keyboard focus lands
+and returns, the same screens at phone width, and an automatic
+accessibility scan (axe) of the landing page, the dashboard, the Overview and the Ask tab in both color modes, and
+again with something open or showing: an answer, a failed question, the edit form, the delete confirmations, an
+upload refusal and a failed document. The fake API checks the token's signature, algorithm and expiry like the real
+one, so every signed in test also proves the website sends a valid token.
 
 Real Google sign in cannot be automated, so signed in tests use a sign in that exists only when `E2E_AUTH=true`
 and the server is not in production (`lib/e2e-auth.ts`, which a test checks, so `next start` and every real host
