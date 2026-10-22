@@ -1,6 +1,8 @@
 import { defineConfig, devices } from "@playwright/test";
 
 const port = 3100;
+// The secret the website signs its tokens with. The fake API gets the same one, as the real API does.
+const serviceSecret = "e2e-only-service-secret-0123456789abcdef";
 
 /**
  * Browser tests. Real Google sign in cannot be automated (Google blocks it), so the signed in screens are
@@ -29,6 +31,7 @@ export default defineConfig({
       url: "http://localhost:3101/health",
       reuseExistingServer: !process.env.CI,
       timeout: 30_000,
+      env: { FAKE_API_SECRET: serviceSecret },
     },
     {
       command: `pnpm dev --port ${port}`,
@@ -40,7 +43,7 @@ export default defineConfig({
         AUTH_GOOGLE_ID: "e2e-google-id",
         AUTH_GOOGLE_SECRET: "e2e-google-secret",
         AUTH_TRUST_HOST: "true",
-        SERVICE_JWT_SECRET: "e2e-only-service-secret-0123456789abcdef",
+        SERVICE_JWT_SECRET: serviceSecret,
         BACKEND_URL: "http://localhost:3101",
         REDIS_URL: process.env.REDIS_URL ?? "redis://localhost:6379",
         // Turns on the sign in that exists only outside production, see lib/e2e-auth.ts

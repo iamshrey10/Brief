@@ -1,9 +1,34 @@
 // A stand-in for the Brief API, only for the browser tests. It answers with realistic data, refuses a
 // call that carries no token, remembers deletes until it is reset, and records the request ids it was
 // sent so a test can check the website forwarded them. Run: node e2e/support/fake-api.mjs
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { createServer } from "node:http";
 
 const PORT = Number(process.env.FAKE_API_PORT ?? 3101);
+// The secret the website signs its tokens with, shared with it the way the real API shares one.
+const SECRET = process.env.FAKE_API_SECRET ?? "e2e-only-service-secret-0123456789abcdef";
+
+/**
+ * Who a token says is asking, or null when it should be refused: not three parts, not HS256, not signed with the
+ * shared secret, or expired. The same checks the real API makes, so a test of the website also proves the website
+ * sends a valid token.
+ */
+function readerFrom(header) {
+  const bearer = /^Bearer ([A-Za-z0-9_-]+)\.([A-Za-z0-9_-]+)\.([A-Za-z0-9_-]+)$/.exec(header ?? "");
+  if (!bearer) return null;
+  const [, head, body, signature] = bearer;
+  try {
+    if (JSON.parse(Buffer.from(head, "base64url").toString()).alg !== "HS256") return null;
+    const expected = createHmac("sha256", SECRET).update(`${head}.${body}`).digest();
+    const given = Buffer.from(signature, "base64url");
+    if (given.length !== expected.length || !timingSafeEqual(given, expected)) return null;
+    const claims = JSON.parse(Buffer.from(body, "base64url").toString());
+    if (typeof claims.exp !== "number" || claims.exp * 1000 <= Date.now()) return null;
+    return typeof claims.sub === "string" ? claims.sub : null;
+  } catch {
+    return null;
+  }
+}
 
 const CLAUSES = [
   { id: "c-deposit", clause_index: 0, page_number: 1, text: "Tenant shall pay a security deposit of $1,450.00 at signing." },
@@ -140,8 +165,8 @@ const server = createServer(async (request, response) => {
   if (path === "/__uploads") return send(response, 200, state.uploads);
 
   // Like the real API, nothing else is answered without a signed token.
-  const bearer = /^Bearer ([^.]+\.[^.]+\.[^.]+)$/.exec(request.headers.authorization ?? "");
-  if (!bearer) return send(response, 401, { detail: "not signed in" });
+  const reader = readerFrom(request.headers.authorization);
+  if (!reader) return send(response, 401, { detail: "not signed in" });
   state.requests.push({ method, path, requestId: request.headers["x-request-id"] ?? null });
 
   if (method === "GET" && path === "/documents") {
