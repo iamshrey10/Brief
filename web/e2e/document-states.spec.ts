@@ -25,3 +25,31 @@ test("a document still being read says so and offers no Overview or questions ye
   await expect(page.getByText("Refresh in a moment")).toBeVisible();
   await expect(page.getByRole("tab", { name: "Overview" })).toHaveCount(0);
 });
+
+test("a hard to read scan warns with its reading confidence but still shows the text and the Overview", async ({ page }) => {
+  await seedDocument(page, { id: "doc-retake", filename: "blurry.png", doc_type: "lease", status: "needs_retake", ocr_confidence: 41.4 });
+  await page.goto("/dashboard/documents/doc-retake");
+
+  await expect(page.getByText("This looks like a hard-to-read scan")).toBeVisible();
+  await expect(page.getByText(/reading confidence 41%/)).toBeVisible();
+  await expect(page.getByText("Tenant shall pay a security deposit of $1,450.00 at signing.")).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Overview" })).toBeVisible();
+});
+
+test("a document that finished but has no text says no readable text was found", async ({ page }) => {
+  await seedDocument(page, { id: "doc-empty", filename: "empty.pdf", doc_type: "other", status: "ready" });
+  await page.goto("/dashboard/documents/doc-empty");
+
+  await expect(page.getByText("No readable text found")).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Overview" })).toHaveCount(0);
+});
+
+test("when the server cannot load a document the page says so plainly and shows nothing else", async ({ page }) => {
+  await seedDocument(page, { id: "doc-down", filename: "down.pdf", doc_type: "other", status: "ready" });
+  await page.goto("/dashboard/documents/doc-down");
+
+  await expect(page.getByText("We couldn't load this document")).toBeVisible();
+  await expect(page.getByText("The server did not respond. Try again in a moment.")).toBeVisible();
+  await expect(page.getByText("the database is unavailable")).toHaveCount(0);
+  await expect(page.getByRole("tab", { name: "Overview" })).toHaveCount(0);
+});
