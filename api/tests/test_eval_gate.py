@@ -41,9 +41,19 @@ CHECKLIST = """# Checklist
 """
 
 
-def write_reports(folder: Path, day="2026-10-08", hybrid=96, right="100% (24/24)", bad="0% (0/8)", gaps="100% (12/12)"):
+def write_reports(
+    folder: Path,
+    day="2026-10-08",
+    hybrid=96,
+    right="100% (24/24)",
+    bad="0% (0/8)",
+    gaps="100% (12/12)",
+    offer_right="100% (25/25)",
+    offer_bad="0% (0/18)",
+):
     (folder / f"retrieval-{day}.md").write_text(RETRIEVAL.format(hybrid=hybrid))
     (folder / f"qa-{day}.md").write_text(QA.format(right=right, bad=bad, abstain="100% (8/8)"))
+    (folder / f"qa-offer-{day}.md").write_text(QA.format(right=offer_right, bad=offer_bad, abstain="100% (18/18)"))
     (folder / f"key-terms-{day}.md").write_text(KEY_TERMS.format(right="100% (39/39)", bad="0% (0/30)"))
     (folder / f"checklist-{day}.md").write_text(CHECKLIST.format(right="100% (39/39)", bad="0% (0/21)", gaps=gaps))
 
@@ -58,6 +68,9 @@ def test_the_numbers_are_read_from_each_kind_of_report(tmp_path):
         "qa_cited_right_clause": 100.0,
         "qa_hallucinated": 0.0,
         "qa_correctly_abstained": 100.0,
+        "qa_offer_cited_right_clause": 100.0,
+        "qa_offer_hallucinated": 0.0,
+        "qa_offer_correctly_abstained": 100.0,
         "key_terms_right": 100.0,
         "key_terms_invented": 0.0,
         "checklist_right": 100.0,
@@ -85,6 +98,29 @@ def test_a_steadiness_report_is_not_mistaken_for_one_of_the_evaluations(tmp_path
     (tmp_path / "steadiness-2026-10-10-lease.md").write_text("# Steadiness\n| Way | Found |\n")
 
     assert gate.read_metrics(tmp_path)["qa_cited_right_clause"] == 100.0
+
+
+def test_a_job_offer_report_is_never_mistaken_for_a_loan_and_lease_one_or_the_other_way_round(tmp_path):
+    write_reports(tmp_path, day="2026-10-08", right="100% (32/32)", offer_right="100% (25/25)")
+    # Newer by date, and for the other fixture: each fixture's newest report must be read for its own numbers.
+    (tmp_path / "qa-offer-2026-10-20.md").write_text(QA.format(right="40% (10/25)", bad="50% (9/18)", abstain="50% (9/18)"))
+
+    metrics = gate.read_metrics(tmp_path)
+
+    assert metrics["qa_cited_right_clause"] == 100.0
+    assert metrics["qa_hallucinated"] == 0.0
+    assert metrics["qa_offer_cited_right_clause"] == 40.0
+    assert metrics["qa_offer_hallucinated"] == 50.0
+
+
+def test_a_bad_job_offer_result_is_caught_by_the_same_limits(tmp_path):
+    write_reports(tmp_path, offer_right="80% (20/25)", offer_bad="6% (1/18)")
+    thresholds = json.loads((EVALS / "thresholds.json").read_text())
+
+    problems = gate.check(gate.read_metrics(tmp_path), thresholds)
+
+    assert any(p.startswith("qa_offer_cited_right_clause") for p in problems)
+    assert any(p.startswith("qa_offer_hallucinated") for p in problems)
 
 
 def test_a_file_that_only_starts_like_a_report_is_ignored(tmp_path):
@@ -164,7 +200,7 @@ def test_the_real_thresholds_cover_every_metric_and_the_real_reports_meet_them()
 def test_a_bad_outcome_may_never_be_above_zero_in_the_real_thresholds():
     thresholds = json.loads((EVALS / "thresholds.json").read_text())
 
-    for name in ("qa_hallucinated", "key_terms_invented", "checklist_invented"):
+    for name in ("qa_hallucinated", "qa_offer_hallucinated", "key_terms_invented", "checklist_invented"):
         assert thresholds[name] == {"max": 0}
 
 
