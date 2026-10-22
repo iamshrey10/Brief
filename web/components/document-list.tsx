@@ -457,7 +457,8 @@ function DocumentRow({
             variant="outline"
             size="sm"
             disabled={retrying}
-            aria-label={`Try reading ${doc.filename} again`}
+            // Starts with the words the button shows, so what is read aloud contains what is on it.
+            aria-label={`${retrying ? "Starting..." : "Try again"} to read ${doc.filename}`}
             onClick={retry}
           >
             {retrying ? "Starting..." : "Try again"}

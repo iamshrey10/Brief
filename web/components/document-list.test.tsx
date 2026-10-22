@@ -252,7 +252,7 @@ describe("DocumentList", () => {
       render(<DocumentList documents={[doc("failed", "a", "scan.pdf", { failure_reason: "rate_limit" })]} />);
 
       expect(screen.getByText(/busy right now/)).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Try reading scan.pdf again" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Try again to read scan.pdf" })).toBeInTheDocument();
     });
 
     it("shows no message on documents that have not failed", () => {
@@ -312,7 +312,7 @@ describe("DocumentList", () => {
     it("offers Try again on a document that failed", () => {
       render(<DocumentList documents={[doc("failed", "a", "broken.pdf")]} />);
 
-      expect(screen.getByRole("button", { name: "Try reading broken.pdf again" })).toHaveTextContent(
+      expect(screen.getByRole("button", { name: "Try again to read broken.pdf" })).toHaveTextContent(
         "Try again",
       );
     });
@@ -322,7 +322,7 @@ describe("DocumentList", () => {
         <DocumentList documents={[doc("processing", "a", "stuck.pdf", { created_at: minutesAgo(60) })]} />,
       );
 
-      expect(screen.getByRole("button", { name: "Try reading stuck.pdf again" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Try again to read stuck.pdf" })).toBeInTheDocument();
     });
 
     it("does not offer it on a document that was uploaded long ago but only just started being read again", () => {
@@ -362,10 +362,19 @@ describe("DocumentList", () => {
       const user = userEvent.setup();
       render(<DocumentList documents={[doc("failed", "a", "broken.pdf")]} onRetried={onRetried} />);
 
-      await user.click(screen.getByRole("button", { name: "Try reading broken.pdf again" }));
+      await user.click(screen.getByRole("button", { name: "Try again to read broken.pdf" }));
 
       expect(retryMock).toHaveBeenCalledWith("a");
       await waitFor(() => expect(onRetried).toHaveBeenCalledWith(updated));
+    });
+
+    it("is named with the words it shows first, so what is read aloud contains what is on the button", () => {
+      render(<DocumentList documents={[doc("failed", "a", "broken.pdf")]} />);
+
+      const button = screen.getByRole("button", { name: /^Try again/ });
+
+      expect(button).toHaveTextContent("Try again");
+      expect(button).toHaveAccessibleName("Try again to read broken.pdf");
     });
 
     it("shows progress and cannot be pressed twice while the request is running", async () => {
@@ -373,9 +382,9 @@ describe("DocumentList", () => {
       const user = userEvent.setup();
       render(<DocumentList documents={[doc("failed", "a", "broken.pdf")]} />);
 
-      await user.click(screen.getByRole("button", { name: "Try reading broken.pdf again" }));
+      await user.click(screen.getByRole("button", { name: "Try again to read broken.pdf" }));
 
-      const button = screen.getByRole("button", { name: "Try reading broken.pdf again" });
+      const button = screen.getByRole("button", { name: "Starting... to read broken.pdf" });
       expect(button).toHaveTextContent("Starting...");
       expect(button).toBeDisabled();
       expect(retryMock).toHaveBeenCalledTimes(1);
@@ -388,12 +397,12 @@ describe("DocumentList", () => {
         <DocumentList documents={[doc("failed", "a", "one.pdf"), doc("failed", "b", "two.pdf")]} />,
       );
 
-      await user.click(screen.getByRole("button", { name: "Try reading one.pdf again" }));
+      await user.click(screen.getByRole("button", { name: "Try again to read one.pdf" }));
 
       const [first, second] = screen.getAllByRole("listitem");
       expect(await within(first).findByRole("alert")).toHaveTextContent("Couldn't start that just now.");
       expect(within(second).queryByRole("alert")).not.toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Try reading one.pdf again" })).toBeEnabled();
+      expect(screen.getByRole("button", { name: "Try again to read one.pdf" })).toBeEnabled();
     });
 
     it("clears an earlier error when it is tried again", async () => {
@@ -402,9 +411,9 @@ describe("DocumentList", () => {
       const user = userEvent.setup();
       render(<DocumentList documents={[doc("failed", "a", "one.pdf")]} />);
 
-      await user.click(screen.getByRole("button", { name: "Try reading one.pdf again" }));
+      await user.click(screen.getByRole("button", { name: "Try again to read one.pdf" }));
       await screen.findByRole("alert");
-      await user.click(screen.getByRole("button", { name: "Try reading one.pdf again" }));
+      await user.click(screen.getByRole("button", { name: "Try again to read one.pdf" }));
 
       expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     });

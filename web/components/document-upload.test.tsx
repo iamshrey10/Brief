@@ -568,7 +568,7 @@ describe("DocumentUpload form", () => {
     render(<DocumentUpload initialDocuments={[doc("failed", "d1", "broken.pdf")]} />);
     expect(screen.getByText("Couldn't read")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Try reading broken.pdf again" }));
+    fireEvent.click(screen.getByRole("button", { name: "Try again to read broken.pdf" }));
     await tick(0);
 
     expect(screen.getByText("Processing")).toBeInTheDocument();

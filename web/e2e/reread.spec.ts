@@ -59,11 +59,11 @@ test("a document that could not be read says why in plain words, and Try again r
 
   await expect(row.getByText("Couldn't read")).toBeVisible();
   await expect(row.getByText("No text could be found in this file. A clearer scan or a text based PDF should work.")).toBeVisible();
-  await row.getByRole("button", { name: "Try reading broken-scan.pdf again" }).click();
+  await row.getByRole("button", { name: "Try again to read broken-scan.pdf" }).click();
 
   await expect(row.getByText("Processing")).toBeVisible();
   await expect(row.getByText("Ready")).toBeVisible({ timeout: 15_000 });
-  await expect(row.getByRole("button", { name: "Try reading broken-scan.pdf again" })).toHaveCount(0);
+  await expect(row.getByRole("button", { name: "Try again to read broken-scan.pdf" })).toHaveCount(0);
 
   const calls = await callsMade(page);
   expect(calls.filter((call) => call.method === "POST").map((call) => call.path)).toEqual([
