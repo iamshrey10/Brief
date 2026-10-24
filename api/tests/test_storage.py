@@ -115,3 +115,23 @@ def test_download_file_returns_the_whole_file_from_the_configured_bucket(monkeyp
 
     assert data == PDF + b"x" * 5000  # all of it, not just the start that inspect_upload reads
     assert fake.asked == [("the-bucket", "user/key.pdf")]
+
+
+class _FakeDelete:
+    def __init__(self):
+        self.deleted = []
+
+    def delete_object(self, Bucket, Key):
+        self.deleted.append((Bucket, Key))
+        return {}
+
+
+def test_delete_file_removes_that_key_from_the_configured_bucket_and_can_be_repeated(monkeypatch):
+    fake = _FakeDelete()
+    monkeypatch.setattr(storage, "get_client", lambda: fake)
+    monkeypatch.setattr(storage.settings, "r2_bucket_name", "the-bucket")
+
+    storage.delete_file("user/key.pdf")
+    storage.delete_file("user/key.pdf")  # a delete tried again after a failure is safe
+
+    assert fake.deleted == [("the-bucket", "user/key.pdf")] * 2
