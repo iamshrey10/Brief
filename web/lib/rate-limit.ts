@@ -1,5 +1,7 @@
 import Redis from "ioredis";
 
+import { WINDOW_SECONDS } from "@/lib/retry-after";
+
 let connection: Redis | undefined;
 
 /**
@@ -16,7 +18,6 @@ function redis(): Redis {
 }
 
 const LIMIT_PER_WINDOW = 30;
-const WINDOW_SECONDS = 60;
 
 /**
  * A simple fixed window counter per user, kept in Redis so it's shared across every

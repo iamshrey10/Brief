@@ -58,9 +58,11 @@ describe("requireSession", () => {
   it("refuses someone over their limit with 429 and gives them no token", async () => {
     limitMock.mockResolvedValue(false);
 
-    const refused = await errorOf(await requireSession());
+    const result = await requireSession();
+    const refused = await errorOf(result);
 
     expect(refused).toEqual({ status: 429, body: { error: "too many requests" } });
+    expect("error" in result && result.error.headers.get("Retry-After")).toMatch(/^([1-9]|[1-5][0-9]|60)$/);
     expect(mintMock).not.toHaveBeenCalled();
   });
 

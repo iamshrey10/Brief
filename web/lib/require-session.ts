@@ -1,5 +1,6 @@
 import { auth } from "@/auth";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { secondsUntilNextWindow } from "@/lib/retry-after";
 import { mintServiceToken } from "@/lib/service-token";
 
 type SessionResult = { token: string } | { error: Response };
@@ -17,7 +18,12 @@ export async function requireSession(): Promise<SessionResult> {
 
   const allowed = await checkRateLimit(email);
   if (!allowed) {
-    return { error: Response.json({ error: "too many requests" }, { status: 429 }) };
+    return {
+      error: Response.json(
+        { error: "too many requests" },
+        { status: 429, headers: { "Retry-After": String(secondsUntilNextWindow()) } },
+      ),
+    };
   }
 
   return { token: await mintServiceToken(email) };
