@@ -6,7 +6,7 @@ import { DeleteAccount } from "@/components/delete-account";
 import { DocumentUpload } from "@/components/document-upload";
 import { ThemeToggle } from "@/components/theme-toggle";
 
-export const metadata = { title: "Your contracts" };
+export const metadata = { title: "Your contracts", robots: { index: false, follow: false } };
 
 async function fetchInitialDocuments(email: string) {
   const backendUrl = process.env.BACKEND_URL ?? "http://localhost:8000";

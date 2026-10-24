@@ -10,7 +10,7 @@ import {
 } from "@/lib/documents";
 import { mintServiceToken } from "@/lib/service-token";
 
-export const metadata = { title: "Document" };
+export const metadata = { title: "Document", robots: { index: false, follow: false } };
 
 const backendUrl = process.env.BACKEND_URL ?? "http://localhost:8000";
 

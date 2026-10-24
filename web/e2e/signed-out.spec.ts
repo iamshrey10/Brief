@@ -54,4 +54,11 @@ test.describe("someone who is not signed in", () => {
     expect(response.status()).toBe(200);
     expect(await response.json()).toEqual({ ready: true, redis: "ok" });
   });
+
+  test("robots.txt keeps search engines out of the dashboard and the API routes", async ({ request }) => {
+    const text = await (await request.get("/robots.txt")).text();
+
+    expect(text).toContain("Disallow: /dashboard");
+    expect(text).toContain("Disallow: /api/");
+  });
 });

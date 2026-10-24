@@ -163,4 +163,8 @@ describe("the document page tab title", () => {
   it("does not put the file name, which is private, into the title", () => {
     expect(metadata.title).toBe("Document");
   });
+
+  it("asks search engines not to index it", () => {
+    expect(metadata.robots).toEqual({ index: false, follow: false });
+  });
 });

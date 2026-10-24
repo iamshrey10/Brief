@@ -100,4 +100,8 @@ describe("the dashboard tab title", () => {
   it("says what the page is, and the site name is added after it", () => {
     expect(metadata.title).toBe("Your contracts");
   });
+
+  it("asks search engines not to index it", () => {
+    expect(metadata.robots).toEqual({ index: false, follow: false });
+  });
 });
