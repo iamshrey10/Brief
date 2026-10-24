@@ -35,3 +35,22 @@ Schema is managed with SQLAlchemy models (`app/models.py`) and Alembic migration
 
 Requires Postgres with the pgvector extension, already provided by the `docker-compose.yml` at the
 repository root.
+
+## Tests and coverage
+
+    .venv/bin/python -m pytest              # the tests, which need Postgres (docker compose up -d)
+    .venv/bin/python -m pytest --cov        # the same, and which lines of app/ they ran
+
+`--cov` reads `.coveragerc` and fails the run if coverage of `app/` falls below the floor in it (99 percent), which is
+what CI does. Two things worth knowing:
+
+- **The settings in `.coveragerc` matter.** The database layer runs inside greenlets and some work runs in threads,
+  and coverage does not follow either unless told to (`concurrency = greenlet,thread`). Without that, the same tests
+  reported 67 percent for `main.py` when it was really 99, which would have sent me to "fix" 117 lines that were fine.
+- **Every line run is not every behaviour checked.** A line can run without anything asserting what it did. For that I
+  break the code on purpose and check a test fails (a mutation check), and the evaluations in `evals/` measure the
+  answers themselves. Coverage only finds lines nothing runs at all, which is how it found `/health/db` and `/me`
+  untested, and a missing token answering 422 instead of 401.
+
+One line is excluded on purpose: `raise AssertionError("unreachable")` in `app/model_call.py`, a safety net after a
+loop that always returns or raises.
