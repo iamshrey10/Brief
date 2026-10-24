@@ -17,7 +17,14 @@ checklist for the real sign in, the real API and the real model. [infra/DEPLOY.m
 
 ## Why this exists
 
-Coming soon.
+Education loans, leases and job offers are the contracts people sign with the least help and the most at stake, and
+they are written to be skimmed, not read. Pasting one into a general chatbot gets a fluent answer with nothing to check
+it against, and a confident answer to a question the document never answers.
+
+Brief is built around the opposite rule: nothing is shown that cannot be proved from the document's own words. Every
+answer carries the quote it came from, checked word for word. A question the document does not answer is said not to be
+answered, and the important ones are listed with wording to ask the other side. Where Brief is unsure, it says so, and
+what it has and has not been measured on is in [STATUS.md](STATUS.md).
 
 ## How an answer is checked
 
