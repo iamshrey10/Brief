@@ -121,3 +121,10 @@ def test_the_blank_secret_error_does_not_print_anything_secret():
         make(service_jwt_secret="   ")
 
     assert "input_value" not in str(caught.value)
+
+
+def test_the_log_format_defaults_to_text_and_accepts_json_only_besides():
+    assert Settings(service_jwt_secret="x" * 40).log_format == "text"
+    assert Settings(service_jwt_secret="x" * 40, log_format="JSON").log_format == "json"
+    with pytest.raises(ValueError):
+        Settings(service_jwt_secret="x" * 40, log_format="xml")

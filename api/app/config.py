@@ -7,12 +7,16 @@ DEV_SERVICE_SECRET = "dev-only-secret-change-me"
 DEV_DATABASE_PASSWORD = "brief_dev_password"
 
 ENVIRONMENTS = ("development", "test", "production")
+LOG_FORMATS = ("text", "json")
 MIN_SECRET_LENGTH = 32
 
 
 class Settings(BaseSettings):
     # development, test, or production. Production refuses to start with the built-in secrets.
     environment: str = "development"
+
+    # text for a person reading a terminal, json for a host that collects logs: one object a line.
+    log_format: str = "text"
 
     database_url: str = f"postgresql+asyncpg://brief:{DEV_DATABASE_PASSWORD}@localhost:5432/brief"
     service_jwt_secret: str = DEV_SERVICE_SECRET
@@ -34,6 +38,14 @@ class Settings(BaseSettings):
         name = value.strip().lower()
         if name not in ENVIRONMENTS:
             raise ValueError(f"ENVIRONMENT must be one of {', '.join(ENVIRONMENTS)}")
+        return name
+
+    @field_validator("log_format")
+    @classmethod
+    def _known_log_format(cls, value: str) -> str:
+        name = value.strip().lower()
+        if name not in LOG_FORMATS:
+            raise ValueError(f"LOG_FORMAT must be one of {', '.join(LOG_FORMATS)}")
         return name
 
     @model_validator(mode="after")

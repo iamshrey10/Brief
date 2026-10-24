@@ -110,3 +110,54 @@ def test_a_line_written_outside_any_request_shows_a_dash_instead_of_an_id(clean_
     logging.getLogger("app.qa").info("starting up")
 
     assert "[-]" in capsys.readouterr().err
+
+
+def test_json_format_writes_one_json_object_per_line_with_the_request_id(clean_app_logger, capsys):
+    import json
+
+    from app import request_id
+
+    configure_logging("json")
+    token = request_id.current.set("req-abc12345")
+    try:
+        logging.getLogger("app.qa").info("answering")
+    finally:
+        request_id.current.reset(token)
+
+    line = capsys.readouterr().err.strip()
+    entry = json.loads(line)
+    assert entry["message"] == "answering"
+    assert (entry["level"], entry["logger"], entry["request_id"]) == ("INFO", "app.qa", "req-abc12345")
+    assert entry["time"].endswith("+00:00")
+
+
+def test_json_format_keeps_a_new_line_inside_the_message_on_one_line(clean_app_logger, capsys):
+    import json
+
+    configure_logging("json")
+    logging.getLogger("app.qa").info("first\nsecond")
+
+    lines = capsys.readouterr().err.strip().splitlines()
+    assert len(lines) == 1
+    assert json.loads(lines[0])["message"] == "first\nsecond"
+
+
+def test_json_format_names_the_type_of_an_error_and_never_its_message_or_trace(clean_app_logger, capsys):
+    import json
+
+    configure_logging("json")
+    try:
+        raise ValueError("a private contract sentence")
+    except ValueError:
+        logging.getLogger("app.ingestion").exception("ingestion failed")
+
+    text = capsys.readouterr().err
+    assert json.loads(text.strip())["error_type"] == "ValueError"
+    assert "private contract sentence" not in text and "Traceback" not in text
+
+
+def test_an_unknown_log_format_is_refused(clean_app_logger):
+    import pytest
+
+    with pytest.raises(ValueError, match="text or json"):
+        configure_logging("xml")
