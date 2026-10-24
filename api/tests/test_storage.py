@@ -92,3 +92,26 @@ def test_another_storage_error_is_not_mistaken_for_a_missing_file(monkeypatch):
 
     with pytest.raises(ClientError):
         inspect_upload("user/key.pdf")
+
+
+class _FakeWhole:
+    """Hands back a whole file and records which bucket and key were asked for."""
+
+    def __init__(self, body=b""):
+        self.body = body
+        self.asked = []
+
+    def get_object(self, Bucket, Key):
+        self.asked.append((Bucket, Key))
+        return {"Body": type("Body", (), {"read": lambda _self: self.body})()}
+
+
+def test_download_file_returns_the_whole_file_from_the_configured_bucket(monkeypatch):
+    fake = _FakeWhole(body=PDF + b"x" * 5000)
+    monkeypatch.setattr(storage, "get_client", lambda: fake)
+    monkeypatch.setattr(storage.settings, "r2_bucket_name", "the-bucket")
+
+    data = storage.download_file("user/key.pdf")
+
+    assert data == PDF + b"x" * 5000  # all of it, not just the start that inspect_upload reads
+    assert fake.asked == [("the-bucket", "user/key.pdf")]
