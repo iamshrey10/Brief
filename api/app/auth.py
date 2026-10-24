@@ -9,14 +9,15 @@ from app.db import get_session
 from app.models import User
 
 
-async def verify_service_token(authorization: str = Header(...)) -> str:
+async def verify_service_token(authorization: str | None = Header(default=None)) -> str:
     """Verifies the short-lived token minted by the Next.js backend-for-frontend layer.
 
     The frontend never lets the browser call this API directly, it mints this token
     server-side after checking the user's real session, so a valid token here means a
     real signed-in user made this request a moment ago.
     """
-    if not authorization.startswith("Bearer "):
+    # A missing header is the same as a wrong one: not signed in. Making it required would answer 422 instead.
+    if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="missing bearer token")
 
     token = authorization.removeprefix("Bearer ")
