@@ -1,12 +1,17 @@
 import { expect, test } from "@playwright/test";
 
 test.describe("someone who is not signed in", () => {
-  for (const path of ["/dashboard", "/dashboard/documents/00000000-0000-0000-0000-000000000000"]) {
+  for (const path of [
+    "/dashboard",
+    "/dashboard/documents/00000000-0000-0000-0000-000000000000",
+  ]) {
     test(`is sent to the landing page from ${path}`, async ({ page }) => {
       await page.goto(path);
 
       expect(new URL(page.url()).pathname).toBe("/");
-      await expect(page.getByRole("button", { name: "Sign in with Google" })).toBeVisible();
+      await expect(
+        page.getByRole("button", { name: "Sign in with Google" }),
+      ).toBeVisible();
     });
   }
 
@@ -27,47 +32,78 @@ test.describe("someone who is not signed in", () => {
   test("cannot delete or rename a document", async ({ request }) => {
     const id = "00000000-0000-0000-0000-000000000000";
 
-    expect((await request.delete(`/api/backend/documents/${id}`)).status()).toBe(401);
     expect(
-      (await request.patch(`/api/backend/documents/${id}`, { data: { filename: "x.pdf" } })).status(),
+      (await request.delete(`/api/backend/documents/${id}`)).status(),
+    ).toBe(401);
+    expect(
+      (
+        await request.patch(`/api/backend/documents/${id}`, {
+          data: { filename: "x.pdf" },
+        })
+      ).status(),
     ).toBe(401);
   });
 
   test("cannot ask a question of a document", async ({ request }) => {
-    const response = await request.post("/api/backend/documents/00000000-0000-0000-0000-000000000000/ask", {
-      data: { question: "What is the rent?" },
-    });
+    const response = await request.post(
+      "/api/backend/documents/00000000-0000-0000-0000-000000000000/ask",
+      {
+        data: { question: "What is the rent?" },
+      },
+    );
 
     expect(response.status()).toBe(401);
   });
 
-  test("is still given a request id to quote when refused", async ({ request }) => {
+  test("is still given a request id to quote when refused", async ({
+    request,
+  }) => {
     const response = await request.get("/api/backend/documents");
 
     expect(response.status()).toBe(401);
     expect(response.headers()["x-request-id"]).toMatch(/^[0-9a-f-]{36}$/);
   });
 
-  test("the website's own health check answers without signing in and says Redis is up", async ({ request }) => {
+  test("the website's own health check answers without signing in and says Redis is up", async ({
+    request,
+  }) => {
     const response = await request.get("/api/health");
 
     expect(response.status()).toBe(200);
     expect(await response.json()).toEqual({ ready: true, redis: "ok" });
   });
 
-  test("robots.txt keeps search engines out of the dashboard and the API routes", async ({ request }) => {
+  test("robots.txt keeps search engines out of the dashboard and the API routes", async ({
+    request,
+  }) => {
     const text = await (await request.get("/robots.txt")).text();
 
     expect(text).toContain("Disallow: /dashboard");
     expect(text).toContain("Disallow: /api/");
   });
 
-  test("the privacy page opens without signing in, from a link on the landing page", async ({ page }) => {
+  test("the privacy page opens without signing in, from a link on the landing page", async ({
+    page,
+  }) => {
     await page.goto("/");
     await page.getByRole("link", { name: "Privacy" }).click();
 
     await expect(page).toHaveURL(/\/privacy$/);
-    await expect(page.getByRole("heading", { level: 1, name: "Privacy" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Privacy" }),
+    ).toBeVisible();
     await expect(page).toHaveTitle("Privacy | Brief");
+  });
+
+  test("the terms page opens without signing in, from a link on the landing page", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await page.getByRole("link", { name: "Terms" }).click();
+
+    await expect(page).toHaveURL(/\/terms$/);
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Terms" }),
+    ).toBeVisible();
   });
 });

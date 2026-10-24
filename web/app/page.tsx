@@ -67,6 +67,9 @@ export default async function Home() {
             <Link href="/privacy" className="underline-offset-4 hover:underline">
               Privacy
             </Link>
+            <Link href="/terms" className="underline-offset-4 hover:underline">
+              Terms
+            </Link>
           </nav>
         </div>
         <DocumentPreview />
