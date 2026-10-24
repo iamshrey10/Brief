@@ -47,4 +47,11 @@ test.describe("someone who is not signed in", () => {
     expect(response.status()).toBe(401);
     expect(response.headers()["x-request-id"]).toMatch(/^[0-9a-f-]{36}$/);
   });
+
+  test("the website's own health check answers without signing in and says Redis is up", async ({ request }) => {
+    const response = await request.get("/api/health");
+
+    expect(response.status()).toBe(200);
+    expect(await response.json()).toEqual({ ready: true, redis: "ok" });
+  });
 });

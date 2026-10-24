@@ -33,3 +33,12 @@ export async function checkRateLimit(identifier: string): Promise<boolean> {
 
   return count <= LIMIT_PER_WINDOW;
 }
+
+/** Whether Redis answers, for the readiness check. Never throws: a failure is just "no". */
+export async function redisIsReachable(): Promise<boolean> {
+  try {
+    return (await redis().ping()) === "PONG";
+  } catch {
+    return false;
+  }
+}
