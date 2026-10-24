@@ -10,6 +10,8 @@ import {
 } from "@/lib/documents";
 import { mintServiceToken } from "@/lib/service-token";
 
+export const metadata = { title: "Document" };
+
 const backendUrl = process.env.BACKEND_URL ?? "http://localhost:8000";
 
 function Notice({ title, children }: { title: string; children: React.ReactNode }) {

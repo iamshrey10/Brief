@@ -3,6 +3,7 @@ import localFont from "next/font/local";
 import { GeistMono } from "geist/font/mono";
 import { GeistSans } from "geist/font/sans";
 import { ThemeProvider } from "@/components/theme-provider";
+import { siteMetadata } from "@/lib/site-metadata";
 import "./globals.css";
 
 // Every font is served from a package in node_modules, never fetched from Google, so a build does
@@ -23,10 +24,7 @@ const fraunces = localFont({
   ],
 });
 
-export const metadata: Metadata = {
-  title: "Brief",
-  description: "Every clause, explained.",
-};
+export const metadata: Metadata = siteMetadata;
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (

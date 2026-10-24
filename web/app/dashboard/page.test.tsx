@@ -12,7 +12,7 @@ vi.mock("next/navigation", () => ({
 
 import { auth } from "@/auth";
 import { ThemeToggle } from "@/components/theme-toggle";
-import Dashboard from "./page";
+import Dashboard, { metadata } from "./page";
 
 const authMock = auth as unknown as ReturnType<typeof vi.fn>;
 const fetchMock = vi.fn();
@@ -93,5 +93,11 @@ describe("the dashboard light and dark mode button", () => {
     const header = elements(tree).find((node) => node.type === "header");
 
     expect(elements(header).some((node) => node.type === ThemeToggle)).toBe(true);
+  });
+});
+
+describe("the dashboard tab title", () => {
+  it("says what the page is, and the site name is added after it", () => {
+    expect(metadata.title).toBe("Your contracts");
   });
 });

@@ -18,7 +18,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 import { auth } from "@/auth";
-import DocumentPage from "./page";
+import DocumentPage, { metadata } from "./page";
 
 const authMock = auth as unknown as ReturnType<typeof vi.fn>;
 const fetchMock = vi.fn();
@@ -156,5 +156,11 @@ describe("the document page", () => {
 
     expect(html).toContain("No readable text found");
     expect(html).not.toContain("data-workspace");
+  });
+});
+
+describe("the document page tab title", () => {
+  it("does not put the file name, which is private, into the title", () => {
+    expect(metadata.title).toBe("Document");
   });
 });
