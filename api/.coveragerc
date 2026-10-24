@@ -1,0 +1,14 @@
+[run]
+source = app
+# The database layer runs inside greenlets and some work runs in threads. Without these two the numbers are
+# far too low (main.py read 67 percent when it was really 99), because coverage does not follow either by default.
+concurrency = greenlet,thread
+
+[report]
+show_missing = True
+skip_covered = True
+# Fails a coverage run that falls below this, so a drop is noticed. It is a floor, not a goal.
+fail_under = 97
+exclude_lines =
+    pragma: no cover
+    raise AssertionError\("unreachable"\)
