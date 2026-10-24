@@ -61,4 +61,13 @@ test.describe("someone who is not signed in", () => {
     expect(text).toContain("Disallow: /dashboard");
     expect(text).toContain("Disallow: /api/");
   });
+
+  test("the privacy page opens without signing in, from a link on the landing page", async ({ page }) => {
+    await page.goto("/");
+    await page.getByRole("link", { name: "Privacy" }).click();
+
+    await expect(page).toHaveURL(/\/privacy$/);
+    await expect(page.getByRole("heading", { level: 1, name: "Privacy" })).toBeVisible();
+    await expect(page).toHaveTitle("Privacy | Brief");
+  });
 });

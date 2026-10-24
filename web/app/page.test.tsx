@@ -47,4 +47,9 @@ describe("the landing page", () => {
 
     expect(html).toContain("Sign in with Google");
   });
+
+  it("links to the privacy page, whether or not someone is signed in", async () => {
+    expect(await landing(null)).toContain('href="/privacy"');
+    expect(await landing({ user: { email: "reader@example.com" } })).toContain('href="/privacy"');
+  });
 });

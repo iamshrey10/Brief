@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth, signOut } from "@/auth";
 import { Button } from "@/components/ui/button";
@@ -65,6 +66,9 @@ export default async function Dashboard() {
         <p className="text-xs text-muted-foreground">
           Brief explains what a document says. It isn&apos;t legal advice.
         </p>
+        <Link href="/privacy" className="text-xs text-muted-foreground underline-offset-4 hover:underline">
+          Privacy
+        </Link>
         <DeleteAccount />
       </footer>
     </div>

@@ -63,6 +63,11 @@ export default async function Home() {
           <p className="font-mono text-xs tracking-wide text-muted-foreground">
             SHREYASREVANKAR.COM
           </p>
+          <nav aria-label="Legal" className="flex justify-center gap-4 text-xs text-muted-foreground md:justify-start">
+            <Link href="/privacy" className="underline-offset-4 hover:underline">
+              Privacy
+            </Link>
+          </nav>
         </div>
         <DocumentPreview />
       </div>
