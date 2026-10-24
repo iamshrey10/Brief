@@ -4,6 +4,7 @@ const redis = vi.hoisted(() => ({
   counts: new Map<string, number>(),
   expires: [] as [string, number][],
   incr: vi.fn(),
+  ping: vi.fn(),
   expire: vi.fn(),
   on: vi.fn(),
   created: [] as (string | undefined)[],
@@ -12,6 +13,7 @@ const redis = vi.hoisted(() => ({
 vi.mock("ioredis", () => ({
   default: class FakeRedis {
     incr = redis.incr;
+    ping = redis.ping;
     expire = redis.expire;
     on = redis.on;
     constructor(url?: string) {
@@ -20,7 +22,7 @@ vi.mock("ioredis", () => ({
   },
 }));
 
-import { checkRateLimit } from "./rate-limit";
+import { checkRateLimit, redisIsReachable } from "./rate-limit";
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -166,5 +168,22 @@ describe("the Redis connection", () => {
     expect(logged).toHaveBeenCalledTimes(1);
     expect(JSON.stringify(logged.mock.calls)).not.toContain("private-person");
     logged.mockRestore();
+  });
+});
+
+describe("redisIsReachable", () => {
+  it("is true when Redis answers PONG", async () => {
+    redis.ping.mockResolvedValue("PONG");
+    expect(await redisIsReachable()).toBe(true);
+  });
+
+  it("is false for any other answer", async () => {
+    redis.ping.mockResolvedValue("something else");
+    expect(await redisIsReachable()).toBe(false);
+  });
+
+  it("is false, and does not throw, when Redis cannot be reached", async () => {
+    redis.ping.mockRejectedValue(new Error("connect ECONNREFUSED 10.0.0.5:6379"));
+    expect(await redisIsReachable()).toBe(false);
   });
 });
