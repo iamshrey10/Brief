@@ -329,3 +329,20 @@ async def test_reranked_search_returns_nothing_for_a_document_with_no_clauses(
     monkeypatch.setattr("app.retrieval.embed_query", lambda query: _make_unit_vector(0))
 
     assert await reranked_search(db_session, document.id, "anything") == []
+
+
+def test_embed_query_embeds_the_one_query_the_same_way_clauses_are_embedded(monkeypatch):
+    from app import retrieval
+
+    asked: list[list[str]] = []
+
+    def fake_embed_texts(texts):
+        asked.append(list(texts))
+        return [[0.25, 0.5, 0.75]]
+
+    monkeypatch.setattr(retrieval, "embed_texts", fake_embed_texts)
+
+    vector = retrieval.embed_query("Can I pay early?")
+
+    assert vector == [0.25, 0.5, 0.75]  # the vector itself, not a list holding it
+    assert asked == [["Can I pay early?"]]
