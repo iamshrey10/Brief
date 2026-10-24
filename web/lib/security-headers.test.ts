@@ -63,3 +63,40 @@ describe("next.config for a container", () => {
     expect(nextConfig.output).toBe("standalone");
   });
 });
+
+describe("the report only policy", () => {
+  const policy = () => byKey()["Content-Security-Policy-Report-Only"];
+  const directive = (name: string) =>
+    policy()
+      .split(";")
+      .map((part) => part.trim())
+      .find((part) => part.startsWith(`${name} `));
+
+  it("is sent, and the enforced policy is still only the framing rule so nothing can break yet", () => {
+    expect(policy()).toBeTruthy();
+    expect(byKey()["Content-Security-Policy"]).toBe("frame-ancestors 'none'");
+  });
+
+  it("allows only this site by default, and no plugins", () => {
+    expect(directive("default-src")).toBe("default-src 'self'");
+    expect(directive("object-src")).toBe("object-src 'none'");
+    expect(directive("base-uri")).toBe("base-uri 'self'");
+  });
+
+  it("lets the browser send an upload to the storage service and nowhere else outside this site", () => {
+    expect(directive("connect-src")).toBe("connect-src 'self' https://*.r2.cloudflarestorage.com");
+  });
+
+  it("allows a form to post to this site and to Google, for signing in", () => {
+    expect(directive("form-action")).toBe("form-action 'self' https://accounts.google.com");
+  });
+
+  it("never allows a wildcard for scripts and never allows eval", () => {
+    expect(policy()).not.toMatch(/script-src[^;]*\s\*(\s|;|$)/);
+    expect(policy()).not.toContain("unsafe-eval");
+  });
+
+  it("keeps the site out of other pages' frames", () => {
+    expect(directive("frame-ancestors")).toBe("frame-ancestors 'none'");
+  });
+});
