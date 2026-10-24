@@ -118,3 +118,13 @@ def test_segment_covers_every_character_of_the_original_text_in_order():
         assert current[1] == following[0]
     assert segments[0][0] == 0
     assert segments[-1][1] == len(text)
+
+
+def test_blank_space_before_the_first_numbered_clause_is_skipped_and_the_offsets_still_point_into_the_page():
+    text = "   \n1. Alpha beta.\n   \n2. Gamma."
+
+    segments = segment_page_into_clauses(text)
+
+    assert [body for _start, _end, body in segments] == ["1. Alpha beta.", "2. Gamma."]
+    for start, end, body in segments:
+        assert text[start:end].strip() == body
