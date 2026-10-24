@@ -7,8 +7,8 @@ concurrency = greenlet,thread
 [report]
 show_missing = True
 skip_covered = True
-# Fails a coverage run that falls below this, so a drop is noticed. It is a floor, not a goal.
-fail_under = 97
+# Fails a coverage run that falls below this, so a drop is noticed. It is a floor, not a goal, and 100 percent of lines is not proof of anything.
+fail_under = 99
 exclude_lines =
     pragma: no cover
     raise AssertionError\("unreachable"\)
