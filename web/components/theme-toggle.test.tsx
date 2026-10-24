@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
 import { cleanup, render, screen } from "@testing-library/react";
+import { renderToStaticMarkup } from "react-dom/server";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -34,5 +35,16 @@ describe("ThemeToggle", () => {
     await userEvent.click(screen.getByRole("button", { name: "Dark mode" }));
 
     expect(setTheme).toHaveBeenCalledExactlyOnceWith("dark");
+  });
+});
+
+describe("ThemeToggle before the browser has taken over", () => {
+  it("renders an empty space of the same size and no button, so the page does not jump or show the wrong label", () => {
+    const html = renderToStaticMarkup(<ThemeToggle />);
+
+    expect(html).toContain("h-9 w-24");
+    expect(html).not.toContain("<button");
+    expect(html).not.toContain("Light mode");
+    expect(html).not.toContain("Dark mode");
   });
 });
