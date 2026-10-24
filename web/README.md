@@ -21,6 +21,19 @@ Open http://localhost:3000
     pnpm test
     pnpm build
 
+## Unit tests and coverage
+
+    pnpm test               # the unit and component tests
+    pnpm test:coverage      # the same, and how much of the app's own code they ran
+
+`pnpm test:coverage` fails if coverage falls below the floor in `vitest.config.mts` (97 percent of statements and lines,
+95 percent of branches and functions), which is what CI runs. It measures the app's own code and leaves out the tests,
+the generated shadcn Button, and three files that only wire something up (the sign in middleware, the Auth.js route and
+the theme provider), because a unit test can say nothing about a one line re-export and the browser tests exercise them
+for real. The floor is a little under what the tests reach today, so a drop is noticed. It is not a goal, and a line being
+run is not the same as its behaviour being checked: for that I break the code on purpose and look for a test that fails,
+and the browser tests check the screens as a person would see them.
+
 ## Browser tests
 
     pnpm exec playwright install chromium   # once
