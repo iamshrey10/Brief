@@ -25,7 +25,8 @@ jobs:
           cache-dependency-path: web/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
-      - run: pnpm test
+      # the unit tests, failing the run if coverage of the app's own code falls below the floor in vitest.config.mts
+      - run: pnpm test:coverage
       - run: pnpm build
 
   web-browser:
