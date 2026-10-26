@@ -1,7 +1,7 @@
 """Ground truth for the key-terms evaluation.
 
 The 17-clause mixed fixture from the retrieval evaluation is split into a loan document and a
-lease document. For every key-term field of that document type this says which clause states
+lease document, and a job offer (offer_fixture.py) is the third. For every key-term field of that document type this says which clause states
 it, or None when the document genuinely does not. Most fields are None on purpose: the
 fixture never names a lender, an amount, a rent, or a date, so a model that fills those in is
 inventing them.
@@ -14,6 +14,7 @@ so "6.8%" and "six point eight percent" both count. An empty list means only the
 checked.
 """
 
+from offer_fixture import CLAUSES as OFFER_CLAUSES
 from retrieval_fixture import CLAUSES
 
 LOAN_KEYS = [
@@ -81,6 +82,22 @@ LEASE_EXPECTED: dict[str, Expected] = {
 # non-refundable, so whether they belong in that field is a judgment call.
 LEASE_AMBIGUOUS = {"nonrefundable_fees"}
 
+# The job offer, added on October 25 and written before any result was seen for it. Employer and job title are
+# never named in the fixture, so a model that fills them in is inventing them. `bonus` is stated in two clauses (the
+# signing bonus and the annual one), so which clause a model picks first is a judgment call and it is not scored.
+OFFER_EXPECTED: dict[str, Expected] = {
+    "employer": None,
+    "job_title": None,
+    "start_date": ("start_date", ["first monday", "monday", "next month"]),
+    "base_salary": ("base_salary", ["120", "one hundred twenty", "two weeks", "every two"]),
+    "equity": ("equity_grant", ["4,000", "four thousand", "4000", "options", "vest"]),
+    "benefits": ("benefits", ["health", "dental", "vision", "80", "eighty"]),
+    "at_will": ("at_will", ["at will", "at-will", "any time", "either"]),
+    "non_compete": ("noncompete", ["twelve", "12", "competitor"]),
+    "repayment_clause": ("signing_bonus", ["repay", "repaid", "twelve months", "12 months", "15,000", "fifteen"]),
+}
+OFFER_AMBIGUOUS = {"bonus"}
+
 DOCUMENTS = {
     "loan": {
         "clauses": {key: CLAUSES[key] for key in LOAN_KEYS},
@@ -91,5 +108,10 @@ DOCUMENTS = {
         "clauses": {key: CLAUSES[key] for key in LEASE_KEYS},
         "expected": LEASE_EXPECTED,
         "ambiguous": LEASE_AMBIGUOUS,
+    },
+    "offer": {
+        "clauses": OFFER_CLAUSES,
+        "expected": OFFER_EXPECTED,
+        "ambiguous": OFFER_AMBIGUOUS,
     },
 }

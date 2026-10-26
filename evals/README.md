@@ -48,7 +48,7 @@ related fact; the second time the question was left as written and the answering
 
 ## Key-terms evaluation
 
-Runs key-term extraction over a loan document and a lease document built from the same fixture,
+Runs key-term extraction over a loan document and a lease document built from the same fixture, and a job offer,
 three times each, and scores two things: whether each term the document states is found with the
 right clause and value, and whether the terms it does not state come back as "not mentioned"
 instead of an invented value. Most fields are not stated on purpose. It also records what the

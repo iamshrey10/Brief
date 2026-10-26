@@ -96,3 +96,33 @@ def test_no_two_fixtures_write_to_the_same_report_name():
 def test_each_fixture_says_how_its_questions_were_written():
     for fixture in fixtures_module.FIXTURES.values():
         assert "before any results" in fixture.provenance
+
+
+# --- the key terms ground truth: every field of a document type is accounted for ---
+
+key_terms_fixture = importlib.import_module("key_terms_fixture")
+
+
+@pytest.mark.parametrize("doc_type", ["loan", "lease", "offer"])
+def test_the_key_terms_ground_truth_accounts_for_every_field_of_its_document_type(doc_type):
+    from app.key_term_fields import fields_for
+
+    spec = key_terms_fixture.DOCUMENTS[doc_type]
+    named = {field.name for field in fields_for(doc_type)}
+
+    accounted = set(spec["expected"]) | set(spec["ambiguous"])
+    assert named - accounted == set(), f"{doc_type}: no ground truth for {named - accounted}"
+    assert set(spec["expected"]) - named == set(), f"{doc_type}: ground truth for a field that does not exist"
+
+
+@pytest.mark.parametrize("doc_type", ["loan", "lease", "offer"])
+def test_every_clause_the_ground_truth_points_at_is_in_that_document(doc_type):
+    spec = key_terms_fixture.DOCUMENTS[doc_type]
+
+    for field, expected in spec["expected"].items():
+        if expected is not None:
+            assert expected[0] in spec["clauses"], f"{doc_type}.{field} points at a clause the document does not have"
+
+
+def test_the_job_offer_document_is_the_whole_offer_fixture():
+    assert key_terms_fixture.DOCUMENTS["offer"]["clauses"] == offer_fixture.CLAUSES

@@ -1,8 +1,8 @@
 """Key-terms evaluation: does extraction find the facts a document states, point at the right
 clause, and say "not mentioned" for the ones it doesn't state?
 
-Runs the real pipeline, Gemini plus the quote and number checks, over a loan document and a
-lease document built from the fixture in key_terms_fixture.py, then writes a dated markdown
+Runs the real pipeline, Gemini plus the quote and number checks, over a loan document, a
+lease document and a job offer built from the fixtures in key_terms_fixture.py, then writes a dated markdown
 report to evals/results/. Each document is extracted three times, because a model that gives
 a different answer on a rerun is not one to trust. Eighteen Gemini calls in all: six extractions, each the vote of three seeded reads.
 
@@ -123,7 +123,7 @@ def render_report(outcomes: list[FieldOutcome], seconds: list[float]) -> str:
         f"Model under test: `{MODEL}`.",
         "",
         f"A loan document (9 clauses) and a lease document (8 clauses) built from the "
-        f"retrieval fixture, each extracted {REPEATS} times (each extraction is itself the vote of {key_terms_module.KEY_TERMS_RUNS} seeded reads) with real Gemini and the real quote "
+        f"retrieval fixture, and a job offer (17 clauses) from the offer fixture, each extracted {REPEATS} times (each extraction is itself the vote of {key_terms_module.KEY_TERMS_RUNS} seeded reads) with real Gemini and the real quote "
         "and number checks. Ground truth was written before any results were seen and not "
         "tuned afterward. Most fields are not stated in the fixture on purpose, so inventing a "
         "value is a measurable failure.",
