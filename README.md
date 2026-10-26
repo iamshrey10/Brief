@@ -10,6 +10,8 @@ pulls out the terms that actually cost you money, and flagging anything unusual 
 Status: in active development. [STATUS.md](STATUS.md) has the honest picture: what works today,
 what is left, the numbers, and the expected finish. It is refreshed every week.
 
+`scripts/check-all.sh` runs every check CI runs (add `--e2e` for the browser tests), stopping at the first failure.
+
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) draws how it is put together: the parts, the data, the path of an upload, and
 how an answer is reached and held back. To try it yourself, [docs/MANUAL-TEST.md](docs/MANUAL-TEST.md) is a step by step
 checklist for the real sign in, the real API and the real model. [infra/DEPLOY.md](infra/DEPLOY.md) is the checklist for putting it online, and
