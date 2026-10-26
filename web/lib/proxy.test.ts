@@ -21,8 +21,8 @@ afterEach(() => {
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
-const backendResponse = (body: unknown, status = 200) =>
-  ({ status, json: async () => body }) as Response;
+const backendResponse = (body: unknown, status = 200, headers: Record<string, string> = {}) =>
+  ({ status, headers: new Headers(headers), json: async () => body }) as Response;
 
 describe("proxyGet", () => {
   it("returns the session error and never calls the backend when the user is not allowed", async () => {
@@ -307,5 +307,28 @@ describe("the request id", () => {
     expect(res.status).toBe(429);
     expect(res.headers.get("X-Request-ID")).toMatch(UUID);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("Retry-After", () => {
+  it("is passed on from the backend, so the browser knows how long a daily limit lasts", async () => {
+    fetchMock.mockResolvedValue(backendResponse({ detail: "limit" }, 429, { "Retry-After": "3600" }));
+
+    const res = await proxyPost("/documents/d1/ask", { question: "x" });
+
+    expect(res.status).toBe(429);
+    expect(res.headers.get("Retry-After")).toBe("3600");
+  });
+
+  it("is left out when the backend sent none", async () => {
+    fetchMock.mockResolvedValue(backendResponse({ detail: "boom" }, 502));
+
+    expect((await proxyGet("/documents")).headers.get("Retry-After")).toBeNull();
+  });
+
+  it("is passed on only when it is a whole number of seconds, so odd text is never relayed", async () => {
+    fetchMock.mockResolvedValue(backendResponse({}, 429, { "Retry-After": "soon; <script>" }));
+
+    expect((await proxyGet("/documents")).headers.get("Retry-After")).toBeNull();
   });
 });

@@ -35,9 +35,12 @@ async function forward(method: Method, path: string, body?: unknown): Promise<Re
       ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
       cache: "no-store",
     });
-    if (res.status === 204) return new Response(null, { status: 204, headers: idHeader });
+    // How long to wait, when the backend says (a daily limit does), passed on only if it is a plain number of seconds.
+    const wait = res.headers?.get("Retry-After") ?? "";
+    const answerHeaders = /^\d{1,6}$/.test(wait) ? { ...idHeader, "Retry-After": wait } : idHeader;
+    if (res.status === 204) return new Response(null, { status: 204, headers: answerHeaders });
     const data = await res.json();
-    return Response.json(data, { status: res.status, headers: idHeader });
+    return Response.json(data, { status: res.status, headers: answerHeaders });
   } catch {
     return Response.json(
       { detail: "could not reach the reading service" },
