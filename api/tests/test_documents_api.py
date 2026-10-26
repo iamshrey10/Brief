@@ -2174,6 +2174,7 @@ async def test_questions_stop_at_the_daily_limit_with_a_clear_message(
     assert statuses == [200, 200, 429, 429]
     assert refused.status_code == 429
     assert "2 questions" in refused.json()["detail"] and "tomorrow" in refused.json()["detail"]
+    assert 1 <= int(refused.headers["retry-after"]) <= 86400  # the seconds until the limit resets at midnight UTC
     assert asked == ["Question 0?", "Question 1?"]  # the refused ones never reached the model
 
 

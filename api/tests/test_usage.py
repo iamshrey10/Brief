@@ -188,3 +188,25 @@ async def test_someone_who_only_used_things_yesterday_starts_today_with_everythi
     report = await usage_today(db_session, test_user.id, today=DAY)
 
     assert report["ask"] == {"used": 0, "limit": 3, "left": 3}
+
+
+def test_the_seconds_until_the_limit_resets_count_down_to_midnight_utc():
+    import datetime
+
+    from app.usage import seconds_until_reset
+
+    utc = datetime.timezone.utc
+    assert seconds_until_reset(datetime.datetime(2026, 10, 25, 0, 0, 0, tzinfo=utc)) == 86400
+    assert seconds_until_reset(datetime.datetime(2026, 10, 25, 23, 59, 30, tzinfo=utc)) == 30
+    assert seconds_until_reset(datetime.datetime(2026, 10, 25, 12, 0, 0, 500000, tzinfo=utc)) == 43200  # rounded up
+    assert seconds_until_reset(datetime.datetime(2026, 12, 31, 23, 59, 59, tzinfo=utc)) == 1  # across a new year
+
+
+def test_the_seconds_until_reset_follow_utc_not_the_local_clock():
+    import datetime
+
+    from app.usage import seconds_until_reset
+
+    plus_five = datetime.timezone(datetime.timedelta(hours=5))
+    # 02:00 at +05:00 is 21:00 UTC the day before, so three hours remain, not twenty two
+    assert seconds_until_reset(datetime.datetime(2026, 10, 25, 2, 0, 0, tzinfo=plus_five)) == 3 * 3600

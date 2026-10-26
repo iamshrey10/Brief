@@ -1,4 +1,5 @@
 import datetime
+import math
 import uuid
 
 from sqlalchemy import select
@@ -69,3 +70,10 @@ async def usage_today(
         }
         for kind, limit in DAILY_LIMITS.items()
     }
+
+
+def seconds_until_reset(now: datetime.datetime | None = None) -> int:
+    """How long until the daily limits start again, at midnight UTC, rounded up and never below 1."""
+    now = (now or datetime.datetime.now(datetime.timezone.utc)).astimezone(datetime.timezone.utc)
+    midnight = datetime.datetime.combine(now.date() + datetime.timedelta(days=1), datetime.time(), tzinfo=datetime.timezone.utc)
+    return max(1, math.ceil((midnight - now).total_seconds()))

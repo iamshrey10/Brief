@@ -256,6 +256,7 @@ async def _spend_or_refuse(session: AsyncSession, user: User, kind: str) -> None
                 f"You have reached today's limit of {usage.DAILY_LIMITS[kind]} {LIMIT_NOUNS[kind]}. "
                 "Try again tomorrow."
             ),
+            headers={"Retry-After": str(usage.seconds_until_reset())},
         )
 
 
