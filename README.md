@@ -10,6 +10,8 @@ pulls out the terms that actually cost you money, and flagging anything unusual 
 Status: in active development. [STATUS.md](STATUS.md) has the honest picture: what works today,
 what is left, the numbers, and the expected finish. It is refreshed every week.
 
+[docs/DEMO.md](docs/DEMO.md) is a script and screenshot list for recording a demo that claims no more than is true.
+
 `scripts/check-all.sh` runs every check CI runs (add `--e2e` for the browser tests), stopping at the first failure.
 
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) draws how it is put together: the parts, the data, the path of an upload, and
