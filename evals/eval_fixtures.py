@@ -3,6 +3,7 @@ can read it without starting a model or a database."""
 
 from dataclasses import dataclass
 
+import loan_fixture
 import offer_fixture
 import qa_fixture
 import retrieval_fixture
@@ -46,6 +47,19 @@ FIXTURES: dict[str, Fixture] = {
         provenance=(
             "Questions were written before any results were seen and not tuned afterward, as the note at "
             "the top of offer_fixture.py describes."
+        ),
+    ),
+    "loan": Fixture(
+        name="loan",
+        description="17-clause education loan fixture",
+        doc_type="loan",
+        clauses=loan_fixture.CLAUSES,
+        answerable=loan_fixture.ANSWERABLE,
+        unanswerable=loan_fixture.UNANSWERABLE,
+        report_prefix="qa-loan",
+        provenance=(
+            "Questions were written before any results were seen and not tuned afterward, as the note at "
+            "the top of loan_fixture.py describes."
         ),
     ),
 }

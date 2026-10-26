@@ -14,10 +14,12 @@ sys.path.insert(0, str(EVALS))
 retrieval_fixture = importlib.import_module("retrieval_fixture")
 qa_fixture = importlib.import_module("qa_fixture")
 offer_fixture = importlib.import_module("offer_fixture")
+loan_fixture = importlib.import_module("loan_fixture")
 
 FIXTURES = [
     ("loan and lease", retrieval_fixture.CLAUSES, qa_fixture.ANSWERABLE, qa_fixture.UNANSWERABLE),
     ("job offer", offer_fixture.CLAUSES, offer_fixture.ANSWERABLE, offer_fixture.UNANSWERABLE),
+    ("education loan", loan_fixture.CLAUSES, loan_fixture.ANSWERABLE, loan_fixture.UNANSWERABLE),
 ]
 IDS = [name for name, *_ in FIXTURES]
 
@@ -126,3 +128,10 @@ def test_every_clause_the_ground_truth_points_at_is_in_that_document(doc_type):
 
 def test_the_job_offer_document_is_the_whole_offer_fixture():
     assert key_terms_fixture.DOCUMENTS["offer"]["clauses"] == offer_fixture.CLAUSES
+
+
+def test_the_education_loan_fixture_is_the_size_it_says_it_is_and_has_its_own_report_name():
+    chosen = fixtures_module.pick("loan")
+
+    assert (chosen.name, chosen.doc_type, chosen.report_prefix) == ("loan", "loan", "qa-loan")
+    assert len(chosen.clauses) == 17 and len(chosen.answerable) == 24 and len(chosen.unanswerable) == 18
