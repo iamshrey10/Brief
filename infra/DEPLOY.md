@@ -55,9 +55,20 @@ address on one command line, including `http://localhost:3000` if local developm
 
 ## 7. Probes and what the server exposes
 
-- `GET /health` says the process is up: use it to decide whether to restart.
-- `GET /health/ready` says it can do real work: use it to decide whether to send traffic.
+- API: `GET /health` says the process is up (use it to decide whether to restart) and `GET /health/ready` says it can do
+  real work (use it to decide whether to send traffic).
+- Website: `GET /api/health` answers 200 only when Redis responds and 503 otherwise, with fixed words. Use it as the
+  website's traffic check. The container's own health check only asks whether the server answers at all, because a restart
+  would not fix Redis.
 - `/docs`, `/redoc` and `/openapi.json` are not served when `ENVIRONMENT=production`.
+- Set `LOG_FORMAT=json` on the API if the host collects logs: one JSON object a line with the request id, and an error named
+  by its type only. Every line of one request shares the request id, which is also in the `X-Request-ID` header and in the
+  `Reference` code a person is shown.
+- The API's server keeps idle connections for 75 seconds (a load balancer's usual limit is 60) and lets a running request
+  finish for 20 seconds when it stops. If the host's limits are different, change them together.
+- The website sends a Content-Security-Policy in **report only** mode. Open the browser console on the deployed site, look for
+  "Content Security Policy" reports, fix what is legitimate (the storage address in `connect-src` is the usual one), and then move
+  the policy to the enforced header in `web/lib/security-headers.ts`.
 
 ## 8. The first run, in order
 
@@ -80,5 +91,6 @@ try a downgrade on a copy of the data before relying on it for an older one. Wit
 - Database backups and a tested restore (use the host's snapshots, or `pg_dump`).
 - Bucket versioning or a lifecycle rule for deleted files.
 - Alerts on a failing `/health/ready` or a rising number of `failed` answer traces.
-- A privacy note and terms for people who upload real contracts. Deleting an account already removes their files,
-  documents and everything read from them.
+- A lawyer's read of the privacy and terms pages before real contracts are uploaded. They are written from what the code does
+  and `docs/PRIVACY-REVIEW.md` lists what only the owner can confirm. Deleting an account already removes the files, documents
+  and everything read from them.
