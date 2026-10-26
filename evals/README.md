@@ -39,8 +39,12 @@ for is not, and each writes its own report:
 |---|---|---|---|---|
 | `loan-lease` (the default) | 17 clauses of a mixed loan and lease | 32 | 18 | `results/qa-<date>.md` |
 | `offer` | 17 clauses of a job offer | 25 | 18 | `results/qa-offer-<date>.md` |
+| `loan` | 17 clauses of an education loan | 24 | 18 | `results/qa-loan-<date>.md` |
 
-The quality gate holds both to the same limits. Questions are written before any result is seen for them. If a question
+The quality gate holds `loan-lease` and `offer` to the same limits. `loan` is measured but **not gated yet**: its first run (23 of 24
+right, 17 of 18 declined) had one over refusal and one nearest fact answer, and its report says what to change before it is held to
+the limits. The job offer is also part of the key terms evaluation (57 of 60 right, the three misses being one label that was too
+narrow, see its report). Questions are written before any result is seen for them. If a question
 turns out to be ambiguous it is replaced in the open: the note at the top of the fixture and the report say so, and the
 first result is kept. Twice now a near miss question asking for one specific detail was answered with the nearest
 related fact; the second time the question was left as written and the answering instruction was changed instead (see
