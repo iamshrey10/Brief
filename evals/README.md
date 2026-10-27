@@ -1,8 +1,9 @@
 # evals
 
-The evaluation harness. A labeled set of documents and a test suite scoring extraction accuracy,
-citation validity, and abstention correctness. The extraction, citation, and abstention parts are
-built in week 3 and 4.
+The evaluation harness. Labeled documents and scripts that score search, question answering (right
+citation, correct abstention), key term extraction, the must-ask checklist, and how steady the results
+are from one read to the next. Each script writes a dated report to `results/`, and
+`check_results.py` holds the latest reports to the limits in `thresholds.json`, which CI runs.
 
 ## Retrieval evaluation
 
