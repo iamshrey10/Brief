@@ -9,6 +9,28 @@ import { cn } from "@/lib/utils";
 
 type Tab = "overview" | "ask";
 
+/** Small line icons for the tabs. They are decoration, so a screen reader hears only the tab's name. */
+function TabIcon({ tab }: { tab: Tab }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+      className="h-4 w-4 shrink-0"
+      stroke="currentColor"
+      strokeWidth={1.75}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      {tab === "overview" ? (
+        <path d="M4 6h16M4 12h10M4 18h7" />
+      ) : (
+        <path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z" />
+      )}
+    </svg>
+  );
+}
+
 const TABS: { id: Tab; label: string }[] = [
   { id: "overview", label: "Overview" },
   { id: "ask", label: "Ask" },
@@ -46,7 +68,7 @@ export function DocumentWorkspace({
           role="tablist"
           aria-label="Document tools"
           onKeyDown={handleTabKeys}
-          className="grid grid-cols-2 gap-1 rounded-lg bg-muted p-1"
+          className="grid grid-cols-2 gap-1 rounded-xl border border-border bg-muted p-1"
         >
           {TABS.map(({ id, label }) => (
             <button
@@ -62,12 +84,15 @@ export function DocumentWorkspace({
               tabIndex={tab === id ? 0 : -1}
               onClick={() => setTab(id)}
               className={cn(
-                "rounded-md px-3 py-1.5 text-sm font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+                "flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
                 tab === id
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground",
+                  ? "bg-card text-foreground shadow-sm ring-1 ring-border"
+                  : "text-muted-foreground hover:bg-background/70 hover:text-foreground",
               )}
             >
+              <span className={tab === id ? "text-primary" : undefined}>
+                <TabIcon tab={id} />
+              </span>
               {label}
             </button>
           ))}

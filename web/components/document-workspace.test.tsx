@@ -173,6 +173,35 @@ describe("DocumentWorkspace tabs", () => {
     expect(document.getElementById("panel-ask")).toHaveAttribute("hidden");
   });
 
+  it("gives each tab an icon that a screen reader skips, so each tab is still named by its label alone", () => {
+    renderWorkspace();
+
+    for (const name of ["Overview", "Ask"]) {
+      const tab = screen.getByRole("tab", { name });
+      const icon = tab.querySelector("svg");
+
+      expect(icon).not.toBeNull();
+      expect(icon).toHaveAttribute("aria-hidden", "true");
+    }
+  });
+
+  it("marks the selected tab with the accent colored icon and a card, and the other with neither", async () => {
+    const user = renderWorkspace();
+    const overview = screen.getByRole("tab", { name: "Overview" });
+    const ask = screen.getByRole("tab", { name: "Ask" });
+
+    expect(overview.className).toContain("bg-card");
+    expect(overview.querySelector("span")).toHaveClass("text-primary");
+    expect(ask.className).not.toContain("bg-card");
+    expect(ask.querySelector("span")).not.toHaveClass("text-primary");
+
+    await user.click(ask);
+
+    expect(ask.className).toContain("bg-card");
+    expect(ask.querySelector("span")).toHaveClass("text-primary");
+    expect(overview.querySelector("span")).not.toHaveClass("text-primary");
+  });
+
   it("lets only the selected tab take focus with Tab", () => {
     renderWorkspace();
 
