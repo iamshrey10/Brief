@@ -101,6 +101,18 @@ def test_generate_answer_tells_the_model_to_answer_the_question_asked_and_not_a_
     assert "set found to false" in instruction
 
 
+def test_generate_answer_tells_the_model_a_which_one_question_is_not_answered_by_a_clause_that_does_not_name_it(
+    monkeypatch,
+):
+    client = _install_fake_client(monkeypatch, GroundedAnswer(found=False, answer="n/a", citations=[]))
+
+    generate_answer("Which benchmark is the rate based on?", [("C1", "reset yearly from a published benchmark")])
+    instruction = client.models.calls[0]["config"].system_instruction
+
+    assert "which benchmark, which bank or which court" in instruction
+    assert "refers to it without naming it" in instruction
+
+
 def test_generate_answer_raises_when_the_model_returns_nothing_usable(monkeypatch):
     _install_fake_client(monkeypatch, None)
 
