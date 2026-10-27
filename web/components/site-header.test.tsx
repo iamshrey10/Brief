@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@/auth", () => ({ signIn: vi.fn(), signOut: vi.fn() }));
 
-import { SiteHeader } from "./site-header";
+import { SECTION_LINKS, SiteHeader } from "./site-header";
 
 describe("the landing page header", () => {
   it("shows the name as a link home, whoever is looking", () => {
@@ -33,5 +33,20 @@ describe("the landing page header", () => {
 
   it("keeps the theme button in the bar", () => {
     expect(renderToStaticMarkup(<SiteHeader signedIn={false} />)).toContain("h-9 w-24");
+  });
+
+  it("links to each section of the page by its id, in the order they appear", () => {
+    const html = renderToStaticMarkup(<SiteHeader signedIn={false} />);
+
+    expect(SECTION_LINKS.map((link) => link.href)).toEqual(["#features", "#how"]);
+    for (const link of SECTION_LINKS) expect(html).toMatch(new RegExp(`href="${link.href}"[^>]*>${link.label}<`));
+    expect(html.indexOf('href="#features"')).toBeLessThan(html.indexOf('href="#how"'));
+  });
+
+  it("hides the section links on a phone, where there is no room, and names them as a landmark", () => {
+    const html = renderToStaticMarkup(<SiteHeader signedIn={false} />);
+
+    expect(html).toContain('aria-label="Sections"');
+    expect(html).toMatch(/<nav[^>]*class="hidden[^"]*md:flex"/);
   });
 });

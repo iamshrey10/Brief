@@ -17,7 +17,7 @@ export const STEPS = [
 /** How it works, as three numbered steps. The section's id is what the top bar's link jumps to. */
 export function LandingSteps() {
   return (
-    <section id="how" aria-labelledby="how-heading" className="border-t border-border/70">
+    <section id="how" aria-labelledby="how-heading" className="scroll-mt-16 border-t border-border/70">
       <div className="mx-auto w-full max-w-6xl px-6 py-16 md:px-8 md:py-20">
         <div className="max-w-2xl">
           <h2 id="how-heading" className="text-3xl font-semibold tracking-tight text-foreground md:text-4xl">
