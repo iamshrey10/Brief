@@ -1,5 +1,6 @@
 import { auth } from "@/auth";
 import { LandingHero } from "@/components/landing-hero";
+import { LandingFeatures } from "@/components/landing-features";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 
@@ -13,6 +14,7 @@ export default async function Home() {
       <div className="flex flex-1 items-center">
         <LandingHero signedIn={signedIn} />
       </div>
+      <LandingFeatures />
       <SiteFooter />
     </div>
   );
