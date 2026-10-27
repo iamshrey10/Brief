@@ -1,3 +1,4 @@
+import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/auth", () => ({ auth: vi.fn(), signOut: vi.fn() }));
@@ -11,7 +12,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 import { auth } from "@/auth";
-import { ThemeToggle } from "@/components/theme-toggle";
+import { AppHeader } from "@/components/app-header";
 import Dashboard, { metadata } from "./page";
 
 const authMock = auth as unknown as ReturnType<typeof vi.fn>;
@@ -63,36 +64,42 @@ function elements(tree: unknown): Node[] {
   return [node, ...elements(node.props?.children)];
 }
 
-describe("the dashboard heading on a phone", () => {
-  async function header(): Promise<Node> {
+describe("the dashboard top bar", () => {
+  async function tree() {
     authMock.mockResolvedValue({ user: { email: "reader@example.com" } });
-    const found = elements(await Dashboard()).find((node) => node.type === "header");
-    if (!found) throw new Error("no header on the page");
-    return found;
+    return Dashboard();
   }
 
-  it("stacks the text above the sign out button on a narrow screen, and side by side on a wide one", async () => {
-    const className = (await header()).props?.className ?? "";
+  it("is the shared signed in header, given the address of the person signed in", async () => {
+    const header = elements(await tree()).find((node) => node.type === AppHeader) as
+      | { props: { email: string } }
+      | undefined;
 
-    expect(className).toContain("flex-col");
-    expect(className).toContain("sm:flex-row");
-    expect(className).toContain("sm:justify-between");
+    expect(header?.props.email).toBe("reader@example.com");
   });
 
-  it("does not squeeze the description beside the button on a narrow screen", async () => {
-    const className = (await header()).props?.className ?? "";
+  it("comes before the page's own content, so it is the first thing on the page", async () => {
+    const all = elements(await tree());
+    const bar = all.findIndex((node) => node.type === AppHeader);
+    const title = all.findIndex((node) => node.type === "h1");
 
-    expect(className.split(" ")).not.toContain("justify-between");
+    expect(bar).toBeGreaterThanOrEqual(0);
+    expect(bar).toBeLessThan(title);
   });
-});
 
-describe("the dashboard light and dark mode button", () => {
-  it("is in the heading, so the choice made on the landing page can be changed after signing in", async () => {
-    authMock.mockResolvedValue({ user: { email: "reader@example.com" } });
-    const tree = await Dashboard();
-    const header = elements(tree).find((node) => node.type === "header");
+  it("is as wide as the content under it, so their edges line up", async () => {
+    const all = elements(await tree());
+    const content = all.find((node) => node.props?.className?.includes("max-w-4xl"));
 
-    expect(elements(header).some((node) => node.type === ThemeToggle)).toBe(true);
+    expect(content).toBeDefined();
+    // The header's default width is the same one.
+    expect(renderToStaticMarkup(<AppHeader email="a@b.co" />)).toContain("max-w-4xl");
+  });
+
+  it("no longer carries its own sign out or theme button beside the heading", async () => {
+    const all = elements(await tree());
+
+    expect(all.filter((node) => node.type === "form")).toHaveLength(0);
   });
 });
 
