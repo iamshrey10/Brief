@@ -159,6 +159,36 @@ describe("the document page", () => {
   });
 });
 
+describe("the document page top bar", () => {
+  it("shows the signed in bar, with who is signed in and Sign out, above the document", async () => {
+    serve(document());
+
+    const html = await page();
+
+    expect(html).toContain("reader@example.com");
+    expect(html).toContain("Sign out");
+    expect(html.indexOf("Sign out")).toBeLessThan(html.indexOf("lease.pdf"));
+  });
+
+  it("still shows the bar when the document could not be loaded, so the reader can leave or sign out", async () => {
+    fetchMock.mockRejectedValue(new TypeError("fetch failed"));
+
+    const html = await page();
+
+    expect(html).toContain("We couldn&#x27;t load this document");
+    expect(html).toContain("Sign out");
+  });
+
+  it("shows the kind of document as a label beside its name, and keeps a long name from pushing the page wide", async () => {
+    serve(document({ filename: "a-very-long-file-name-that-goes-on.pdf", doc_type: "offer" }));
+
+    const html = await page();
+
+    expect(html).toMatch(/<span class="rounded-full[^"]*">Job offer<\/span>/);
+    expect(html).toMatch(/<h1 class="[^"]*break-all/);
+  });
+});
+
 describe("the document page tab title", () => {
   it("does not put the file name, which is private, into the title", () => {
     expect(metadata.title).toBe("Document");

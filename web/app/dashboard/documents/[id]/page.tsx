@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
+import { AppHeader } from "@/components/app-header";
 import { DocumentWorkspace } from "@/components/document-workspace";
 import {
   DOC_TYPE_LABELS,
@@ -53,6 +54,16 @@ function StatusNotice({ document }: { document: DocumentSummary }) {
   return null;
 }
 
+/** The signed in top bar, then the page's own content at the same width. */
+function PageShell({ email, children }: { email: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-1 flex-col">
+      <AppHeader email={email} widthClass="max-w-6xl" />
+      <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-6 py-8">{children}</div>
+    </div>
+  );
+}
+
 export default async function DocumentPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
@@ -80,24 +91,28 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
     // notFound() works by throwing, let Next handle that one instead of swallowing it.
     if (error instanceof Error && "digest" in error) throw error;
     return (
-      <div className="mx-auto w-full max-w-3xl px-6 py-10">
+      <PageShell email={email}>
         <Notice title="We couldn't load this document">
           The server did not respond. Try again in a moment.
         </Notice>
-      </div>
+      </PageShell>
     );
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-6 py-10">
-      <div className="flex flex-col gap-2">
-        <Link href="/dashboard" className="text-sm text-primary underline-offset-4 hover:underline">
+    <PageShell email={email}>
+      <div className="flex flex-col gap-3">
+        <Link href="/dashboard" className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">
           ← Back to your documents
         </Link>
-        <h1 className="font-heading text-2xl font-semibold text-foreground">{document.filename}</h1>
-        <p className="text-sm text-muted-foreground">
-          {DOC_TYPE_LABELS[document.doc_type] ?? document.doc_type}
-        </p>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <h1 className="font-heading text-2xl font-semibold tracking-tight break-all text-foreground md:text-3xl">
+            {document.filename}
+          </h1>
+          <span className="rounded-full border border-border bg-accent px-2.5 py-0.5 text-xs font-medium text-accent-foreground">
+            {DOC_TYPE_LABELS[document.doc_type] ?? document.doc_type}
+          </span>
+        </div>
       </div>
 
       <StatusNotice document={document} />
@@ -110,6 +125,6 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
             This document finished processing but no text could be extracted from it.
           </Notice>
         ))}
-    </div>
+    </PageShell>
   );
 }
