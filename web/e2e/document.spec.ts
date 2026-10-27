@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { FAKE_API, resetFakeApi, signInAsTestReader } from "./support/session";
+import { FAKE_API, resetFakeApi, seedDocument, signInAsTestReader } from "./support/session";
 
 test.beforeEach(async ({ page }) => {
   await resetFakeApi(page);
@@ -63,4 +63,22 @@ test("a document that is not there shows a not found page, not someone else's da
   const response = await page.goto("/dashboard/documents/doc-nobody");
 
   expect(response?.status()).toBe(404);
+});
+
+test("on a long document the top bar stays in view, and the Overview panel, which sticks while the clauses scroll, sticks below it", async ({
+  page,
+}) => {
+  await seedDocument(page, { id: "doc-long", filename: "long.pdf", doc_type: "lease", status: "ready" });
+  await page.setViewportSize({ width: 1280, height: 700 });
+  await page.goto("/dashboard/documents/doc-long");
+  await page.evaluate(() => window.scrollTo(0, 1200));
+
+  const bar = page.locator("header").first();
+  const tabs = page.getByRole("tablist");
+  await expect(bar).toBeInViewport();
+  await expect(tabs).toBeInViewport();
+  const barBox = (await bar.boundingBox())!;
+  const tabsTop = (await tabs.boundingBox())!.y;
+
+  expect(tabsTop).toBeGreaterThanOrEqual(barBox.y + barBox.height);
 });

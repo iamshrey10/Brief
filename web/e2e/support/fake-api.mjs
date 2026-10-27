@@ -36,6 +36,14 @@ const CLAUSES = [
   { id: "c-late", clause_index: 2, page_number: 2, text: "Rent is due on the first of the month. A late fee of $50 applies after the fifth day." },
 ];
 
+// A document long enough that its clauses scroll for a long time, for the tests of what sticks while they do.
+const LONG_CLAUSES = Array.from({ length: 40 }, (_, index) => ({
+  id: `c-long-${index}`,
+  clause_index: index,
+  page_number: Math.floor(index / 4) + 1,
+  text: `Clause ${index + 1} of the long test document sets out one more obligation, in a sentence of ordinary length.`,
+}));
+
 const fresh = () => ({
   documents: [
     { id: "doc-lease", filename: "sample-lease.pdf", doc_type: "lease", status: "ready", ocr_confidence: null, created_at: "2026-10-01T12:00:00Z", status_changed_at: "2026-10-01T12:01:00Z" },
@@ -227,7 +235,7 @@ const server = createServer(async (request, response) => {
       if (document.id === "doc-down") return send(response, 500, { detail: "the database is unavailable" });
       return send(response, 200, visible(document));
     }
-    if (method === "GET" && part === "clauses") return send(response, 200, document.id === "doc-empty" ? [] : CLAUSES);
+    if (method === "GET" && part === "clauses") return send(response, 200, document.id === "doc-empty" ? [] : document.id === "doc-long" ? LONG_CLAUSES : CLAUSES);
     if (method === "GET" && part === "key-terms") {
       // A "flaky" reader's first key terms read fails and the next one works, so a test can Try again.
       if (reader.startsWith("flaky-") && !state.flakyServed.includes(reader)) {

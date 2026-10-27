@@ -41,7 +41,7 @@ export function DocumentWorkspace({
 
   return (
     <div className="grid items-start gap-6 lg:grid-cols-2">
-      <div className="flex max-h-[80vh] min-h-[28rem] flex-col gap-3 lg:sticky lg:top-6 lg:h-[calc(100vh-3rem)] lg:max-h-none">
+      <div className="flex max-h-[80vh] min-h-[28rem] flex-col gap-3 lg:sticky lg:top-20 lg:h-[calc(100vh-6.5rem)] lg:max-h-none">
         <div
           role="tablist"
           aria-label="Document tools"
