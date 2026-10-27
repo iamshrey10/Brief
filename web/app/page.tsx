@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import { LandingHero } from "@/components/landing-hero";
 import { LandingFeatures } from "@/components/landing-features";
+import { LandingSteps } from "@/components/landing-steps";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 
@@ -15,6 +16,7 @@ export default async function Home() {
         <LandingHero signedIn={signedIn} />
       </div>
       <LandingFeatures />
+      <LandingSteps />
       <SiteFooter />
     </div>
   );
