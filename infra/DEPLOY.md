@@ -1,9 +1,22 @@
 # Putting Brief online: a checklist
 
 **Status: nothing is deployed yet.** This is what the code requires, collected in one place so going online is not
-done from memory. Each step names the file or command that backs it. Choosing the hosts is still open.
+done from memory. Each step names the file or command that backs it. The plan for the first deploy (October 28) is in
+section 1; it is a plan, not something done.
 
 ## 1. Decide first
+
+The plan for the first deploy, chosen for the fewest moving parts rather than the lowest cost:
+
+| Piece | Host | Note |
+|---|---|---|
+| Website | Vercel | Built for Next.js, so `AUTH_TRUST_HOST` is not needed there. |
+| API | Render, from `api/Dockerfile` | Its free tier sleeps when idle, so the first request after a pause can take about a minute. Use the paid tier before sharing the link. |
+| Postgres with pgvector | Neon | Switch the `vector` extension on in its settings before the first migration. Its free tier also pauses when idle. |
+| Redis | Upstash | |
+| File storage | Cloudflare R2 | Browsers upload straight to it, so it is required, and its CORS rule is step 6. |
+
+Prices and free tier limits change, so check each host's page on the day.
 
 - A host that runs the API container (`api/Dockerfile`) and one for the website (`web/Dockerfile`, or Vercel).
 - A Postgres with the **pgvector** extension, a Redis, and the R2 bucket.
