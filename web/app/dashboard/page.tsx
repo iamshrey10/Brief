@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { auth, signOut } from "@/auth";
+import { auth } from "@/auth";
+import { signOutToHome } from "@/lib/auth-actions";
 import { Button } from "@/components/ui/button";
 import { mintServiceToken } from "@/lib/service-token";
 import { DeleteAccount } from "@/components/delete-account";
@@ -46,10 +47,7 @@ export default async function Dashboard() {
         <div className="flex shrink-0 items-start gap-3">
           <ThemeToggle />
           <form
-            action={async () => {
-              "use server";
-              await signOut({ redirectTo: "/" });
-            }}
+            action={signOutToHome}
             className="flex shrink-0 flex-col items-start gap-1 sm:items-end"
           >
             <p className="max-w-[12rem] truncate text-xs text-muted-foreground">{email}</p>

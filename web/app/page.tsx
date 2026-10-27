@@ -1,6 +1,7 @@
 import Link from "next/link";
 
-import { auth, signIn, signOut } from "@/auth";
+import { auth } from "@/auth";
+import { signInWithGoogle, signOutToHome } from "@/lib/auth-actions";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { DocumentPreview } from "@/components/document-preview";
 
@@ -33,24 +34,14 @@ export default async function Home() {
               <Link href="/dashboard" className="text-sm font-medium text-primary underline">
                 Go to dashboard
               </Link>
-              <form
-                action={async () => {
-                  "use server";
-                  await signOut({ redirectTo: "/" });
-                }}
-              >
+              <form action={signOutToHome}>
                 <button type="submit" className="text-sm text-muted-foreground underline">
                   Sign out
                 </button>
               </form>
             </div>
           ) : (
-            <form
-              action={async () => {
-                "use server";
-                await signIn("google", { redirectTo: "/dashboard" });
-              }}
-            >
+            <form action={signInWithGoogle}>
               <button
                 type="submit"
                 className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
