@@ -225,6 +225,11 @@ redirect URI.
 
 Frontend checks: `pnpm lint`, `pnpm test`, `pnpm build`, and `pnpm e2e` (browser tests of the signed out pages).
 
+Once after cloning, install the commit hook, which refuses a commit message that credits an AI tool
+(`scripts/check-commit-messages.sh` checks the whole history, and CI runs it too):
+
+    scripts/install-hooks.sh
+
 The evaluations call the real Gemini API and need Postgres running. Each one is a single command,
 see [evals/README.md](evals/README.md).
 
