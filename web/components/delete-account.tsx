@@ -67,7 +67,7 @@ export function DeleteAccount({ onDeleted = signOutAfterDelete }: { onDeleted?: 
         type="button"
         variant="ghost"
         size="sm"
-        className="text-muted-foreground"
+        className="-ml-2.5 text-muted-foreground"
         onClick={() => setOpen(true)}
       >
         Delete my account

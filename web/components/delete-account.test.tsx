@@ -169,3 +169,11 @@ describe("DeleteAccount", () => {
     expect(confirmButton()).toBeDisabled();
   });
 });
+
+describe("the Delete my account button", () => {
+  it("is pulled left by its own padding, so its words line up with the legal text above it", () => {
+    render(<DeleteAccount onDeleted={vi.fn()} />);
+
+    expect(screen.getByRole("button", { name: "Delete my account" })).toHaveClass("-ml-2.5");
+  });
+});

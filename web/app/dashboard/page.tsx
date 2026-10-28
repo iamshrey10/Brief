@@ -48,7 +48,7 @@ export default async function Dashboard() {
 
         <DocumentUpload initialDocuments={initialDocuments} />
 
-        <footer className="flex flex-col items-start gap-3">
+        <footer className="flex flex-col items-start gap-3 border-t border-border/70 pt-6">
           <p className="text-xs text-muted-foreground">
             Brief explains what a document says. It isn&apos;t legal advice.
           </p>

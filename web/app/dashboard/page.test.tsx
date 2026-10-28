@@ -103,6 +103,15 @@ describe("the dashboard top bar", () => {
   });
 });
 
+describe("the dashboard footer", () => {
+  it("is set off from the documents by a rule above it", async () => {
+    authMock.mockResolvedValue({ user: { email: "reader@example.com" } });
+    const footer = elements(await Dashboard()).find((node) => node.type === "footer");
+
+    expect(footer?.props?.className).toContain("border-t");
+  });
+});
+
 describe("the dashboard tab title", () => {
   it("says what the page is, and the site name is added after it", () => {
     expect(metadata.title).toBe("Your contracts");
