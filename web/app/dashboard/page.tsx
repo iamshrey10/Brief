@@ -27,7 +27,7 @@ async function fetchInitialDocuments(email: string) {
 export default async function Dashboard() {
   const session = await auth();
   const email = session?.user?.email;
-  // The middleware already turns visitors away, and this makes the page safe on its own too: nobody who
+  // The proxy already turns visitors away, and this makes the page safe on its own too: nobody who
   // is not signed in is ever shown the dashboard or has anything fetched for it.
   if (!email) redirect("/");
   const initialDocuments = await fetchInitialDocuments(email);
