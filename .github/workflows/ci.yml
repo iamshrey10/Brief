@@ -98,6 +98,9 @@ jobs:
       R2_ENDPOINT_URL: https://ci-only-account.r2.cloudflarestorage.com
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The whole history, so the commit message check sees every commit and not only the newest.
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -112,3 +115,5 @@ jobs:
       - run: python -m pytest -v --cov
       # The recorded evaluation results must still meet their minimums. No model or secret is needed.
       - run: python ../evals/check_results.py
+      # No commit message may credit an AI tool.
+      - run: ../scripts/check-commit-messages.sh

@@ -11,6 +11,7 @@ STAGES=(
   "api lint|cd $ROOT/api && .venv/bin/ruff check ."
   "api tests with coverage|cd $ROOT/api && .venv/bin/python -m pytest -q --cov"
   "quality gate|python3 $ROOT/evals/check_results.py"
+  "commit messages|cd $ROOT && scripts/check-commit-messages.sh"
   "web types|cd $ROOT/web && pnpm exec tsc --noEmit"
   "web lint|cd $ROOT/web && pnpm lint"
   "web tests with coverage|cd $ROOT/web && pnpm test:coverage"

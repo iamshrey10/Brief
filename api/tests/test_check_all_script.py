@@ -20,6 +20,7 @@ def test_list_names_every_check_ci_runs_and_runs_none_of_them():
         "api lint",
         "api tests with coverage",
         "quality gate",
+        "commit messages",
         "web types",
         "web lint",
         "web tests with coverage",
@@ -35,3 +36,10 @@ def test_the_browser_tests_are_added_only_when_asked_for():
 
 def test_the_script_is_executable():
     assert SCRIPT.stat().st_mode & 0o111
+
+
+def test_the_commit_message_check_runs_in_ci_over_the_whole_history():
+    workflow = (SCRIPT.parent.parent / ".github" / "workflows" / "ci.yml").read_text()
+
+    assert "check-commit-messages.sh" in workflow
+    assert "fetch-depth: 0" in workflow
