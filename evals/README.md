@@ -44,7 +44,10 @@ for is not, and each writes its own report:
 
 The quality gate holds `loan-lease` and `offer` to the same limits. `loan` is measured but **not gated yet**: its first run (23 of 24
 right, 17 of 18 declined) had one over refusal and one nearest fact answer, and its report says what to change before it is held to
-the limits. The job offer is also part of the key terms evaluation (57 of 60 right, the three misses being one label that was too
+the limits. On October 27 the answering instruction gained a rule for "which one" questions. The loan fixture then scored 22 of 24
+right and 18 of 18 declined with an extra arithmetic rule (since removed, it did not help and cost an answer on the loan and lease
+fixture), and 21 of 24 and 17 of 18 with only the "which one" rule, so its score moves by one or two between runs and it stays outside
+the gate until it holds. The loan and lease and job offer fixtures stayed at 100 percent both times. The job offer is also part of the key terms evaluation (57 of 60 right, the three misses being one label that was too
 narrow, see its report). Questions are written before any result is seen for them. If a question
 turns out to be ambiguous it is replaced in the open: the note at the top of the fixture and the report say so, and the
 first result is kept. Twice now a near miss question asking for one specific detail was answered with the nearest
