@@ -3,30 +3,31 @@
 A plain account of what works today, what is still missing, and how long the rest should take. I
 update it every week, so you can hold my pace against my promises.
 
-**Last updated:** October 21, 2026 (day 32 of building)
+**Last updated:** October 28, 2026 (day 38 of building)
 
 ## The short version
 
-Brief is about **80% of the way** to a finished first version, counting working days: 32 done and about
-7 to go. You can upload a contract, see its key terms and the questions it leaves unanswered on one
-screen, ask questions, and get an answer with a checked quote. The parts still ahead are putting it
-online, a step that retries a weak search, a bigger test set, and a demo.
+Brief is about **85% of the way** to a finished first version, counting working days: 38 done and about 6
+to go. You can upload a contract, see its key terms and the questions it leaves unanswered on one screen,
+ask questions, and get an answer with a checked quote. The website now has a proper landing page and
+signed in screens. The parts still ahead are putting it online, a step that retries a weak search, and a
+recorded demo.
 
-**Expected finish for the core product: around November 3**, with a realistic window of October 28 to
-November 9. **That is four days later than I said last week, and the reason is in the calendar section.** The extras (Word files, several files at once, sharper photo handling) would add about 4
-more working days.
+**Expected finish for the core product: around November 7**, with a realistic window of November 3 to
+November 13. **That is four days later than I said last week, and the reason is in the calendar section.**
+The extras (Word files, several files at once, sharper photo handling) would add about 4 more working days.
 
 ## By the numbers
 
 | | |
 |---|---|
-| Working days so far | 32 |
-| Commits | 313 |
-| Tests | 1,588 (805 backend, 695 frontend, 88 in a real browser), run on every push |
-| Lines of code vs lines of tests | about 7,300 vs 19,200 (tests count the evaluation scripts and the browser test helpers) |
+| Working days so far | 38 |
+| Commits | 404 |
+| Tests | 1,853 (959 backend, 792 frontend, 102 in a real browser), run on every push |
+| Lines of code vs lines of tests | about 7,900 vs 18,800 (tests count the browser test helpers) |
 | API endpoints | 19 |
 | Database tables | 8 |
-| Evaluations | 5 (search, question answering, key terms, must-ask checklist, steadiness) |
+| Evaluations | 5 (search, question answering on three documents, key terms, must-ask checklist, steadiness) |
 | Documents it can read | text PDFs and phone photos or scans (JPG, PNG, HEIC) |
 | Limits | 50 MB a file, 25 documents a person, 100 pages a document |
 | Time to answer a question | about 2.5 seconds on average |
@@ -81,13 +82,13 @@ heavier on polish and proof than the first.
 | Key terms, must-ask questions, the Overview screen, the dashboard, delete and edit, limits | done | Finished Oct 5 to 8 |
 | Steadier results | 0.5 day | Voted reads help on three real leases but not fully on the longest, and I still cannot say whether the voted questions are right |
 | An agent step that retries a weak search or checks a term against typical terms | 2 to 3 days | Not started |
-| A larger test set, with a build that fails if quality drops | 0.5 day | The build already fails on a drop and the question set grew to 50, ten of them near misses; it is still one short fixture |
-| An automatic click-through test of the screens in a real browser | done | 57 browser tests, signed in too, covering upload, rename, Read again, Try again, delete and sign out, using a sign in that exists only outside production and a fake API; still not the real API or Google |
+| A larger test set, with a build that fails if quality drops | 0.25 day | The build fails on a drop. There are now three short documents (a loan and lease, a job offer, an education loan) with 135 questions between them; the education loan is measured but not held to the limits yet, because its score moves by a question or two from run to run |
+| An automatic click-through test of the screens in a real browser | done | 102 browser tests, signed in too, covering upload, rename, Read again, Try again, delete and sign out, using a sign in that exists only outside production and a fake API; still not the real API or Google |
 | Tracing, so every answer can be inspected afterwards | 0.25 day | Mostly done: request ids, reference codes and a saved record of what each question used, found by a script. Not built: a screen for looking at it |
-| Putting the backend online | 1.75 days | Not started. Ready: the images, a readiness check, example settings files, a script for the storage rules, and a checklist. Needs your choice of host and whether to pay for Gemini |
+| Putting the backend online | 1.75 days | Not started. The plan is written down (Vercel for the website, Render for the API, Neon for the database, Upstash for Redis, Cloudflare R2 for files). Ready: the images, a readiness check, example settings files, a script for the storage rules, and a checklist. Still needs the accounts, and a decision on paying for Gemini |
 | Hardening: a browser test of delete account and upload checks, then a security pass once it is online | 0.5 day | Mostly done (limits, delete, upload checks, secrets, dependency scan) |
-| README, diagrams, and a short demo | 1.5 days | README kept current as I go; diagrams and demo not started |
-| **Core total still to go** | **about 7 days** (range 6 to 11) | |
+| README, diagrams, and a short demo | 0.75 day | README kept current as I go; five diagrams are written and a demo script exists; the recorded demo waits for the site being online |
+| **Core total still to go** | **about 6 days** (range 5 to 9) | |
 | Word (.docx) files | 1 day | Last |
 | Several files in one upload | 2 days | Last |
 | Sharper handling of low quality photos | 1 day | Last |
@@ -95,27 +96,30 @@ heavier on polish and proof than the first.
 
 ## How long, in calendar time
 
-At five working days a week, 7 days from Thursday October 22 would end around October 30. I add a quarter on
-top for the things that always go wrong, which lands around November 3, so call it **about November 3**. A
-fast run at six days a week could finish near October 29, and a slow one at four days a week would reach
-November 9. Adding the extras moves each of those by about a week. A first version people can try only needs
-the backend online, which is about two days of work once you have chosen a host and decided about paying for
-Gemini, so it could be up around October 26.
+At five working days a week, 6 days from Wednesday October 28 would end around November 4. I add a quarter on
+top for the things that always go wrong, which lands around November 7, so call it **about November 7**. A
+fast run at six days a week could finish near November 3, and a slow one at four days a week would reach
+November 13. Adding the extras moves each of those by about a week. A first version people can try only needs
+the backend online, which is about two days of work once the accounts exist and the decision about paying for
+Gemini is made.
 
-**Why the date moved.** Last week I said October 30. Since then five working days went on things that were not
-in the list: an accessibility pass over every screen (it found real problems), documentation of the API that is
-checked against the code, deployment preparation, and many more browser tests than I planned. I counted those
-days as done, which is why the percentage rose faster than the list shrank, and the finish moved by about as
-many days as they took. The list of what is left did not grow.
+**Why the date moved.** Last week I said November 3. Since then five working days went on things that were
+not the list: two more question sets for the evaluation (and a change to the answering instruction that I
+measured on all three before keeping), a check on how the site's top bar, landing page and signed in screens
+look and work on a phone, a rewrite of the whole landing page and signed in header, and guards so that no commit
+message credits a tool. Deployment, the one item that would have moved the date back, was not started. The list of
+what is left did not grow.
 
 These are estimates, not promises. I will say so in the update log if they move.
 
 ## Where I am unsure
 
-- **The test sets are small.** The 24 search questions, the 93 answer questions on two short documents (a
-  loan and lease of 17 clauses, and a job offer of 17 clauses; 57 with an answer and 36 without), and the
-  key-terms check are all short, clean examples. The scores on them (96% right clause first, 57 of 57 cited
-  correctly, 36 of 36 correctly declined) are not a claim about contracts in general. Twenty of the 36 are near
+- **The test sets are small.** The 24 search questions, the 135 answer questions on three short documents (a
+  loan and lease, a job offer and an education loan, each 17 clauses; 81 with an answer and 54 without), and the
+  key-terms check are all short, clean examples. The scores on them (96% right clause first; on the first two
+  documents 57 of 57 cited correctly and 36 of 36 correctly declined; on the education loan 21 to 23 of 24 and
+  17 to 18 of 18 across three runs) are not a claim about contracts in general, and a difference of one or two
+  answers between runs is noise at this size. Twenty of the 36 are near
   misses, where the topic is in a clause but the fact asked for is not, and those found something real: twice a
   question asking for one specific detail was answered with the nearest related fact (a number of months when
   dollars were asked for, a number of days when weekdays were asked for). The first time I judged my own question
@@ -163,5 +167,6 @@ These are estimates, not promises. I will say so in the update log if they move.
 | Oct 10 | Security work: uploads are checked against what the file really is, tokens must expire, both servers refuse weak secrets in production, a dependency scan found and fixed 10 real vulnerabilities and now runs weekly, and you can delete your account and everything in it. Steadiness was measured on two more real leases. 152 commits, 1,003 tests. The finish stays about October 30. |
 | Oct 16 | Daily limits, abandoned upload cleanup, timing of every model call, and a build that fails if a recorded quality score drops (Oct 11 to 12). A browser test of the whole app by hand found a rate limit failure with nothing in the log, a deposit missing from key terms, and one tap sign in; each was fixed, and a key term can now rest on up to three checked quotes (Oct 13). Browser tests of the pages anyone can reach, a health check that says whether the server can do real work, request ids, and a short reference code on failure messages (Oct 14 to 16). 240 commits, 1,377 tests. About 75 percent, finish still around October 30. |
 | Oct 21 | Answer traces (what each question used, ids only, found from a reference code), documentation of every route checked against the code, example settings files, a script for the storage upload rules, a deployment checklist, and a test-only sign in with a fake API that lets the signed in screens be tested in a real browser: 88 browser tests, accessibility scans of every main screen and state, and four real problems they found fixed. 313 commits, 1,588 tests. About 80 percent, and the finish moved from about October 30 to about November 3 for the reason given above. |
+| Oct 28 | The landing page was rebuilt (top bar, hero, what you get, how it works, footer) and the signed in screens got one shared top bar; the Overview and Ask tabs are clearer. A third question set (an education loan) was added and the answering instruction gained a rule for "which one" questions, measured on all three before it was kept (a second rule for simple arithmetic was tried and removed because it cost an answer). The website file `middleware` was renamed to `proxy`, and a check, run in CI too, now refuses any commit message that credits a tool. 404 commits, 1,853 tests. About 85 percent, and the finish moved from about November 3 to about November 7 for the reason given above. |
 
 Thanks for reading. If something here looks wrong or unclear, please open an issue.
