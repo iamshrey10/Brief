@@ -47,3 +47,21 @@ export function questionsLeftNote(entry: UsageEntry): string | null {
   if (entry.left > SHOW_WHEN_LEFT_IS_AT_MOST) return null;
   return `${entry.left} ${entry.left === 1 ? "question" : "questions"} left today`;
 }
+
+/** What a person calls each daily limit. */
+export const USAGE_LABELS: Record<UsageKind, string> = {
+  ask: "Questions",
+  read: "Document reads",
+  analyze: "Overviews",
+};
+
+export type UsageRow = { kind: UsageKind; label: string; used: number; limit: number; left: number; percent: number };
+
+/** One row per daily limit for the Profile page, in a fixed order. The bar never goes past full, whatever the numbers say. */
+export function usageRows(usage: Usage): UsageRow[] {
+  return KINDS.map((kind) => {
+    const { used, limit, left } = usage[kind];
+    const percent = limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : 100;
+    return { kind, label: USAGE_LABELS[kind], used, limit, left, percent };
+  });
+}

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { fetchUsage, questionsLeftNote, type UsageEntry } from "./usage";
+import { fetchUsage, questionsLeftNote, usageRows, type UsageEntry } from "./usage";
 
 const fetchMock = vi.fn();
 
@@ -106,5 +106,35 @@ describe("questionsLeftNote", () => {
 
   it("never uses an em dash", () => {
     for (const used of [90, 99, 100]) expect(questionsLeftNote(entry(used))).not.toContain("—");
+  });
+});
+
+describe("usageRows", () => {
+  const usage = {
+    ask: { used: 25, limit: 100, left: 75 },
+    read: { used: 30, limit: 30, left: 0 },
+    analyze: { used: 0, limit: 60, left: 60 },
+  };
+
+  it("gives one row per limit in a fixed order, with the names a person uses", () => {
+    expect(usageRows(usage).map((row) => [row.kind, row.label])).toEqual([
+      ["ask", "Questions"],
+      ["read", "Document reads"],
+      ["analyze", "Overviews"],
+    ]);
+  });
+
+  it("shows how full each limit is as a whole percentage", () => {
+    expect(usageRows(usage).map((row) => row.percent)).toEqual([25, 100, 0]);
+    expect(usageRows({ ...usage, ask: { used: 1, limit: 3, left: 2 } })[0].percent).toBe(33);
+  });
+
+  it("never goes past full, and treats a limit of zero as full", () => {
+    expect(usageRows({ ...usage, ask: { used: 130, limit: 100, left: 0 } })[0].percent).toBe(100);
+    expect(usageRows({ ...usage, ask: { used: 0, limit: 0, left: 0 } })[0].percent).toBe(100);
+  });
+
+  it("passes the counts through unchanged", () => {
+    expect(usageRows(usage)[0]).toMatchObject({ used: 25, limit: 100, left: 75 });
   });
 });
