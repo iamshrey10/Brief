@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
 import { AppHeader } from "@/components/app-header";
+import { DeleteAccount } from "@/components/delete-account";
 import { UsageCard } from "@/components/usage-card";
 import { initialOf } from "@/lib/profile";
 import { mintServiceToken } from "@/lib/service-token";
@@ -57,6 +58,21 @@ export default async function ProfilePage() {
         </section>
 
         <UsageCard usage={usage} />
+
+        <section
+          aria-labelledby="danger-heading"
+          className="rounded-2xl border border-destructive/30 bg-card p-6"
+        >
+          <h2 id="danger-heading" className="text-lg font-semibold tracking-tight text-foreground">
+            Danger zone
+          </h2>
+          <p className="mt-2 max-w-xl text-sm text-muted-foreground">
+            Deleting your account removes your documents, the stored files and everything read from them. It cannot be undone.
+          </p>
+          <div className="mt-4">
+            <DeleteAccount />
+          </div>
+        </section>
       </div>
     </div>
   );

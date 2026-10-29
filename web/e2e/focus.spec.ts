@@ -47,6 +47,7 @@ test("the Read again confirmation starts on Cancel and closing returns to the Re
 });
 
 test("opening the account deletion puts the keyboard in its box, and closing returns to its button", async ({ page }) => {
+  await page.goto("/dashboard/profile");
   const open = page.getByRole("button", { name: "Delete my account" });
   await open.focus();
   await page.keyboard.press("Enter");

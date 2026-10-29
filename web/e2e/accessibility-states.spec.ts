@@ -63,7 +63,7 @@ for (const scheme of ["light", "dark"] as const) {
     });
 
     test("the account deletion form", async ({ page }) => {
-      await page.goto("/dashboard");
+      await page.goto("/dashboard/profile");
       await page.getByRole("button", { name: "Delete my account" }).click();
       await expect(page.getByRole("group", { name: "Delete your account" })).toBeVisible();
 

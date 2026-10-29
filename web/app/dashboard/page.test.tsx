@@ -4,7 +4,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@/auth", () => ({ auth: vi.fn(), signOut: vi.fn() }));
 vi.mock("@/lib/service-token", () => ({ mintServiceToken: vi.fn().mockResolvedValue("token") }));
 vi.mock("@/components/document-upload", () => ({ DocumentUpload: () => null }));
-vi.mock("@/components/delete-account", () => ({ DeleteAccount: () => null }));
 vi.mock("next/navigation", () => ({
   redirect: vi.fn((to: string) => {
     throw new Error(`NEXT_REDIRECT:${to}`);
@@ -104,6 +103,13 @@ describe("the dashboard top bar", () => {
 });
 
 describe("the dashboard footer", () => {
+  it("no longer holds account deletion, which lives in the Danger zone of the Profile page", async () => {
+    authMock.mockResolvedValue({ user: { email: "reader@example.com" } });
+    const footer = elements(await Dashboard()).find((node) => node.type === "footer");
+
+    expect(elements(footer).some((node) => typeof node.type === "function" && node.type.name === "DeleteAccount")).toBe(false);
+  });
+
   it("is set off from the documents by a rule above it", async () => {
     authMock.mockResolvedValue({ user: { email: "reader@example.com" } });
     const footer = elements(await Dashboard()).find((node) => node.type === "footer");

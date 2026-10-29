@@ -5,7 +5,7 @@ import { FAKE_API, resetFakeApi, signInAsTestReader } from "./support/session";
 test.beforeEach(async ({ page }) => {
   await resetFakeApi(page);
   await signInAsTestReader(page);
-  await page.goto("/dashboard");
+  await page.goto("/dashboard/profile");
 });
 
 test("signing out returns to the landing page and the dashboard is closed again", async ({ page }) => {
@@ -46,8 +46,9 @@ test("cancelling the account deletion keeps everything and signs nobody out", as
   await confirmation.getByRole("button", { name: "Cancel" }).click();
 
   await expect(confirmation).toHaveCount(0);
+  expect(new URL(page.url()).pathname).toBe("/dashboard/profile");
+  await page.goto("/dashboard");
   await expect(page.getByText("sample-lease.pdf")).toBeVisible();
-  expect(new URL(page.url()).pathname).toBe("/dashboard");
   const state = (await (await request.get(`${FAKE_API}/__account-deleted`)).json()) as { deleted: boolean };
   expect(state.deleted).toBe(false);
 });

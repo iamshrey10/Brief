@@ -3,7 +3,6 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { AppHeader } from "@/components/app-header";
 import { mintServiceToken } from "@/lib/service-token";
-import { DeleteAccount } from "@/components/delete-account";
 import { DocumentUpload } from "@/components/document-upload";
 
 export const metadata = { title: "Your contracts", robots: { index: false, follow: false } };
@@ -60,7 +59,6 @@ export default async function Dashboard() {
               Terms
             </Link>
           </nav>
-          <DeleteAccount />
         </footer>
       </div>
     </div>

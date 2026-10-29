@@ -119,4 +119,16 @@ describe("the profile page", () => {
     await expect(ProfilePage()).rejects.toThrow("NEXT_REDIRECT");
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it("keeps account deletion in its own Danger zone section, with what it removes and that it cannot be undone", async () => {
+    authMock.mockResolvedValue({ user: { email: "reader@example.com" } });
+
+    const html = await page();
+
+    expect(html).toContain('aria-labelledby="danger-heading"');
+    expect(html).toContain("Danger zone");
+    expect(html).toContain("It cannot be undone");
+    expect(html).toContain("Delete my account");
+    expect(html.indexOf("Danger zone")).toBeGreaterThan(html.indexOf("Today&#x27;s limits"));
+  });
 });
