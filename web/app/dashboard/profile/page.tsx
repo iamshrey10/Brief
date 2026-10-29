@@ -2,14 +2,32 @@ import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
 import { AppHeader } from "@/components/app-header";
+import { UsageCard } from "@/components/usage-card";
 import { initialOf } from "@/lib/profile";
+import { mintServiceToken } from "@/lib/service-token";
+import { parseUsage, type Usage } from "@/lib/usage";
 
 export const metadata = { title: "Profile", robots: { index: false, follow: false } };
+
+/** Today's usage for this person, or null when the API does not answer with the numbers expected. Looking uses nothing up. */
+async function fetchUsageToday(email: string): Promise<Usage | null> {
+  const backendUrl = process.env.BACKEND_URL ?? "http://localhost:8000";
+  try {
+    const res = await fetch(`${backendUrl}/me/usage`, {
+      headers: { Authorization: `Bearer ${await mintServiceToken(email)}` },
+      cache: "no-store",
+    });
+    return res.ok ? parseUsage(await res.json()) : null;
+  } catch {
+    return null;
+  }
+}
 
 export default async function ProfilePage() {
   const email = (await auth())?.user?.email;
   // The proxy already turns visitors away, and this makes the page safe on its own too.
   if (!email) redirect("/");
+  const usage = await fetchUsageToday(email);
 
   return (
     <div className="flex flex-1 flex-col">
@@ -37,6 +55,8 @@ export default async function ProfilePage() {
             </div>
           </div>
         </section>
+
+        <UsageCard usage={usage} />
       </div>
     </div>
   );

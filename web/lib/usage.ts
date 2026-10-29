@@ -65,3 +65,8 @@ export function usageRows(usage: Usage): UsageRow[] {
     return { kind, label: USAGE_LABELS[kind], used, limit, left, percent };
   });
 }
+
+/** The usage from an API reply, or null when the reply is not the numbers expected. */
+export function parseUsage(body: unknown): Usage | null {
+  return isUsage(body) ? body : null;
+}

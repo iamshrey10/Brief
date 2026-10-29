@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { fetchUsage, questionsLeftNote, usageRows, type UsageEntry } from "./usage";
+import { fetchUsage, questionsLeftNote, parseUsage, usageRows, type UsageEntry } from "./usage";
 
 const fetchMock = vi.fn();
 
@@ -136,5 +136,27 @@ describe("usageRows", () => {
 
   it("passes the counts through unchanged", () => {
     expect(usageRows(usage)[0]).toMatchObject({ used: 25, limit: 100, left: 75 });
+  });
+});
+
+describe("parseUsage", () => {
+  const good = {
+    ask: { used: 1, limit: 100, left: 99 },
+    read: { used: 0, limit: 30, left: 30 },
+    analyze: { used: 0, limit: 60, left: 60 },
+  };
+
+  it("keeps a reply that has all three limits with counts", () => {
+    expect(parseUsage(good)).toEqual(good);
+  });
+
+  it.each([
+    ["nothing", null],
+    ["text", "ok"],
+    ["a missing limit", { ask: good.ask, read: good.read }],
+    ["a negative count", { ...good, ask: { used: -1, limit: 100, left: 99 } }],
+    ["a count that is not a number", { ...good, read: { used: "0", limit: 30, left: 30 } }],
+  ])("throws away %s", (_name, body) => {
+    expect(parseUsage(body)).toBeNull();
   });
 });
