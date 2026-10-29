@@ -93,7 +93,7 @@ describe("the dashboard top bar", () => {
 
     expect(content).toBeDefined();
     // The header's default width is the same one.
-    expect(renderToStaticMarkup(<AppHeader email="a@b.co" />)).toContain("max-w-4xl");
+    expect(renderToStaticMarkup(<AppHeader email="a@b.co" current="documents" />)).toContain("max-w-4xl");
   });
 
   it("no longer carries its own sign out or theme button beside the heading", async () => {

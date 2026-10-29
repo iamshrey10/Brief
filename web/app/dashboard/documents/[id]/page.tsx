@@ -58,7 +58,7 @@ function StatusNotice({ document }: { document: DocumentSummary }) {
 function PageShell({ email, children }: { email: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-1 flex-col">
-      <AppHeader email={email} widthClass="max-w-6xl" />
+      <AppHeader email={email} current="documents" widthClass="max-w-6xl" />
       <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-6 py-8">{children}</div>
     </div>
   );
