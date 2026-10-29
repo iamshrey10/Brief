@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { AppHeader } from "@/components/app-header";
+import { countByKind, summaryLine } from "@/lib/document-summary";
 import { mintServiceToken } from "@/lib/service-token";
 import { DocumentUpload } from "@/components/document-upload";
 
@@ -43,6 +44,18 @@ export default async function Dashboard() {
             Upload a loan, lease, or job offer. Brief explains it clause by clause and shows you the
             exact words behind every answer.
           </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2" aria-label="Your documents at a glance" role="group">
+          <p className="text-sm font-medium text-foreground">{summaryLine(initialDocuments)}</p>
+          {countByKind(initialDocuments).map(({ kind, label, count }) => (
+            <span
+              key={kind}
+              className="rounded-full border border-border bg-card px-2.5 py-0.5 text-xs text-muted-foreground"
+            >
+              {label} <span className="font-medium text-foreground">{count}</span>
+            </span>
+          ))}
         </div>
 
         <DocumentUpload initialDocuments={initialDocuments} />

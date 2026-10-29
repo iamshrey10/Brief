@@ -102,6 +102,36 @@ describe("the dashboard top bar", () => {
   });
 });
 
+describe("the dashboard documents summary", () => {
+  async function html(documents: unknown[]): Promise<string> {
+    authMock.mockResolvedValue({ user: { email: "reader@example.com" } });
+    fetchMock.mockResolvedValue({ ok: true, json: async () => documents });
+    return renderToStaticMarkup(await Dashboard());
+  }
+
+  it("says how many documents there are and how many of each kind", async () => {
+    const page = await html([{ doc_type: "lease" }, { doc_type: "lease" }, { doc_type: "loan" }]);
+
+    expect(page).toContain("3 documents");
+    expect(page).toMatch(/Education loan <span[^>]*>1<\/span>/);
+    expect(page).toMatch(/Lease <span[^>]*>2<\/span>/);
+  });
+
+  it("says there are none yet, with no kind badges, when the person has no documents", async () => {
+    const page = await html([]);
+
+    expect(page).toContain("No documents yet");
+    expect(page).not.toContain("rounded-full");
+  });
+
+  it("shows no summary of someone else's data when the API fails, only that there are none", async () => {
+    authMock.mockResolvedValue({ user: { email: "reader@example.com" } });
+    fetchMock.mockResolvedValue({ ok: false, json: async () => ({ detail: "boom" }) });
+
+    expect(renderToStaticMarkup(await Dashboard())).toContain("No documents yet");
+  });
+});
+
 describe("the dashboard footer", () => {
   it("no longer holds account deletion, which lives in the Danger zone of the Profile page", async () => {
     authMock.mockResolvedValue({ user: { email: "reader@example.com" } });

@@ -32,14 +32,10 @@ describe("summaryLine", () => {
   });
 
   it("says one document in the singular", () => {
-    expect(summaryLine([doc("lease")])).toBe("1 document: 1 lease");
+    expect(summaryLine([doc("lease")])).toBe("1 document");
   });
 
-  it("says how many there are in all and of each kind", () => {
-    expect(summaryLine([doc("loan"), doc("lease"), doc("lease")])).toBe("3 documents: 1 education loan, 2 lease");
-  });
-
-  it("uses no em dash", () => {
-    expect(summaryLine([doc("lease"), doc("offer")])).not.toContain("—");
+  it("says how many there are in the plural, whatever their kinds", () => {
+    expect(summaryLine([doc("loan"), doc("lease"), doc("lease")])).toBe("3 documents");
   });
 });

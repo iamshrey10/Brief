@@ -14,10 +14,8 @@ export function countByKind(documents: { doc_type: string }[]): KindCount[] {
     .map((kind) => ({ kind, label: DOC_TYPE_LABELS[kind] ?? kind, count: counts.get(kind) ?? 0 }));
 }
 
-/** The line above the documents: "2 documents" and, when there are some, how they divide by kind. */
+/** The line above the documents: how many there are, with the count in the right number. */
 export function summaryLine(documents: { doc_type: string }[]): string {
   if (documents.length === 0) return "No documents yet";
-  const total = `${documents.length} ${documents.length === 1 ? "document" : "documents"}`;
-  const kinds = countByKind(documents).map(({ label, count }) => `${count} ${label.toLowerCase()}`);
-  return `${total}: ${kinds.join(", ")}`;
+  return `${documents.length} ${documents.length === 1 ? "document" : "documents"}`;
 }
