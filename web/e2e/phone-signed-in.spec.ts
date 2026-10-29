@@ -23,6 +23,29 @@ test("the dashboard fits a phone, with the whole file name readable and no sidew
   expect(name!.x + name!.width).toBeLessThanOrEqual(390);
 });
 
+test("the Profile page fits a phone, with the sections on a row of their own and no sideways scrolling", async ({ page }) => {
+  await page.goto("/dashboard/profile");
+  await expect(page.getByRole("region", { name: "Today's limits" })).toBeVisible();
+
+  expect(await sidewaysOverflow(page)).toBeLessThanOrEqual(0);
+  const sections = page.getByRole("navigation", { name: "Sections" }).filter({ visible: true });
+  await expect(sections).toHaveCount(1);
+  const links = await sections.getByRole("link").all();
+  expect(links).toHaveLength(2);
+  const [documents, profile] = await Promise.all(links.map((link) => link.boundingBox()));
+  expect(documents!.y).toBe(profile!.y);
+  expect(profile!.x + profile!.width).toBeLessThanOrEqual(390);
+});
+
+test("the dashboard's summary of documents fits a phone", async ({ page }) => {
+  await page.goto("/dashboard");
+
+  const summary = page.getByRole("group", { name: "Your documents at a glance" });
+  await expect(summary).toBeVisible();
+  const box = await summary.boundingBox();
+  expect(box!.x + box!.width).toBeLessThanOrEqual(390);
+});
+
 test("the document page fits a phone on the Overview", async ({ page }) => {
   await page.goto("/dashboard/documents/doc-lease");
   await expect(page.getByRole("region", { name: "Key terms" }).getByText("Security deposit")).toBeVisible();

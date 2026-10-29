@@ -30,6 +30,13 @@ for (const scheme of ["light", "dark"] as const) {
       expect(await problems(page)).toEqual([]);
     });
 
+    test("the Profile page has no automatically detectable accessibility problems", async ({ page }) => {
+      await page.goto("/dashboard/profile");
+      await expect(page.getByRole("region", { name: "Today's limits" }).getByRole("progressbar")).toHaveCount(3);
+
+      expect(await problems(page)).toEqual([]);
+    });
+
     test("the document Overview has no automatically detectable accessibility problems", async ({ page }) => {
       await page.goto("/dashboard/documents/doc-lease");
       await expect(page.getByRole("region", { name: "Key terms" }).getByText("Security deposit")).toBeVisible();
