@@ -171,9 +171,12 @@ describe("DeleteAccount", () => {
 });
 
 describe("the Delete my account button", () => {
-  it("is pulled left by its own padding, so its words line up with the legal text above it", () => {
+  it("is a clearly visible button in the error color, not plain text, since it has a section of its own", () => {
     render(<DeleteAccount onDeleted={vi.fn()} />);
 
-    expect(screen.getByRole("button", { name: "Delete my account" })).toHaveClass("-ml-2.5");
+    const button = screen.getByRole("button", { name: "Delete my account" });
+
+    expect(button.className).toContain("text-destructive");
+    expect(button.className).toContain("bg-destructive/10");
   });
 });
