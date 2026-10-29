@@ -3,6 +3,7 @@ import { expect, test } from "@playwright/test";
 test.describe("someone who is not signed in", () => {
   for (const path of [
     "/dashboard",
+    "/dashboard/profile",
     "/dashboard/documents/00000000-0000-0000-0000-000000000000",
   ]) {
     test(`is sent to the landing page from ${path}`, async ({ page }) => {
