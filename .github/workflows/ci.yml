@@ -14,7 +14,7 @@ jobs:
       run:
         working-directory: web
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v4
         with:
           package_json_file: web/package.json
@@ -47,7 +47,7 @@ jobs:
           --health-timeout 3s
           --health-retries 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v4
         with:
           package_json_file: web/package.json
@@ -97,7 +97,7 @@ jobs:
       R2_BUCKET_NAME: brief-documents-ci
       R2_ENDPOINT_URL: https://ci-only-account.r2.cloudflarestorage.com
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # The whole history, so the commit message check sees every commit and not only the newest.
           fetch-depth: 0
