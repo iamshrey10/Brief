@@ -143,15 +143,13 @@ describe("OverviewPanel key terms", () => {
     expect(within(section).getByText("2 of 3 found")).toBeInTheDocument();
   });
 
-  it("keeps terms the document does not state out of the main list, in a collapsed note", async () => {
+  it("lists the terms the document does not state apart from the cards, as visible names, since that is a finding too", async () => {
     setup();
 
     const section = await screen.findByRole("region", { name: "Key terms" });
-    const summary = within(section).getByText("Not mentioned in this document (1)");
-    const details = summary.closest("details");
-    expect(details).not.toHaveAttribute("open");
-    expect(within(details as HTMLElement).getByText("Lender")).toBeInTheDocument();
-    expect(screen.getAllByRole("listitem").some((li) => li.textContent === "Lender")).toBe(true);
+    const missing = within(section).getByRole("list", { name: "Not mentioned in this document (1)" });
+    expect(within(missing).getByText("Lender")).toBeVisible();
+    expect(within(missing).getAllByRole("listitem")).toHaveLength(1);
     // and the Lender term is not shown as a card with a value
     expect(within(section).queryByText("null")).not.toBeInTheDocument();
   });

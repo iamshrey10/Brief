@@ -137,9 +137,13 @@ function EvidenceButton({
           : `Show "${label}" in the document, ${pageText.toLowerCase()}${which}`
       }
       onClick={() => onSelect({ clauseId, quote })}
-      className="block w-full rounded-md border-l-2 border-primary px-3 py-1.5 text-left text-muted-foreground transition-colors outline-none hover:bg-accent hover:text-accent-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
+      className={
+        showQuote
+          ? "block w-full rounded-md border-l-2 border-primary px-3 py-1.5 text-left text-muted-foreground transition-colors outline-none hover:bg-accent hover:text-accent-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
+          : "inline-flex items-center gap-1 rounded-full border border-border bg-background px-2.5 py-1 text-xs text-muted-foreground transition-colors outline-none hover:border-primary/50 hover:bg-accent hover:text-accent-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
+      }
     >
-      <span className="block text-xs">{pageText}</span>
+      <span className={showQuote ? "block text-xs" : undefined}>{pageText}</span>
       {showQuote && <span className="text-sm italic">&ldquo;{quote}&rdquo;</span>}
     </button>
   );
@@ -193,23 +197,25 @@ function KeyTermCard({
   onSelect: (citation: ActiveCitation) => void;
 }) {
   return (
-    <li className="flex flex-col gap-1.5 rounded-lg border border-border bg-card p-3">
+    <li className="flex flex-col gap-2 rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary/40">
       <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
         {term.label}
       </p>
-      <p className="text-sm font-medium text-card-foreground">{term.value}</p>
-      {term.evidence.map((item, index) => (
-        <EvidenceButton
-          key={`${item.clause_id}-${item.quote}`}
-          position={{ index, total: term.evidence.length }}
-          label={term.label}
-          page={item.page_number}
-          quote={item.quote}
-          clauseId={item.clause_id}
-          showQuote={false}
-          onSelect={onSelect}
-        />
-      ))}
+      <p className="text-base leading-snug font-semibold text-card-foreground">{term.value}</p>
+      <div className="mt-auto flex flex-wrap gap-1.5 pt-1">
+        {term.evidence.map((item, index) => (
+          <EvidenceButton
+            key={`${item.clause_id}-${item.quote}`}
+            position={{ index, total: term.evidence.length }}
+            label={term.label}
+            page={item.page_number}
+            quote={item.quote}
+            clauseId={item.clause_id}
+            showQuote={false}
+            onSelect={onSelect}
+          />
+        ))}
+      </div>
     </li>
   );
 }
@@ -260,23 +266,28 @@ function KeyTermsBody({
           None of the usual key terms are stated in this document.
         </p>
       ) : (
-        <ul className="grid gap-2 sm:grid-cols-2">
+        <ul className="grid gap-3 sm:grid-cols-2">
           {found.map((term) => (
             <KeyTermCard key={term.name} term={term} onSelect={onSelect} />
           ))}
         </ul>
       )}
       {notMentioned.length > 0 && (
-        <details className="rounded-lg border border-border px-3 py-2 text-sm">
-          <summary className="cursor-pointer text-muted-foreground">
+        <div className="flex flex-col gap-2">
+          <p id="not-mentioned-heading" className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
             Not mentioned in this document ({notMentioned.length})
-          </summary>
-          <ul className="mt-2 flex flex-col gap-1 text-muted-foreground">
+          </p>
+          <ul aria-labelledby="not-mentioned-heading" className="flex flex-wrap gap-1.5">
             {notMentioned.map((term) => (
-              <li key={term.name}>{term.label}</li>
+              <li
+                key={term.name}
+                className="rounded-full border border-dashed border-border px-2.5 py-1 text-xs text-muted-foreground"
+              >
+                {term.label}
+              </li>
             ))}
           </ul>
-        </details>
+        </div>
       )}
     </>
   );
