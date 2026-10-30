@@ -1,4 +1,5 @@
 import time
+import uuid
 
 import pytest
 from fastapi import HTTPException
@@ -77,4 +78,42 @@ async def test_the_first_request_from_someone_creates_their_user_and_later_ones_
 
     assert first.id == second.id
     count = await db_session.scalar(select(func.count()).select_from(User).where(User.email == email))
+    assert count == 1
+
+
+async def test_requests_from_a_brand_new_person_that_overlap_make_one_user_and_none_fails():
+    import asyncio
+
+    from sqlalchemy import func, select
+    from sqlalchemy.ext.asyncio import AsyncSession
+
+    from app.models import User
+    from tests.conftest import engine
+
+    email = f"{uuid.uuid4()}@example.com"
+    arrivals = 8
+    all_have_looked = asyncio.Barrier(arrivals)
+
+    class HoldAfterFirstLookup(AsyncSession):
+        """Holds each request after its first query until every request has made one, which is the worst timing:
+        all of them have seen that the person does not exist before any of them creates it."""
+
+        looked = False
+
+        async def execute(self, *args, **kwargs):
+            result = await super().execute(*args, **kwargs)
+            if not self.looked:
+                self.looked = True
+                await all_have_looked.wait()
+            return result
+
+    async def arrive() -> uuid.UUID:
+        async with HoldAfterFirstLookup(engine, expire_on_commit=False) as session:
+            return (await get_current_user(email=email, session=session)).id
+
+    ids = await asyncio.gather(*(arrive() for _ in range(arrivals)))
+
+    assert len(set(ids)) == 1
+    async with AsyncSession(engine) as session:
+        count = (await session.execute(select(func.count()).select_from(User).where(User.email == email))).scalar_one()
     assert count == 1

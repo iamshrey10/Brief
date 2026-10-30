@@ -2,6 +2,7 @@ from fastapi import Depends, Header, HTTPException
 import jwt
 from jwt import InvalidTokenError
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -43,14 +44,19 @@ async def get_current_user(
     email: str = Depends(verify_service_token),
     session: AsyncSession = Depends(get_session),
 ) -> User:
-    """Looks up the signed-in user, creating a row the first time they're ever seen."""
+    """Looks up the signed-in user, creating a row the first time they're ever seen.
+
+    A new person's first page makes several requests at once, and each of them arrives here before any row
+    exists. So the row is made with an insert that does nothing when the address is already there, and every
+    request then reads the one row. A plain "look, then insert" would let two of them both insert and one fail.
+    """
     result = await session.execute(select(User).where(User.email == email))
     user = result.scalar_one_or_none()
 
     if user is None:
-        user = User(email=email)
-        session.add(user)
+        await session.execute(pg_insert(User).values(email=email).on_conflict_do_nothing(index_elements=["email"]))
         await session.commit()
-        await session.refresh(user)
+        result = await session.execute(select(User).where(User.email == email))
+        user = result.scalar_one()
 
     return user
