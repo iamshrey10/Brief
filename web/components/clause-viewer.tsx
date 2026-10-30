@@ -44,34 +44,37 @@ export function ClauseViewer({
   }, [activeCitation]);
 
   return (
-    <section aria-label="Document text" className="flex flex-col gap-6">
+    <section aria-label="Document text" className="flex flex-col gap-4">
       <h2 className="sr-only">Document text</h2>
       {groupByPage(clauses).map(({ pageNumber, clauses: pageClauses }) => (
-        <div key={pageNumber} className="flex flex-col gap-2">
-          <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+        <div key={pageNumber} className="rounded-2xl border border-border bg-card">
+          <h3 className="rounded-t-2xl border-b border-border bg-card/95 px-5 py-2.5 text-xs font-medium tracking-wide text-muted-foreground uppercase backdrop-blur lg:sticky lg:top-14 lg:z-10">
             Page {pageNumber}
           </h3>
-          {pageClauses.map((clause) => {
-            const isActive = activeCitation?.clauseId === clause.id;
-            return (
-              <p
-                key={clause.id}
-                id={`clause-${clause.id}`}
-                tabIndex={-1}
-                aria-current={isActive ? "true" : undefined}
-                className={cn(
-                  "rounded-lg border bg-card px-4 py-3 text-sm leading-relaxed whitespace-pre-line text-card-foreground transition-colors outline-none",
-                  isActive ? "border-primary bg-accent" : "border-border",
-                )}
-              >
-                {isActive ? (
-                  <HighlightedText text={clause.text} quote={activeCitation.quote} />
-                ) : (
-                  clause.text
-                )}
-              </p>
-            );
-          })}
+          <ol className="divide-y divide-border">
+            {pageClauses.map((clause) => {
+              const isActive = activeCitation?.clauseId === clause.id;
+              return (
+                <li key={clause.id} className="last:rounded-b-2xl">
+                  <p
+                    id={`clause-${clause.id}`}
+                    tabIndex={-1}
+                    aria-current={isActive ? "true" : undefined}
+                    className={cn(
+                      "border-l-2 px-5 py-3.5 text-sm leading-relaxed whitespace-pre-line text-card-foreground transition-colors outline-none",
+                      isActive ? "border-l-primary bg-accent" : "border-l-transparent hover:bg-muted/50",
+                    )}
+                  >
+                    {isActive ? (
+                      <HighlightedText text={clause.text} quote={activeCitation.quote} />
+                    ) : (
+                      clause.text
+                    )}
+                  </p>
+                </li>
+              );
+            })}
+          </ol>
         </div>
       ))}
     </section>

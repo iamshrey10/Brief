@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 import type { ClauseData } from "@/lib/documents";
 import { ClauseViewer } from "./clause-viewer";
@@ -163,5 +163,22 @@ describe("ClauseViewer headings", () => {
     render(<ClauseViewer clauses={CLAUSES} />);
 
     expect(screen.getByRole("heading", { level: 2, name: "Document text" })).toHaveClass("sr-only");
+  });
+
+  it("shows each page as one sheet: an ordered list of its clauses under one page label", () => {
+    render(<ClauseViewer clauses={CLAUSES} />);
+
+    const lists = screen.getAllByRole("list");
+    expect(lists).toHaveLength(2);
+    expect(within(lists[0]).getAllByRole("listitem")).toHaveLength(2);
+    expect(within(lists[1]).getAllByRole("listitem")).toHaveLength(1);
+  });
+
+  it("marks the chosen clause with the accent edge, and leaves the others with an invisible one", () => {
+    const { rerender } = render(<ClauseViewer clauses={CLAUSES} />);
+    rerender(<ClauseViewer clauses={CLAUSES} activeCitation={{ clauseId: "c3", quote: "late fee" }} />);
+
+    expect(clauseElement("c3").className).toContain("border-l-primary");
+    expect(clauseElement("c1").className).toContain("border-l-transparent");
   });
 });
