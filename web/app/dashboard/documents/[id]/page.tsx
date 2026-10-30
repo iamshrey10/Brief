@@ -9,6 +9,7 @@ import {
   type ClauseData,
   type DocumentSummary,
 } from "@/lib/documents";
+import { documentFacts } from "@/lib/document-facts";
 import { mintServiceToken } from "@/lib/service-token";
 
 export const metadata = { title: "Document", robots: { index: false, follow: false } };
@@ -113,6 +114,24 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
             {DOC_TYPE_LABELS[document.doc_type] ?? document.doc_type}
           </span>
         </div>
+        {documentFacts(clauses, document.created_at).length > 0 && (
+          <dl aria-label="About this document" className="flex flex-wrap gap-x-5 gap-y-1 text-sm text-muted-foreground">
+            {documentFacts(clauses, document.created_at).map((fact) => (
+              <div key={fact.label} className="flex gap-1.5">
+                <dt className="sr-only">{fact.label}</dt>
+                <dd>
+                  {fact.label === "uploaded" ? (
+                    <>Uploaded {fact.value}</>
+                  ) : (
+                    <>
+                      <span className="font-medium text-foreground">{fact.value}</span> {fact.label}
+                    </>
+                  )}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        )}
       </div>
 
       <StatusNotice document={document} />

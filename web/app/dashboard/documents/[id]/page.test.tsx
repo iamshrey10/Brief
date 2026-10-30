@@ -159,6 +159,24 @@ describe("the document page", () => {
   });
 });
 
+describe("the facts under the document's name", () => {
+  it("say how many clauses and pages it was read into", async () => {
+    serve(document());
+
+    const html = await page();
+
+    expect(html).toContain('aria-label="About this document"');
+    expect(html).toMatch(/>2<\/span> clauses/);
+    expect(html).toMatch(/>1<\/span> page</);
+  });
+
+  it("are left out for a document still being read, which has no clauses yet", async () => {
+    serve(document({ status: "processing" }));
+
+    expect(await page()).not.toContain("About this document");
+  });
+});
+
 describe("the document page top bar", () => {
   it("shows the signed in bar, with who is signed in and Sign out, above the document", async () => {
     serve(document());
