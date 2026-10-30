@@ -19,3 +19,16 @@ export function summaryLine(documents: { doc_type: string }[]): string {
   if (documents.length === 0) return "No documents yet";
   return `${documents.length} ${documents.length === 1 ? "document" : "documents"}`;
 }
+
+/** The documents whose name contains the search (ignoring case and spaces at either end) and, unless kind is "all", are of that kind. */
+export function filterDocuments<T extends { filename: string; doc_type: string }>(
+  documents: T[],
+  search: string,
+  kind: string,
+): T[] {
+  const needle = search.trim().toLowerCase();
+  return documents.filter(
+    (document) =>
+      (kind === "all" || document.doc_type === kind) && (!needle || document.filename.toLowerCase().includes(needle)),
+  );
+}

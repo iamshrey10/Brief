@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { countByKind, summaryLine } from "./document-summary";
+import { countByKind, filterDocuments, summaryLine } from "./document-summary";
 
 const doc = (doc_type: string) => ({ doc_type });
 
@@ -37,5 +37,31 @@ describe("summaryLine", () => {
 
   it("says how many there are in the plural, whatever their kinds", () => {
     expect(summaryLine([doc("loan"), doc("lease"), doc("lease")])).toBe("3 documents");
+  });
+});
+
+describe("filterDocuments", () => {
+  const documents = [
+    { filename: "Maple Court Lease.pdf", doc_type: "lease" },
+    { filename: "student-loan.pdf", doc_type: "loan" },
+    { filename: "Old lease scan.jpg", doc_type: "lease" },
+  ];
+
+  it("keeps everything when nothing is searched and every kind is shown", () => {
+    expect(filterDocuments(documents, "", "all")).toEqual(documents);
+    expect(filterDocuments(documents, "   ", "all")).toEqual(documents);
+  });
+
+  it("matches part of a name, ignoring case and spaces around the search", () => {
+    expect(filterDocuments(documents, "  LEASE ", "all").map((d) => d.filename)).toEqual([
+      "Maple Court Lease.pdf",
+      "Old lease scan.jpg",
+    ]);
+  });
+
+  it("keeps only one kind when asked, and combines that with the search", () => {
+    expect(filterDocuments(documents, "", "loan").map((d) => d.filename)).toEqual(["student-loan.pdf"]);
+    expect(filterDocuments(documents, "maple", "lease").map((d) => d.filename)).toEqual(["Maple Court Lease.pdf"]);
+    expect(filterDocuments(documents, "maple", "loan")).toEqual([]);
   });
 });
