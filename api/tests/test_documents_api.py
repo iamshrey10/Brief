@@ -2690,3 +2690,102 @@ async def test_a_failed_question_is_logged_with_its_type_and_code_and_no_text(
         "model call failed: AnswerGenerationError"
     ]
     assert "Jane" not in caplog.text
+
+
+# --- GET /me/key-dates ---
+
+LEASE_DATES_TEXT = "The Lease begins on January 1, 2027 and ends on December 31, 2027."
+
+
+def _fake_date_model(monkeypatch, calls: list):
+    def fake_generate(fields, clauses, seed=None):
+        calls.append(clauses)
+        return ExtractionResponse(
+            fields=[
+                ExtractedField(
+                    name="lease_end",
+                    found=True,
+                    value="December 31, 2027",
+                    clause_ref="C1",
+                    quote="ends on December 31, 2027",
+                ),
+                ExtractedField(
+                    name="monthly_rent",
+                    found=True,
+                    value="$2,054.00 a month",
+                    clause_ref="C2",
+                    quote="Monthly rent is $2,054.00",
+                ),
+            ]
+        )
+
+    monkeypatch.setattr("app.key_terms.generate_key_terms", fake_generate)
+
+
+async def test_key_dates_returns_only_the_dates_already_saved_and_never_calls_the_model(
+    client, db_session, test_user, monkeypatch
+):
+    document = await _ready_document(db_session, test_user)
+    await _add_clause(db_session, document, 0, 1, LEASE_DATES_TEXT)
+    await _add_clause(db_session, document, 1, 1, LEASE_RENT_TEXT)
+    await db_session.commit()
+    calls: list = []
+    _fake_date_model(monkeypatch, calls)
+    await client.get(f"/documents/{document.id}/key-terms")  # reads and saves
+    calls.clear()
+
+    response = await client.get("/me/key-dates")
+
+    assert response.status_code == 200
+    assert response.json() == [
+        {
+            "document_id": str(document.id),
+            "field": "lease_end",
+            "label": "Lease ends",
+            "value": "December 31, 2027",
+        }
+    ]
+    assert calls == []  # looking at the dates read nothing
+
+
+async def test_key_dates_skips_a_document_whose_terms_were_never_read(client, db_session, test_user, monkeypatch):
+    document = await _ready_document(db_session, test_user)
+    await _add_clause(db_session, document, 0, 1, LEASE_DATES_TEXT)
+    await db_session.commit()
+    calls: list = []
+    _fake_date_model(monkeypatch, calls)
+
+    response = await client.get("/me/key-dates")
+
+    assert response.status_code == 200
+    assert response.json() == []
+    assert calls == []  # an unread document is not read just to be looked at
+
+
+async def test_key_dates_never_includes_another_persons_dates(client, db_session, test_user, monkeypatch):
+    other_user = User(email=f"{uuid.uuid4()}@example.com")
+    db_session.add(other_user)
+    await db_session.commit()
+    await db_session.refresh(other_user)
+    theirs = Document(
+        user_id=other_user.id,
+        filename="theirs.pdf",
+        doc_type="lease",
+        status="ready",
+        storage_key="fake/theirs.pdf",
+        file_size_bytes=1024,
+    )
+    db_session.add(theirs)
+    await db_session.commit()
+    await db_session.refresh(theirs)
+    await _add_clause(db_session, theirs, 0, 1, LEASE_DATES_TEXT)
+    await _add_clause(db_session, theirs, 1, 1, LEASE_RENT_TEXT)
+    await db_session.commit()
+    _fake_date_model(monkeypatch, [])
+    # The other person's terms get read and saved, through the function the endpoint uses for its own.
+    await main_module.get_key_terms(db_session, theirs.id, theirs.doc_type)
+
+    response = await client.get("/me/key-dates")
+
+    assert response.status_code == 200
+    assert response.json() == []

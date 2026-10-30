@@ -21,6 +21,7 @@ from app.ingestion import ingest_document
 from app.logging_setup import configure_logging
 from app.readiness import check_ready
 from app import request_id
+from app.key_dates import KeyDate, saved_key_dates
 from app.key_terms import KeyTermsGenerationError, KeyTermsResult, get_key_terms, load_key_terms
 from app.models import ChecklistAnswerRow, Clause, Document, Extraction, User
 from app.qa import AnswerGenerationError, AnswerResult, answer_with_path
@@ -183,6 +184,23 @@ async def my_usage(
     """Where the signed-in person stands today against each daily limit: used, the limit, and what is
     left. Only reads, so looking never uses anything up."""
     return await usage.usage_today(session, user.id)
+
+
+@app.get(
+    "/me/key-dates",
+    tags=["account"],
+    summary="Show the dates found in your documents",
+    description=(
+        "Returns the start and end dates already found in the signed-in person's documents, as the documents word them. Only terms that were already read and saved are included, so this never calls the model and never counts against a daily limit."
+    ),
+    responses=_errors(401),
+)
+async def my_key_dates(
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> list[KeyDate]:
+    """The dates in this person's documents that are already saved. Looking uses nothing up."""
+    return await saved_key_dates(session, user.id)
 
 
 @app.delete(
