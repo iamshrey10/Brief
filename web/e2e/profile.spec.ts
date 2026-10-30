@@ -62,3 +62,15 @@ test("the dashboard says how many documents there are and how many of each kind"
   await expect(summary.getByText("2 documents")).toBeVisible();
   await expect(summary.getByText(/Lease\s*1/)).toBeVisible();
 });
+
+test("choosing Dark on the Profile page turns the site dark and is kept after a reload", async ({ page }) => {
+  await signInAsTestReader(page);
+  await page.goto("/dashboard/profile");
+
+  await page.getByRole("radiogroup", { name: "Appearance" }).getByRole("radio", { name: "Dark" }).click();
+  await expect(page.locator("html")).toHaveClass(/dark/);
+
+  await page.reload();
+  await expect(page.locator("html")).toHaveClass(/dark/);
+  await expect(page.getByRole("radio", { name: "Dark" })).toHaveAttribute("aria-checked", "true");
+});

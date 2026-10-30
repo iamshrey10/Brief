@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { AppHeader } from "@/components/app-header";
 import { DeleteAccount } from "@/components/delete-account";
+import { ThemeChoice } from "@/components/theme-choice";
 import { UsageCard } from "@/components/usage-card";
 import { initialOf } from "@/lib/profile";
 import { mintServiceToken } from "@/lib/service-token";
@@ -58,6 +59,14 @@ export default async function ProfilePage() {
         </section>
 
         <UsageCard usage={usage} />
+
+        <section aria-labelledby="appearance-heading" className="rounded-2xl border border-border bg-card p-6">
+          <h2 id="appearance-heading" className="text-lg font-semibold tracking-tight text-foreground">
+            Appearance
+          </h2>
+          <p className="mt-1 mb-4 text-sm text-muted-foreground">Choose how Brief looks on this device.</p>
+          <ThemeChoice />
+        </section>
 
         <section
           aria-labelledby="danger-heading"
