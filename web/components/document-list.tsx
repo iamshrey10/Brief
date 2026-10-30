@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import Link from "next/link";
-import { countByKind, filterDocuments } from "@/lib/document-summary";
+import { countByKind, filterDocuments, ORDER_LABELS, sortDocuments, type DocumentOrder } from "@/lib/document-summary";
 import {
   ChevronRight,
   CircleCheck,
@@ -525,6 +525,7 @@ export function DocumentList({
 }) {
   const [search, setSearch] = useState("");
   const [kind, setKind] = useState("all");
+  const [order, setOrder] = useState<DocumentOrder>("newest");
 
   if (documents.length === 0) {
     return (
@@ -584,6 +585,18 @@ export function DocumentList({
                 </option>
               ))}
             </select>
+            <select
+              aria-label="Sort documents"
+              value={order}
+              onChange={(event) => setOrder(event.target.value as DocumentOrder)}
+              className="h-9 rounded-lg border border-input bg-background px-2 text-sm text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+            >
+              {(Object.keys(ORDER_LABELS) as DocumentOrder[]).map((value) => (
+                <option key={value} value={value}>
+                  {ORDER_LABELS[value]}
+                </option>
+              ))}
+            </select>
           </div>
         )}
       </div>
@@ -603,7 +616,7 @@ export function DocumentList({
         </p>
       ) : (
         <ul className="flex flex-col gap-2">
-          {filterDocuments(documents, search, kind).map((doc) => (
+          {sortDocuments(filterDocuments(documents, search, kind), order).map((doc) => (
             <li key={doc.id}>
               <DocumentRow
                 doc={doc}

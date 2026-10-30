@@ -942,3 +942,21 @@ describe("searching and filtering the documents", () => {
     expect(screen.queryByRole("search")).not.toBeInTheDocument();
   });
 });
+
+describe("sorting the documents", () => {
+  const documents = [
+    doc("ready", "d1", "b lease.pdf", { created_at: "2026-10-02T00:00:00Z" }),
+    doc("ready", "d2", "A loan.pdf", { created_at: "2026-10-03T00:00:00Z" }),
+  ];
+  const order = () => within(screen.getByRole("region", { name: "Your documents" })).getAllByText(/\.pdf$/).map((el) => el.textContent);
+
+  it("shows the newest first until another order is chosen, then follows it", () => {
+    render(<DocumentList documents={documents} />);
+
+    expect(order()).toEqual(["A loan.pdf", "b lease.pdf"]);
+    fireEvent.change(screen.getByRole("combobox", { name: "Sort documents" }), { target: { value: "oldest" } });
+    expect(order()).toEqual(["b lease.pdf", "A loan.pdf"]);
+    fireEvent.change(screen.getByRole("combobox", { name: "Sort documents" }), { target: { value: "name" } });
+    expect(order()).toEqual(["A loan.pdf", "b lease.pdf"]);
+  });
+});

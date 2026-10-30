@@ -32,3 +32,27 @@ export function filterDocuments<T extends { filename: string; doc_type: string }
       (kind === "all" || document.doc_type === kind) && (!needle || document.filename.toLowerCase().includes(needle)),
   );
 }
+
+export type DocumentOrder = "newest" | "oldest" | "name";
+
+export const ORDER_LABELS: Record<DocumentOrder, string> = {
+  newest: "Newest first",
+  oldest: "Oldest first",
+  name: "Name A to Z",
+};
+
+/** A sorted copy. A document with no upload time sorts after the dated ones either way, and ties keep their order. */
+export function sortDocuments<T extends { filename: string; created_at?: string | null }>(
+  documents: T[],
+  order: DocumentOrder,
+): T[] {
+  if (order === "name") {
+    return [...documents].sort((a, b) => a.filename.localeCompare(b.filename, undefined, { sensitivity: "base", numeric: true }));
+  }
+  const time = (document: T) => (document.created_at ? Date.parse(document.created_at) : Number.NaN);
+  return [...documents].sort((a, b) => {
+    const [ta, tb] = [time(a), time(b)];
+    if (Number.isNaN(ta) || Number.isNaN(tb)) return Number(Number.isNaN(ta)) - Number(Number.isNaN(tb));
+    return order === "newest" ? tb - ta : ta - tb;
+  });
+}

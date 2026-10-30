@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { countByKind, filterDocuments, summaryLine } from "./document-summary";
+import { countByKind, filterDocuments, sortDocuments, summaryLine } from "./document-summary";
 
 const doc = (doc_type: string) => ({ doc_type });
 
@@ -63,5 +63,33 @@ describe("filterDocuments", () => {
     expect(filterDocuments(documents, "", "loan").map((d) => d.filename)).toEqual(["student-loan.pdf"]);
     expect(filterDocuments(documents, "maple", "lease").map((d) => d.filename)).toEqual(["Maple Court Lease.pdf"]);
     expect(filterDocuments(documents, "maple", "loan")).toEqual([]);
+  });
+});
+
+describe("sortDocuments", () => {
+  const documents = [
+    { filename: "b lease.pdf", created_at: "2026-10-02T00:00:00Z" },
+    { filename: "A loan.pdf", created_at: "2026-10-03T00:00:00Z" },
+    { filename: "c offer 10.pdf", created_at: null },
+    { filename: "c offer 9.pdf", created_at: "2026-10-01T00:00:00Z" },
+  ];
+  const names = (list: { filename: string }[]) => list.map((d) => d.filename);
+
+  it("puts the newest first, and a document with no date last", () => {
+    expect(names(sortDocuments(documents, "newest"))).toEqual(["A loan.pdf", "b lease.pdf", "c offer 9.pdf", "c offer 10.pdf"]);
+  });
+
+  it("puts the oldest first, and a document with no date still last", () => {
+    expect(names(sortDocuments(documents, "oldest"))).toEqual(["c offer 9.pdf", "b lease.pdf", "A loan.pdf", "c offer 10.pdf"]);
+  });
+
+  it("sorts by name ignoring case, with numbers in their natural order", () => {
+    expect(names(sortDocuments(documents, "name"))).toEqual(["A loan.pdf", "b lease.pdf", "c offer 9.pdf", "c offer 10.pdf"]);
+  });
+
+  it("returns a copy and leaves the list it was given alone", () => {
+    const before = names(documents);
+    sortDocuments(documents, "name");
+    expect(names(documents)).toEqual(before);
   });
 });
