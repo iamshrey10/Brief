@@ -36,3 +36,18 @@ test("the top bar stays in view after scrolling to the bottom, and the section l
   await expect(phonePage.getByRole("navigation", { name: "Sections" })).toBeHidden();
   await phone.close();
 });
+
+test("a shared link shows Brief's own card image and the page has Brief's own icon", async ({ page, request }) => {
+  await page.goto("/");
+
+  const image = await page.locator('meta[property="og:image"]').getAttribute("content");
+  expect(image).toBeTruthy();
+  const card = await request.get(image!);
+  expect(card.status()).toBe(200);
+  expect(card.headers()["content-type"]).toContain("image/png");
+  await expect(page.locator('meta[property="og:image:width"]')).toHaveAttribute("content", "1200");
+  await expect(page.locator('meta[property="og:image:alt"]')).toHaveAttribute("content", "Brief: Every clause, explained.");
+
+  const icon = await page.locator('link[rel="icon"][type="image/svg+xml"]').getAttribute("href");
+  expect((await request.get(icon!)).status()).toBe(200);
+});
