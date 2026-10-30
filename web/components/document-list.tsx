@@ -504,6 +504,13 @@ function DocumentRow({
   );
 }
 
+/** What the first upload will show, so an empty list explains itself instead of looking broken. Each is built today. */
+export const EMPTY_STATE_PROMISES = [
+  { title: "Key terms", body: "Rates, fees, dates and amounts, each with the exact words it came from." },
+  { title: "Questions to ask", body: "What the document leaves open, with wording you can send the other side." },
+  { title: "Checked answers", body: "Ask anything, and see the clause each answer rests on." },
+];
+
 export function DocumentList({
   documents,
   onRetried,
@@ -517,12 +524,32 @@ export function DocumentList({
 }) {
   if (documents.length === 0) {
     return (
-      <div className="rounded-lg border border-dashed border-border px-4 py-8 text-center">
-        <p className="text-sm font-medium text-foreground">No documents yet</p>
-        <p className="mt-1 text-sm text-muted-foreground">
+      <section
+        aria-label="No documents yet"
+        className="rounded-2xl border border-dashed border-border bg-card/60 px-6 py-10 text-center"
+      >
+        <span
+          aria-hidden="true"
+          className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-accent text-accent-foreground"
+        >
+          <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+            <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z" />
+            <path d="M14 3v5h5M9 13h6M9 17h4" />
+          </svg>
+        </span>
+        <p className="mt-4 font-heading text-xl font-semibold text-foreground">No documents yet</p>
+        <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
           Upload a loan, lease, or job offer above and Brief will explain it clause by clause.
         </p>
-      </div>
+        <ul className="mx-auto mt-6 grid max-w-2xl gap-3 text-left sm:grid-cols-3">
+          {EMPTY_STATE_PROMISES.map((promise) => (
+            <li key={promise.title} className="rounded-xl border border-border bg-background p-4">
+              <p className="text-sm font-medium text-foreground">{promise.title}</p>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{promise.body}</p>
+            </li>
+          ))}
+        </ul>
+      </section>
     );
   }
 

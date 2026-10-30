@@ -7,7 +7,7 @@ import type { DocumentSummary } from "@/lib/documents";
 import { deleteDocument, updateDocument } from "@/lib/document-actions";
 import { retryDocument } from "@/lib/retry";
 import { rereadDocument } from "@/lib/reread";
-import { DocumentList } from "./document-list";
+import { EMPTY_STATE_PROMISES, DocumentList } from "./document-list";
 
 vi.mock("@/lib/document-actions", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/document-actions")>();
@@ -49,7 +49,18 @@ describe("DocumentList", () => {
 
     expect(screen.getByText("No documents yet")).toBeInTheDocument();
     expect(screen.getByText(/upload a loan, lease, or job offer/i)).toBeInTheDocument();
-    expect(screen.queryByRole("list")).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Your documents" })).not.toBeInTheDocument();
+  });
+
+  it("says, when there are no documents, what the first upload will show, so the empty space does not look broken", () => {
+    render(<DocumentList documents={[]} />);
+
+    const empty = screen.getByRole("region", { name: "No documents yet" });
+    for (const promise of EMPTY_STATE_PROMISES) {
+      expect(within(empty).getByText(promise.title)).toBeInTheDocument();
+      expect(within(empty).getByText(promise.body)).toBeInTheDocument();
+    }
+    expect(EMPTY_STATE_PROMISES.map((promise) => promise.body).join(" ")).not.toContain("\u2014");
   });
 
   it("links a ready document to its page", () => {
