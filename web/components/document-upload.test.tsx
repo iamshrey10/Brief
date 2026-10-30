@@ -329,6 +329,46 @@ describe("DocumentUpload form", () => {
     expect(JSON.parse(create?.body ?? "{}")).toMatchObject({ filename: "loan.pdf", doc_type: "offer" });
   });
 
+  it("says which step an upload is on while it waits, step by step, and says nothing once it is done", async () => {
+    const gates: Record<string, (value: Response) => void> = {};
+    const hold = (name: string) => new Promise<Response>((resolve) => (gates[name] = resolve));
+    fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+      const method = init?.method ?? "GET";
+      if (url === "/api/backend/documents" && method === "POST") return hold("create");
+      if (url === "https://storage.example/upload") return hold("send");
+      if (url.endsWith("/confirm")) return hold("confirm");
+      throw new Error(`unexpected request: ${method} ${url}`);
+    });
+    render(<DocumentUpload initialDocuments={[]} />);
+
+    chooseFile(pdf());
+    fireEvent.click(screen.getByRole("button", { name: "Upload" }));
+    await tick(0);
+    expect(screen.getByRole("status")).toHaveTextContent("Getting ready...");
+
+    gates.create(ok({ document_id: "d9", upload_url: "https://storage.example/upload" }));
+    await tick(0);
+    expect(screen.getByRole("status")).toHaveTextContent("Sending your file...");
+
+    gates.send({ ok: true } as Response);
+    await tick(0);
+    expect(screen.getByRole("status")).toHaveTextContent("Checking your file...");
+
+    gates.confirm(ok(doc("uploaded", "d9")));
+    await tick(0);
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  it("says it is loading the sample lease while it fetches it", async () => {
+    fetchMock.mockImplementation(() => new Promise<Response>(() => {}));
+    render(<DocumentUpload initialDocuments={[]} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Try a sample lease" }));
+    await tick(0);
+
+    expect(screen.getByRole("status")).toHaveTextContent("Loading the sample lease...");
+  });
+
   it("uploads a PDF as a PDF", async () => {
     const requests = acceptUploads();
     render(<DocumentUpload initialDocuments={[]} />);

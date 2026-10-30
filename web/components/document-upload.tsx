@@ -33,6 +33,15 @@ type RecentEdit = { filename: string; doc_type: string; at: number };
 
 type Status = "idle" | "uploading" | "error";
 
+/** What an upload is doing right now, in words, so a slow moment does not look like a freeze. */
+export type UploadStage = "sample" | "preparing" | "sending" | "checking";
+export const STAGE_TEXT: Record<UploadStage, string> = {
+  sample: "Loading the sample lease...",
+  preparing: "Getting ready...",
+  sending: "Sending your file...",
+  checking: "Checking your file...",
+};
+
 /** A made up lease that ships with the site (web/samples), so Brief can be tried without a real contract. */
 export const SAMPLE_LEASE_URL = "/samples/sample-lease.pdf";
 
@@ -40,6 +49,7 @@ export function DocumentUpload({ initialDocuments }: { initialDocuments: Documen
   const [file, setFile] = useState<File | null>(null);
   const [docType, setDocType] = useState("loan");
   const [status, setStatus] = useState<Status>("idle");
+  const [stage, setStage] = useState<UploadStage>("preparing");
   const [errorMessage, setErrorMessage] = useState("");
   const [documents, setDocuments] = useState(initialDocuments);
   const [dragging, setDragging] = useState(false);
@@ -144,6 +154,7 @@ export function DocumentUpload({ initialDocuments }: { initialDocuments: Documen
   // Loads the made up lease that ships with the site and sends it through the very same upload as a chosen file.
   async function trySample() {
     if (status === "uploading") return;
+    setStage("sample");
     setStatus("uploading");
     setErrorMessage("");
     try {
@@ -162,6 +173,7 @@ export function DocumentUpload({ initialDocuments }: { initialDocuments: Documen
     if (!contentType) return;
 
     setStatus("uploading");
+    setStage("preparing");
     setErrorMessage("");
 
     try {
@@ -178,6 +190,7 @@ export function DocumentUpload({ initialDocuments }: { initialDocuments: Documen
       if (!createRes.ok) throw new Error(await startFailureMessage(createRes));
       const { document_id, upload_url } = await createRes.json();
 
+      setStage("sending");
       const uploadRes = await fetch(upload_url, {
         method: "PUT",
         headers: { "Content-Type": contentType },
@@ -185,6 +198,7 @@ export function DocumentUpload({ initialDocuments }: { initialDocuments: Documen
       });
       if (!uploadRes.ok) throw new Error("the file upload failed");
 
+      setStage("checking");
       const confirmRes = await fetch(`/api/backend/documents/${document_id}/confirm`, {
         method: "PATCH",
       });
@@ -291,6 +305,11 @@ export function DocumentUpload({ initialDocuments }: { initialDocuments: Documen
         <Button type="submit" size="lg" disabled={!file || uploading}>
           {uploading ? "Uploading..." : "Upload"}
         </Button>
+        {uploading && (
+          <p role="status" className="text-center text-sm text-muted-foreground">
+            {STAGE_TEXT[stage]}
+          </p>
+        )}
         <p className="text-center text-sm text-muted-foreground">
           No contract handy?{" "}
           <button
