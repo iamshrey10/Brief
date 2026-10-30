@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, within, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -72,6 +72,26 @@ describe("ChatPanel", () => {
     expect(screen.getByText(/points to the exact clause it came from/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Ask" })).toBeDisabled();
     expect(screen.getByText(/not legal advice/i)).toBeInTheDocument();
+  });
+
+  it("suggests three questions for the kind of document before anything is asked, and asks one when it is clicked", async () => {
+    askMock.mockResolvedValue({ ok: true, result: FOUND });
+    const user = userEvent.setup();
+    render(<ChatPanel documentId="doc-1" docType="lease" onCitationSelect={vi.fn()} />);
+    const suggestions = screen.getByRole("list", { name: "Suggested questions" });
+
+    expect(within(suggestions).getAllByRole("button")).toHaveLength(3);
+    await user.click(within(suggestions).getByRole("button", { name: "What happens if I pay rent late?" }));
+
+    expect(askMock).toHaveBeenCalledWith("doc-1", "What happens if I pay rent late?");
+    expect(await screen.findByText("What happens if I pay rent late?")).toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "Suggested questions" })).not.toBeInTheDocument();
+  });
+
+  it("suggests the general questions when the kind of document is not given", () => {
+    renderPanel();
+
+    expect(screen.getByRole("button", { name: "What are the key dates in this document?" })).toBeInTheDocument();
   });
 
   it("sends a trimmed question, shows it, and clears the box", async () => {

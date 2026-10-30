@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { suggestionsFor } from "@/lib/suggested-questions";
 import { Button } from "@/components/ui/button";
 import { askQuestion, MAX_QUESTION_LENGTH, type AskCitation, type AskResult } from "@/lib/ask";
 import { fetchUsage, questionsLeftNote } from "@/lib/usage";
@@ -52,9 +53,11 @@ function AnswerBubble({
 
 export function ChatPanel({
   documentId,
+  docType,
   onCitationSelect,
 }: {
   documentId: string;
+  docType?: string;
   onCitationSelect: (citation: AskCitation) => void;
 }) {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -83,9 +86,12 @@ export function ChatPanel({
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, pending]);
 
-  async function handleSubmit(event: FormEvent) {
+  function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    const question = draft.trim();
+    void send(draft.trim());
+  }
+
+  async function send(question: string) {
     if (!question || pending) return;
 
     const questionMessage: Message = { id: nextId.current++, kind: "question", text: question };
@@ -126,6 +132,22 @@ export function ChatPanel({
               Every answer points to the exact clause it came from. If the document doesn&apos;t
               cover something, Brief will say so instead of guessing.
             </p>
+            <div className="mt-5 flex flex-col items-center gap-2">
+              <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Try asking</p>
+              <ul aria-label="Suggested questions" className="flex flex-wrap justify-center gap-2">
+                {suggestionsFor(docType).map((question) => (
+                  <li key={question}>
+                    <button
+                      type="button"
+                      onClick={() => void send(question)}
+                      className="rounded-full border border-border bg-card px-3 py-1.5 text-left text-xs text-foreground transition-colors outline-none hover:border-primary/50 hover:bg-accent focus-visible:ring-3 focus-visible:ring-ring/50"
+                    >
+                      {question}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
         )}
 

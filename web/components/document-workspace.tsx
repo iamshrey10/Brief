@@ -38,9 +38,11 @@ const TABS: { id: Tab; label: string }[] = [
 
 export function DocumentWorkspace({
   documentId,
+  docType,
   clauses,
 }: {
   documentId: string;
+  docType?: string;
   clauses: ClauseData[];
 }) {
   const [activeCitation, setActiveCitation] = useState<ActiveCitation | null>(null);
@@ -118,6 +120,7 @@ export function DocumentWorkspace({
         >
           <ChatPanel
             documentId={documentId}
+            docType={docType}
             onCitationSelect={(citation) =>
               showInDocument({ clauseId: citation.clause_id, quote: citation.quote })
             }

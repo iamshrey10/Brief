@@ -119,7 +119,7 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
 
       {isReadable(document.status) &&
         (clauses.length > 0 ? (
-          <DocumentWorkspace documentId={document.id} clauses={clauses} />
+          <DocumentWorkspace documentId={document.id} docType={document.doc_type} clauses={clauses} />
         ) : (
           <Notice title="No readable text found">
             This document finished processing but no text could be extracted from it.
