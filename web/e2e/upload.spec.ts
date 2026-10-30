@@ -79,3 +79,20 @@ test("when storage fails the person is told, keeps their chosen file to try agai
   expect((await callsMade(page)).filter((call) => call.path.endsWith("/confirm"))).toEqual([]);
   expect(await uploadsReceived(page)).toEqual([]);
 });
+
+test("Try a sample lease sends the made up lease that ships with the site to storage, as a lease, in one click", async ({ page }) => {
+  const sample = await page.request.get("/samples/sample-lease.pdf");
+  expect(sample.status()).toBe(200);
+  expect(sample.headers()["content-type"]).toContain("application/pdf");
+  const bytes = (await sample.body()).length;
+
+  await page.getByRole("button", { name: "Try a sample lease" }).click();
+
+  // The fake API already holds a document with this name, so the new one is the second row with it.
+  const rows = page.getByRole("region", { name: "Your documents" }).getByRole("listitem").filter({ hasText: "sample-lease.pdf" });
+  await expect(rows).toHaveCount(2);
+  await expect(rows.first().getByText(/^Lease/)).toBeVisible();
+  await expect
+    .poll(async () => (await uploadsReceived(page)).map((upload) => `${upload.contentType} ${upload.bytes}`))
+    .toEqual([`application/pdf ${bytes}`]);
+});
