@@ -128,3 +128,38 @@ def test_the_log_format_defaults_to_text_and_accepts_json_only_besides():
     assert Settings(service_jwt_secret="x" * 40, log_format="JSON").log_format == "json"
     with pytest.raises(ValueError):
         Settings(service_jwt_secret="x" * 40, log_format="xml")
+
+
+NEON = "postgresql://brief_owner:p%40ss-w0rd@ep-cool-name-123.us-east-2.aws.neon.tech/brief?sslmode=require&channel_binding=require"
+
+
+def test_a_neon_address_pasted_as_given_becomes_one_the_async_driver_takes():
+    from app.config import async_database_url
+
+    assert async_database_url(NEON) == (
+        "postgresql+asyncpg://brief_owner:p%40ss-w0rd@ep-cool-name-123.us-east-2.aws.neon.tech/brief?ssl=require"
+    )
+
+
+@pytest.mark.parametrize(
+    ("given", "expected"),
+    [
+        ("postgres://u:p@h:5432/d", "postgresql+asyncpg://u:p@h:5432/d"),
+        ("postgresql+asyncpg://u:p@h/d", "postgresql+asyncpg://u:p@h/d"),
+        ("postgresql://u:p@h/d?sslmode=verify-full&application_name=brief", "postgresql+asyncpg://u:p@h/d?ssl=verify-full&application_name=brief"),
+        ("postgresql://u:p@h/d?ssl=require&sslmode=disable", "postgresql+asyncpg://u:p@h/d?ssl=require"),
+        ("  postgresql://u:p@h/d  ", "postgresql+asyncpg://u:p@h/d"),
+    ],
+)
+def test_the_address_keeps_everything_but_the_driver_name_and_the_options_the_driver_does_not_take(given, expected):
+    from app.config import async_database_url
+
+    assert async_database_url(given) == expected
+
+
+def test_settings_apply_it_to_database_url_whatever_the_host_gave():
+    settings = Settings(_env_file=None, database_url=NEON)
+
+    assert settings.database_url.startswith("postgresql+asyncpg://")
+    assert "channel_binding" not in settings.database_url
+    assert settings.database_url.endswith("?ssl=require")

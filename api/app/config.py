@@ -1,3 +1,5 @@
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -9,6 +11,32 @@ DEV_DATABASE_PASSWORD = "brief_dev_password"
 ENVIRONMENTS = ("development", "test", "production")
 LOG_FORMATS = ("text", "json")
 MIN_SECRET_LENGTH = 32
+
+
+# Query options a hosted Postgres such as Neon puts on its address that the asyncpg driver does not take.
+_DROPPED_DATABASE_OPTIONS = ("channel_binding",)
+
+
+def async_database_url(url: str) -> str:
+    """The address as the async driver needs it, so a host's address can be pasted as it is given.
+
+    `postgres://` and `postgresql://` become `postgresql+asyncpg://`, `sslmode=require` becomes the driver's
+    `ssl=require`, and `channel_binding`, which the driver does not take, is dropped. The user, password, host and
+    database name are left exactly as they were.
+    """
+    parts = urlsplit(url.strip())
+    scheme = "postgresql+asyncpg" if parts.scheme in ("postgres", "postgresql") else parts.scheme
+    options = []
+    has_ssl = any(key == "ssl" for key, _ in parse_qsl(parts.query))
+    for key, value in parse_qsl(parts.query, keep_blank_values=True):
+        if key in _DROPPED_DATABASE_OPTIONS:
+            continue
+        if key == "sslmode":
+            if not has_ssl:
+                options.append(("ssl", value))
+            continue
+        options.append((key, value))
+    return urlunsplit((scheme, parts.netloc, parts.path, urlencode(options), parts.fragment))
 
 
 class Settings(BaseSettings):
@@ -39,6 +67,11 @@ class Settings(BaseSettings):
         if name not in ENVIRONMENTS:
             raise ValueError(f"ENVIRONMENT must be one of {', '.join(ENVIRONMENTS)}")
         return name
+
+    @field_validator("database_url")
+    @classmethod
+    def _async_driver_address(cls, value: str) -> str:
+        return async_database_url(value)
 
     @field_validator("log_format")
     @classmethod
