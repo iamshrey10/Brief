@@ -73,6 +73,7 @@ const KEY_TERMS = {
       ],
     },
     { name: "late_fee", label: "Late fee", found: true, value: "$50 after the fifth day", clause_id: "c-late", page_number: 2, quote: CLAUSES[2].text, evidence: [{ clause_id: "c-late", page_number: 2, quote: CLAUSES[2].text }] },
+    { name: "lease_end", label: "Lease end date", found: true, value: "December 31, 2099", clause_id: "c-late", page_number: 2, quote: CLAUSES[2].text, evidence: [{ clause_id: "c-late", page_number: 2, quote: CLAUSES[2].text }] },
     { name: "pet_policy", label: "Pet policy", found: false, value: null, clause_id: null, page_number: null, quote: null, evidence: [] },
   ],
   truncated: false,
@@ -220,6 +221,13 @@ const server = createServer(async (request, response) => {
     return send(response, 200, visible(document));
   }
   if (method === "GET" && path === "/me/usage") return send(response, 200, usageFor(reader));
+  // The dates already saved in this reader's documents. One is clear, and one is a loose phrase the website must leave out.
+  if (method === "GET" && path === "/me/key-dates") {
+    return send(response, 200, [
+      { document_id: "doc-lease", field: "lease_end", label: "Lease ends", value: "December 31, 2099" },
+      { document_id: "doc-loan", field: "repayment_start", label: "Repayments start", value: "six months after graduation" },
+    ]);
+  }
   if (method === "GET" && path === "/me") return send(response, 200, { id: "e2e-reader", email: "e2e-reader@example.invalid" });
   if (method === "DELETE" && path === "/me") {
     state.accountDeleted = true;

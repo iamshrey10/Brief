@@ -121,7 +121,7 @@ afterEach(() => {
 
 function renderWorkspace() {
   const user = userEvent.setup();
-  render(<DocumentWorkspace documentId="doc-1" clauses={CLAUSES} />);
+  render(<DocumentWorkspace filename="lease.pdf" documentId="doc-1" clauses={CLAUSES} />);
   return user;
 }
 

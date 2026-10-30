@@ -98,3 +98,19 @@ test("printed, the document page is the Overview alone, without the top bar, the
   await expect(page.getByRole("region", { name: "Document text" })).toBeHidden();
   await expect(page.getByRole("button", { name: "Print or save as PDF" })).toBeHidden();
 });
+
+test("Add the date to your calendar saves a calendar file with the lease end date and a week's reminder", async ({ page }) => {
+  await page.goto("/dashboard/documents/doc-lease");
+  const button = page.getByRole("button", { name: /Add this date to your calendar/ });
+  await expect(button).toBeVisible();
+
+  const [download] = await Promise.all([page.waitForEvent("download"), button.click()]);
+
+  expect(download.suggestedFilename()).toBe("sample-lease-dates.ics");
+  const file = await (await import("node:fs/promises")).readFile((await download.path())!, "utf8");
+  expect(file).toContain("BEGIN:VCALENDAR");
+  expect(file).toContain("SUMMARY:Lease ends: sample-lease.pdf");
+  expect(file).toContain("DTSTART;VALUE=DATE:20991231");
+  expect(file).toContain("TRIGGER:-P7D");
+  expect(file).toContain("\r\n");
+});

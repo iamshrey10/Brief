@@ -38,10 +38,12 @@ const TABS: { id: Tab; label: string }[] = [
 
 export function DocumentWorkspace({
   documentId,
+  filename,
   docType,
   clauses,
 }: {
   documentId: string;
+  filename: string;
   docType?: string;
   clauses: ClauseData[];
 }) {
@@ -109,7 +111,7 @@ export function DocumentWorkspace({
           hidden={tab !== "overview"}
           className="flex min-h-0 flex-1 flex-col"
         >
-          <OverviewPanel documentId={documentId} onCitationSelect={showInDocument} />
+          <OverviewPanel documentId={documentId} filename={filename} onCitationSelect={showInDocument} />
         </div>
         <div
           role="tabpanel"

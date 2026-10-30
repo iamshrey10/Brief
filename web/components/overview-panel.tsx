@@ -1,5 +1,6 @@
 "use client";
 
+import { CalendarButton } from "@/components/calendar-button";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Check, Copy, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -222,9 +223,11 @@ function KeyTermCard({
 
 function KeyTermsSection({
   documentId,
+  filename,
   onSelect,
 }: {
   documentId: string;
+  filename: string;
   onSelect: (citation: ActiveCitation) => void;
 }) {
   const { state, retry } = useLoad<KeyTermsResult>(documentId, fetchKeyTerms);
@@ -244,7 +247,7 @@ function KeyTermsSection({
         <LoadingBlock label="Reading your document. The first time takes a few seconds." />
       )}
       {state.status === "error" && <ErrorBlock message={state.message} reference={state.reference} onRetry={retry} />}
-      {state.status === "ready" && <KeyTermsBody result={state.result} onSelect={onSelect} />}
+      {state.status === "ready" && <KeyTermsBody result={state.result} onSelect={onSelect} documentId={documentId} filename={filename} />}
     </section>
   );
 }
@@ -252,8 +255,12 @@ function KeyTermsSection({
 function KeyTermsBody({
   result,
   onSelect,
+  documentId,
+  filename,
 }: {
   result: KeyTermsResult;
+  documentId: string;
+  filename: string;
   onSelect: (citation: ActiveCitation) => void;
 }) {
   const { found, notMentioned } = splitKeyTerms(result.terms);
@@ -272,6 +279,9 @@ function KeyTermsBody({
           ))}
         </ul>
       )}
+      <div className="print:hidden">
+        <CalendarButton documentId={documentId} filename={filename} terms={result.terms} />
+      </div>
       {notMentioned.length > 0 && (
         <div className="flex flex-col gap-2">
           <p id="not-mentioned-heading" className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
@@ -445,9 +455,11 @@ function ChecklistBody({
 
 export function OverviewPanel({
   documentId,
+  filename,
   onCitationSelect,
 }: {
   documentId: string;
+  filename: string;
   onCitationSelect: (citation: ActiveCitation) => void;
 }): ReactNode {
   return (
@@ -456,7 +468,7 @@ export function OverviewPanel({
       className="min-h-0 flex-1 overflow-y-auto rounded-lg border border-border bg-background p-4 print:overflow-visible print:border-0 print:p-0"
     >
       <div className="flex flex-col gap-8">
-        <KeyTermsSection documentId={documentId} onSelect={onCitationSelect} />
+        <KeyTermsSection documentId={documentId} filename={filename} onSelect={onCitationSelect} />
         <ChecklistSection documentId={documentId} onSelect={onCitationSelect} />
       </div>
       <p className="mt-8 text-xs text-muted-foreground">

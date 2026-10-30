@@ -102,7 +102,7 @@ function setup(onCitationSelect = vi.fn()) {
   keyTermsMock.mockResolvedValue({ ok: true, result: KEY_TERMS });
   checklistMock.mockResolvedValue({ ok: true, result: CHECKLIST });
   const user = userEvent.setup();
-  render(<OverviewPanel documentId="doc-1" onCitationSelect={onCitationSelect} />);
+  render(<OverviewPanel filename="lease.pdf" documentId="doc-1" onCitationSelect={onCitationSelect} />);
   return { user, onCitationSelect };
 }
 
@@ -111,7 +111,7 @@ describe("OverviewPanel loading", () => {
     keyTermsMock.mockReturnValue(new Promise(() => {}));
     checklistMock.mockReturnValue(new Promise(() => {}));
 
-    render(<OverviewPanel documentId="doc-1" onCitationSelect={vi.fn()} />);
+    render(<OverviewPanel filename="lease.pdf" documentId="doc-1" onCitationSelect={vi.fn()} />);
 
     expect(screen.getByText(/reading your document/i)).toBeInTheDocument();
     expect(screen.getByText(/questions people most often miss/i)).toBeInTheDocument();
@@ -180,7 +180,7 @@ describe("OverviewPanel key terms", () => {
     });
     checklistMock.mockResolvedValue({ ok: true, result: CHECKLIST });
 
-    render(<OverviewPanel documentId="doc-1" onCitationSelect={vi.fn()} />);
+    render(<OverviewPanel filename="lease.pdf" documentId="doc-1" onCitationSelect={vi.fn()} />);
 
     expect(await screen.findByText(/none of the usual key terms/i)).toBeInTheDocument();
   });
@@ -189,7 +189,7 @@ describe("OverviewPanel key terms", () => {
     keyTermsMock.mockResolvedValue({ ok: true, result: { ...KEY_TERMS, truncated: true } });
     checklistMock.mockResolvedValue({ ok: true, result: CHECKLIST });
 
-    render(<OverviewPanel documentId="doc-1" onCitationSelect={vi.fn()} />);
+    render(<OverviewPanel filename="lease.pdf" documentId="doc-1" onCitationSelect={vi.fn()} />);
 
     const section = await screen.findByRole("region", { name: "Key terms" });
     expect(within(section).getByText(/too long to read in full/i)).toBeInTheDocument();
@@ -219,7 +219,7 @@ describe("OverviewPanel checklist", () => {
     const onSelect = vi.fn();
     const user = userEvent.setup();
 
-    render(<OverviewPanel documentId="doc-1" onCitationSelect={onSelect} />);
+    render(<OverviewPanel filename="lease.pdf" documentId="doc-1" onCitationSelect={onSelect} />);
 
     const buttons = await screen.findAllByRole("button", { name: /Show "Security deposit" in the document/ });
     expect(buttons).toHaveLength(2);
@@ -236,7 +236,7 @@ describe("OverviewPanel checklist", () => {
     checklistMock.mockResolvedValue({ ok: true, result: { answers: [ANSWERED], truncated: false } });
     keyTermsMock.mockResolvedValue({ ok: true, result: KEY_TERMS });
 
-    render(<OverviewPanel documentId="doc-1" onCitationSelect={vi.fn()} />);
+    render(<OverviewPanel filename="lease.pdf" documentId="doc-1" onCitationSelect={vi.fn()} />);
 
     const button = await screen.findByRole("button", {
       name: /^Page 1 .variable annual rate equal to the 30-day average SOFR/,
@@ -251,7 +251,7 @@ describe("OverviewPanel checklist", () => {
     keyTermsMock.mockResolvedValue({ ok: true, result: { terms: [FOUND_TERM("late_fee", "Late fee", "4%")], truncated: false } });
     checklistMock.mockResolvedValue({ ok: true, result: { answers: [], truncated: false } });
 
-    render(<OverviewPanel documentId="doc-1" onCitationSelect={vi.fn()} />);
+    render(<OverviewPanel filename="lease.pdf" documentId="doc-1" onCitationSelect={vi.fn()} />);
 
     const button = await screen.findByRole("button", { name: /Show "Late fee" in the document/ });
     expect(button).toHaveAccessibleName('Show "Late fee" in the document, page 1');
@@ -268,7 +268,7 @@ describe("OverviewPanel checklist", () => {
     keyTermsMock.mockResolvedValue({ ok: true, result: KEY_TERMS });
     checklistMock.mockResolvedValue({ ok: true, result: { answers: [ANSWERED], truncated: false } });
 
-    render(<OverviewPanel documentId="doc-1" onCitationSelect={vi.fn()} />);
+    render(<OverviewPanel filename="lease.pdf" documentId="doc-1" onCitationSelect={vi.fn()} />);
 
     expect(await screen.findByText("1 answered")).toBeInTheDocument();
   });
@@ -348,7 +348,7 @@ describe("OverviewPanel checklist", () => {
     keyTermsMock.mockResolvedValue({ ok: true, result: KEY_TERMS });
     checklistMock.mockResolvedValue({ ok: true, result: { ...CHECKLIST, truncated: true } });
 
-    render(<OverviewPanel documentId="doc-1" onCitationSelect={vi.fn()} />);
+    render(<OverviewPanel filename="lease.pdf" documentId="doc-1" onCitationSelect={vi.fn()} />);
 
     const section = await screen.findByRole("region", { name: "Before you sign" });
     expect(await within(section).findByText(/too long to read in full/i)).toBeInTheDocument();
@@ -360,7 +360,7 @@ describe("OverviewPanel when something fails", () => {
     keyTermsMock.mockResolvedValue({ ok: false, message: "I couldn't read this document just now." });
     checklistMock.mockResolvedValue({ ok: true, result: CHECKLIST });
 
-    render(<OverviewPanel documentId="doc-1" onCitationSelect={vi.fn()} />);
+    render(<OverviewPanel filename="lease.pdf" documentId="doc-1" onCitationSelect={vi.fn()} />);
 
     const keyTerms = await screen.findByRole("region", { name: "Key terms" });
     expect(await within(keyTerms).findByRole("alert")).toHaveTextContent(/couldn't read this document/i);
@@ -376,7 +376,7 @@ describe("OverviewPanel when something fails", () => {
     });
     checklistMock.mockResolvedValue({ ok: true, result: CHECKLIST });
 
-    render(<OverviewPanel documentId="doc-1" onCitationSelect={vi.fn()} />);
+    render(<OverviewPanel filename="lease.pdf" documentId="doc-1" onCitationSelect={vi.fn()} />);
 
     const keyTerms = await screen.findByRole("region", { name: "Key terms" });
     expect(await within(keyTerms).findByRole("alert")).toHaveTextContent("Reference: 3f2b8c1e");
@@ -386,7 +386,7 @@ describe("OverviewPanel when something fails", () => {
     keyTermsMock.mockResolvedValue({ ok: false, message: "I couldn't read this document just now." });
     checklistMock.mockResolvedValue({ ok: true, result: CHECKLIST });
 
-    render(<OverviewPanel documentId="doc-1" onCitationSelect={vi.fn()} />);
+    render(<OverviewPanel filename="lease.pdf" documentId="doc-1" onCitationSelect={vi.fn()} />);
 
     const keyTerms = await screen.findByRole("region", { name: "Key terms" });
     expect(await within(keyTerms).findByRole("alert")).not.toHaveTextContent(/reference/i);
@@ -398,7 +398,7 @@ describe("OverviewPanel when something fails", () => {
     checklistMock.mockResolvedValue({ ok: true, result: CHECKLIST });
     const user = userEvent.setup();
 
-    render(<OverviewPanel documentId="doc-1" onCitationSelect={vi.fn()} />);
+    render(<OverviewPanel filename="lease.pdf" documentId="doc-1" onCitationSelect={vi.fn()} />);
     const keyTerms = await screen.findByRole("region", { name: "Key terms" });
     await user.click(await within(keyTerms).findByRole("button", { name: "Try again" }));
 
@@ -413,7 +413,7 @@ describe("OverviewPanel when something fails", () => {
     checklistMock.mockResolvedValue({ ok: true, result: CHECKLIST });
     const user = userEvent.setup();
 
-    render(<OverviewPanel documentId="doc-1" onCitationSelect={vi.fn()} />);
+    render(<OverviewPanel filename="lease.pdf" documentId="doc-1" onCitationSelect={vi.fn()} />);
     const keyTerms = await screen.findByRole("region", { name: "Key terms" });
     await user.click(await within(keyTerms).findByRole("button", { name: "Try again" }));
 
@@ -426,15 +426,35 @@ describe("OverviewPanel for a different document", () => {
   it("loads the new document and does not keep showing the old one's results", async () => {
     keyTermsMock.mockResolvedValueOnce({ ok: true, result: KEY_TERMS });
     checklistMock.mockResolvedValueOnce({ ok: true, result: CHECKLIST });
-    const { rerender } = render(<OverviewPanel documentId="doc-1" onCitationSelect={vi.fn()} />);
+    const { rerender } = render(<OverviewPanel filename="lease.pdf" documentId="doc-1" onCitationSelect={vi.fn()} />);
     await screen.findByText("6.8% variable");
 
     keyTermsMock.mockReturnValueOnce(new Promise(() => {}));
     checklistMock.mockReturnValueOnce(new Promise(() => {}));
-    rerender(<OverviewPanel documentId="doc-2" onCitationSelect={vi.fn()} />);
+    rerender(<OverviewPanel filename="lease.pdf" documentId="doc-2" onCitationSelect={vi.fn()} />);
 
     expect(screen.queryByText("6.8% variable")).not.toBeInTheDocument();
     expect(keyTermsMock).toHaveBeenLastCalledWith("doc-2");
     expect(screen.getAllByRole("status")).toHaveLength(2);
+  });
+});
+
+describe("OverviewPanel calendar button", () => {
+  it("offers to add a document's clear dates to a calendar, with the number of them", async () => {
+    keyTermsMock.mockResolvedValue({
+      ok: true,
+      result: { terms: [FOUND_TERM("lease_start", "Lease start date", "January 1, 2027"), FOUND_TERM("lease_end", "Lease end date", "December 31, 2027")], truncated: false },
+    });
+    checklistMock.mockResolvedValue({ ok: true, result: CHECKLIST });
+    render(<OverviewPanel filename="lease.pdf" documentId="doc-1" onCitationSelect={vi.fn()} />);
+
+    expect(await screen.findByRole("button", { name: /Add these 2 dates to your calendar/ })).toBeInTheDocument();
+  });
+
+  it("offers nothing when the document has no clear date, as in the loan with only an interest rate and a late fee", async () => {
+    setup();
+
+    await screen.findByRole("region", { name: "Key terms" });
+    expect(screen.queryByRole("button", { name: /to your calendar/ })).not.toBeInTheDocument();
   });
 });
