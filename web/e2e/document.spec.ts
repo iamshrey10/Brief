@@ -114,3 +114,17 @@ test("Add the date to your calendar saves a calendar file with the lease end dat
   expect(file).toContain("TRIGGER:-P7D");
   expect(file).toContain("\r\n");
 });
+
+test("Email these questions is a link that opens a message with the lease's open questions in it", async ({ page }) => {
+  await page.goto("/dashboard/documents/doc-lease");
+
+  const link = page.getByRole("link", { name: "Email these questions" });
+  await expect(link).toBeVisible();
+  const href = (await link.getAttribute("href")) ?? "";
+
+  expect(href.startsWith("mailto:?subject=")).toBe(true);
+  const decoded = decodeURIComponent(href);
+  expect(decoded).toContain("Questions about the lease before I sign");
+  expect(decoded).toContain("Does this renew automatically, and by what date must I cancel?");
+  expect(decoded).not.toContain("sample-lease.pdf");
+});

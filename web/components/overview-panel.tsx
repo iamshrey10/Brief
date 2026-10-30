@@ -1,9 +1,10 @@
 "use client";
 
 import { CalendarButton } from "@/components/calendar-button";
+import { buildQuestionsEmail } from "@/lib/questions-email";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Check, Copy, TriangleAlert } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import type { ActiveCitation } from "@/lib/documents";
 import {
   fetchChecklist,
@@ -360,9 +361,11 @@ function AnsweredCard({
 
 function ChecklistSection({
   documentId,
+  docType,
   onSelect,
 }: {
   documentId: string;
+  docType: string;
   onSelect: (citation: ActiveCitation) => void;
 }) {
   const { state, retry } = useLoad<ChecklistResult>(documentId, fetchChecklist);
@@ -383,23 +386,46 @@ function ChecklistSection({
         <LoadingBlock label="Checking the questions people most often miss." />
       )}
       {state.status === "error" && <ErrorBlock message={state.message} reference={state.reference} onRetry={retry} />}
-      {state.status === "ready" && <ChecklistBody result={state.result} onSelect={onSelect} />}
+      {state.status === "ready" && <ChecklistBody result={state.result} docType={docType} onSelect={onSelect} />}
     </section>
   );
 }
 
 function ChecklistBody({
   result,
+  docType,
   onSelect,
 }: {
   result: ChecklistResult;
+  docType: string;
   onSelect: (citation: ActiveCitation) => void;
 }) {
   const { gaps, answered, otherNotMentioned } = groupChecklist(result.answers);
+  const email = buildQuestionsEmail(docType, result.answers);
 
   return (
     <>
       {result.truncated && <TruncatedNotice />}
+
+      {email && (
+        <div className="flex flex-col gap-2 rounded-xl border border-border bg-card p-4 print:hidden">
+          <p className="text-sm text-foreground">
+            {email.total === 1 ? "One question" : `${email.total} questions`} to put to the other side, ready to send.
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <a href={email.href} className={buttonVariants({ variant: "default", size: "lg" })}>
+              Email these questions
+            </a>
+            <CopyButton text={email.body} label="all the questions" />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {email.included < email.total
+              ? `Opens a new message in your own mail program with the first ${email.included}; copy the rest from below. `
+              : "Opens a new message in your own mail program. "}
+            Nothing is sent by Brief, and you choose who it goes to.
+          </p>
+        </div>
+      )}
 
       {gaps.length > 0 && (
         <div className="flex flex-col gap-2">
@@ -456,10 +482,12 @@ function ChecklistBody({
 export function OverviewPanel({
   documentId,
   filename,
+  docType = "other",
   onCitationSelect,
 }: {
   documentId: string;
   filename: string;
+  docType?: string;
   onCitationSelect: (citation: ActiveCitation) => void;
 }): ReactNode {
   return (
@@ -469,7 +497,7 @@ export function OverviewPanel({
     >
       <div className="flex flex-col gap-8">
         <KeyTermsSection documentId={documentId} filename={filename} onSelect={onCitationSelect} />
-        <ChecklistSection documentId={documentId} onSelect={onCitationSelect} />
+        <ChecklistSection documentId={documentId} docType={docType} onSelect={onCitationSelect} />
       </div>
       <p className="mt-8 text-xs text-muted-foreground">
         Explains what the document says. Not legal advice.

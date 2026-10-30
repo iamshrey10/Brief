@@ -458,3 +458,41 @@ describe("OverviewPanel calendar button", () => {
     expect(screen.queryByRole("button", { name: /to your calendar/ })).not.toBeInTheDocument();
   });
 });
+
+describe("OverviewPanel email of questions", () => {
+  it("offers to email the questions the document leaves open, to a mail program, with the wording in it", async () => {
+    setup();
+
+    const link = await screen.findByRole("link", { name: "Email these questions" });
+
+    expect(link).toHaveAttribute("href", expect.stringMatching(/^mailto:\?subject=/));
+    expect(decodeURIComponent(link.getAttribute("href") ?? "")).toContain("Is there any fee if I pay the loan off early?");
+    expect(screen.getByText(/1 question|One question/)).toBeInTheDocument();
+    expect(screen.getByText(/Nothing is sent by Brief/)).toBeInTheDocument();
+  });
+
+  it("uses the subject for the kind of document it is given", async () => {
+    keyTermsMock.mockResolvedValue({ ok: true, result: KEY_TERMS });
+    checklistMock.mockResolvedValue({ ok: true, result: CHECKLIST });
+    render(<OverviewPanel filename="lease.pdf" docType="lease" documentId="doc-1" onCitationSelect={vi.fn()} />);
+
+    const link = await screen.findByRole("link", { name: "Email these questions" });
+
+    expect(decodeURIComponent(link.getAttribute("href") ?? "")).toContain("Questions about the lease before I sign");
+  });
+
+  it("offers a copy of every question too", async () => {
+    setup();
+
+    expect(await screen.findByRole("button", { name: "Copy the wording for: all the questions" })).toBeInTheDocument();
+  });
+
+  it("is not shown when the document leaves nothing important open", async () => {
+    keyTermsMock.mockResolvedValue({ ok: true, result: KEY_TERMS });
+    checklistMock.mockResolvedValue({ ok: true, result: { answers: [ANSWERED, QUIET], truncated: false } });
+    render(<OverviewPanel filename="lease.pdf" documentId="doc-1" onCitationSelect={vi.fn()} />);
+
+    await screen.findByRole("region", { name: "Before you sign" });
+    expect(screen.queryByRole("link", { name: "Email these questions" })).not.toBeInTheDocument();
+  });
+});

@@ -111,7 +111,7 @@ export function DocumentWorkspace({
           hidden={tab !== "overview"}
           className="flex min-h-0 flex-1 flex-col"
         >
-          <OverviewPanel documentId={documentId} filename={filename} onCitationSelect={showInDocument} />
+          <OverviewPanel documentId={documentId} filename={filename} docType={docType} onCitationSelect={showInDocument} />
         </div>
         <div
           role="tabpanel"
