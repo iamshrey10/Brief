@@ -15,10 +15,10 @@ async function sidewaysOverflow(page: Page): Promise<number> {
 
 test("the dashboard fits a phone, with the whole file name readable and no sideways scrolling", async ({ page }) => {
   await page.goto("/dashboard");
-  await expect(page.getByText("sample-lease.pdf")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Your documents" }).getByText("sample-lease.pdf")).toBeVisible();
 
   expect(await sidewaysOverflow(page)).toBeLessThanOrEqual(0);
-  const name = await page.getByText("sample-lease.pdf").boundingBox();
+  const name = await page.getByRole("region", { name: "Your documents" }).getByText("sample-lease.pdf").boundingBox();
   expect(name!.x).toBeGreaterThanOrEqual(0);
   expect(name!.x + name!.width).toBeLessThanOrEqual(390);
 });

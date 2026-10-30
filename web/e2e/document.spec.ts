@@ -9,7 +9,7 @@ test.beforeEach(async ({ page }) => {
 
 test("opening a document shows its name, its clauses and the Overview", async ({ page }) => {
   await page.goto("/dashboard");
-  await page.getByText("sample-lease.pdf").click();
+  await page.getByRole("region", { name: "Your documents" }).getByText("sample-lease.pdf").click();
 
   await expect(page.getByRole("heading", { name: "sample-lease.pdf" })).toBeVisible();
   await expect(page).toHaveURL(/\/dashboard\/documents\/doc-lease$/);

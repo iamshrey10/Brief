@@ -35,5 +35,5 @@ test("the tokens the website really sends pass that check", async ({ page }) => 
   await signInAsTestReader(page);
   await page.goto("/dashboard");
 
-  await expect(page.getByText("sample-lease.pdf")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Your documents" }).getByText("sample-lease.pdf")).toBeVisible();
 });

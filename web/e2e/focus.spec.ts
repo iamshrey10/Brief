@@ -32,7 +32,7 @@ test("the delete confirmation starts on Cancel, so a stray Enter cannot delete a
   await page.keyboard.press("Enter");
 
   await expect(confirmation).toHaveCount(0);
-  await expect(page.getByText("sample-lease.pdf")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Your documents" }).getByText("sample-lease.pdf")).toBeVisible();
   await expect(trash).toBeFocused();
 });
 

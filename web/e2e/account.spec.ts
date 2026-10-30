@@ -48,7 +48,7 @@ test("cancelling the account deletion keeps everything and signs nobody out", as
   await expect(confirmation).toHaveCount(0);
   expect(new URL(page.url()).pathname).toBe("/dashboard/profile");
   await page.goto("/dashboard");
-  await expect(page.getByText("sample-lease.pdf")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Your documents" }).getByText("sample-lease.pdf")).toBeVisible();
   const state = (await (await request.get(`${FAKE_API}/__account-deleted`)).json()) as { deleted: boolean };
   expect(state.deleted).toBe(false);
 });
