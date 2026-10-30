@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import Link from "next/link";
+import { countByKind, filterDocuments } from "@/lib/document-summary";
 import {
   ChevronRight,
   CircleCheck,
@@ -522,6 +523,9 @@ export function DocumentList({
   onUpdated?: (document: DocumentSummary) => void;
   onDeleted?: (id: string) => void;
 }) {
+  const [search, setSearch] = useState("");
+  const [kind, setKind] = useState("all");
+
   if (documents.length === 0) {
     return (
       <section
@@ -554,20 +558,63 @@ export function DocumentList({
   }
 
   return (
-    <section aria-label="Your documents" className="flex flex-col gap-2">
-      <h2 className="font-heading text-lg font-semibold text-foreground">Your documents</h2>
-      <ul className="flex flex-col gap-2">
-        {documents.map((doc) => (
-          <li key={doc.id}>
-            <DocumentRow
-              doc={doc}
-              onRetried={onRetried}
-              onUpdated={onUpdated}
-              onDeleted={onDeleted}
+    <section aria-label="Your documents" className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="font-heading text-lg font-semibold text-foreground">Your documents</h2>
+        {documents.length > 1 && (
+          <div role="search" className="flex flex-wrap items-center gap-2">
+            <input
+              type="search"
+              aria-label="Search your documents"
+              placeholder="Search by name"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              className="h-9 w-48 rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
             />
-          </li>
-        ))}
-      </ul>
+            <select
+              aria-label="Show documents of kind"
+              value={kind}
+              onChange={(event) => setKind(event.target.value)}
+              className="h-9 rounded-lg border border-input bg-background px-2 text-sm text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+            >
+              <option value="all">All kinds</option>
+              {countByKind(documents).map((entry) => (
+                <option key={entry.kind} value={entry.kind}>
+                  {entry.label} ({entry.count})
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
+      {filterDocuments(documents, search, kind).length === 0 ? (
+        <p className="rounded-lg border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
+          No documents match.{" "}
+          <button
+            type="button"
+            onClick={() => {
+              setSearch("");
+              setKind("all");
+            }}
+            className="font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+          >
+            Show all documents
+          </button>
+        </p>
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {filterDocuments(documents, search, kind).map((doc) => (
+            <li key={doc.id}>
+              <DocumentRow
+                doc={doc}
+                onRetried={onRetried}
+                onUpdated={onUpdated}
+                onDeleted={onDeleted}
+              />
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }

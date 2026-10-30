@@ -891,3 +891,54 @@ describe("DocumentList", () => {
     });
   });
 });
+
+describe("searching and filtering the documents", () => {
+  const documents = [
+    doc("ready", "d1", "Maple Court Lease.pdf", { doc_type: "lease" }),
+    doc("ready", "d2", "student-loan.pdf"),
+    doc("ready", "d3", "Old lease scan.jpg", { doc_type: "lease" }),
+  ];
+
+  it("keeps only the documents whose name matches what is typed", () => {
+    render(<DocumentList documents={documents} />);
+
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search your documents" }), { target: { value: "LEASE" } });
+
+    const list = screen.getByRole("region", { name: "Your documents" });
+    expect(within(list).getByText("Maple Court Lease.pdf")).toBeInTheDocument();
+    expect(within(list).getByText("Old lease scan.jpg")).toBeInTheDocument();
+    expect(within(list).queryByText("student-loan.pdf")).not.toBeInTheDocument();
+  });
+
+  it("offers each kind present, with its count, and keeps only that kind when one is chosen", () => {
+    render(<DocumentList documents={documents} />);
+    const kinds = screen.getByRole("combobox", { name: "Show documents of kind" });
+
+    expect(within(kinds).getAllByRole("option").map((option) => option.textContent)).toEqual([
+      "All kinds",
+      "Education loan (1)",
+      "Lease (2)",
+    ]);
+    fireEvent.change(kinds, { target: { value: "loan" } });
+
+    expect(screen.getByText("student-loan.pdf")).toBeInTheDocument();
+    expect(screen.queryByText("Maple Court Lease.pdf")).not.toBeInTheDocument();
+  });
+
+  it("says when nothing matches, and brings every document back with one click", () => {
+    render(<DocumentList documents={documents} />);
+
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search your documents" }), { target: { value: "passport" } });
+    expect(screen.getByText(/No documents match/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Show all documents" }));
+    expect(screen.getByText("student-loan.pdf")).toBeInTheDocument();
+    expect(screen.getByRole("searchbox", { name: "Search your documents" })).toHaveValue("");
+  });
+
+  it("shows no search for a single document, where there is nothing to narrow", () => {
+    render(<DocumentList documents={[documents[0]]} />);
+
+    expect(screen.queryByRole("search")).not.toBeInTheDocument();
+  });
+});
