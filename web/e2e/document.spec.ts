@@ -82,3 +82,19 @@ test("on a long document the top bar stays in view, and the Overview panel, whic
 
   expect(tabsTop).toBeGreaterThanOrEqual(barBox.y + barBox.height);
 });
+
+test("printed, the document page is the Overview alone, without the top bar, the tabs or the clause text", async ({ page }) => {
+  await page.goto("/dashboard/documents/doc-lease");
+  await expect(page.getByRole("region", { name: "Key terms" }).getByText("Security deposit")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Print or save as PDF" })).toBeVisible();
+
+  await page.emulateMedia({ media: "print" });
+
+  await expect(page.getByRole("region", { name: "Key terms" }).getByText("Security deposit")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Before you sign" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "sample-lease.pdf" })).toBeVisible();
+  await expect(page.locator("header").first()).toBeHidden();
+  await expect(page.getByRole("tablist")).toBeHidden();
+  await expect(page.getByRole("region", { name: "Document text" })).toBeHidden();
+  await expect(page.getByRole("button", { name: "Print or save as PDF" })).toBeHidden();
+});

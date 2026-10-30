@@ -453,7 +453,7 @@ export function OverviewPanel({
   return (
     <section
       aria-label="Overview"
-      className="min-h-0 flex-1 overflow-y-auto rounded-lg border border-border bg-background p-4"
+      className="min-h-0 flex-1 overflow-y-auto rounded-lg border border-border bg-background p-4 print:overflow-visible print:border-0 print:p-0"
     >
       <div className="flex flex-col gap-8">
         <KeyTermsSection documentId={documentId} onSelect={onCitationSelect} />

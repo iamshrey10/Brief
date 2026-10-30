@@ -64,13 +64,13 @@ export function DocumentWorkspace({
   }
 
   return (
-    <div className="grid items-start gap-6 lg:grid-cols-2">
-      <div className="flex max-h-[80vh] min-h-[28rem] flex-col gap-3 lg:sticky lg:top-20 lg:h-[calc(100vh-6.5rem)] lg:max-h-none">
+    <div className="grid items-start gap-6 lg:grid-cols-2 print:block">
+      <div className="flex max-h-[80vh] min-h-[28rem] flex-col gap-3 lg:sticky lg:top-20 lg:h-[calc(100vh-6.5rem)] lg:max-h-none print:static print:h-auto print:max-h-none">
         <div
           role="tablist"
           aria-label="Document tools"
           onKeyDown={handleTabKeys}
-          className="grid grid-cols-2 gap-1 rounded-xl border border-border bg-muted p-1"
+          className="grid grid-cols-2 gap-1 rounded-xl border border-border bg-muted p-1 print:hidden"
         >
           {TABS.map(({ id, label }) => (
             <button
@@ -127,7 +127,9 @@ export function DocumentWorkspace({
           />
         </div>
       </div>
-      <ClauseViewer clauses={clauses} activeCitation={activeCitation} />
+      <div className="print:hidden">
+        <ClauseViewer clauses={clauses} activeCitation={activeCitation} />
+      </div>
     </div>
   );
 }

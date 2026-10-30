@@ -27,7 +27,7 @@ export function AppHeader({
   widthClass?: string;
 }) {
   return (
-    <header className="sticky top-0 z-40 border-b border-border/70 bg-background/85 backdrop-blur">
+    <header className="sticky top-0 z-40 border-b border-border/70 bg-background/85 backdrop-blur print:hidden">
       <div className={`mx-auto flex w-full flex-wrap items-center justify-between gap-x-4 px-6 ${widthClass}`}>
         <div className="flex h-14 items-center gap-8">
           <Link href="/dashboard" className="font-heading text-xl font-semibold tracking-tight text-foreground">

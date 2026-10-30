@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { AppHeader } from "@/components/app-header";
+import { PrintButton } from "@/components/print-button";
 import { DocumentWorkspace } from "@/components/document-workspace";
 import {
   DOC_TYPE_LABELS,
@@ -103,9 +104,12 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
   return (
     <PageShell email={email}>
       <div className="flex flex-col gap-3">
-        <Link href="/dashboard" className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">
-          ← Back to your documents
-        </Link>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <Link href="/dashboard" className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline print:hidden">
+            ← Back to your documents
+          </Link>
+          {isReadable(document.status) && clauses.length > 0 && <PrintButton />}
+        </div>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <h1 className="font-heading text-2xl font-semibold tracking-tight break-all text-foreground md:text-3xl">
             {document.filename}
