@@ -74,3 +74,14 @@ test("choosing Dark on the Profile page turns the site dark and is kept after a 
   await expect(page.locator("html")).toHaveClass(/dark/);
   await expect(page.getByRole("radio", { name: "Dark" })).toHaveAttribute("aria-checked", "true");
 });
+
+test("the dashboard counts down to a clear date and leaves out a loose phrase", async ({ page }) => {
+  await signInAsTestReader(page);
+  await page.goto("/dashboard");
+
+  const comingUp = page.getByRole("region", { name: "Coming up" });
+  await expect(comingUp.getByRole("link", { name: /Lease ends in \d+ days/ })).toBeVisible();
+  await expect(comingUp.getByRole("link", { name: /sample-lease\.pdf/ })).toHaveAttribute("href", "/dashboard/documents/doc-lease");
+  // The loan's "six months after graduation" is not a date, so it is not counted down to.
+  await expect(comingUp.getByText(/Repayments/)).toHaveCount(0);
+});

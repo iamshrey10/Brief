@@ -3,7 +3,9 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { AppHeader } from "@/components/app-header";
 import { countByKind, summaryLine } from "@/lib/document-summary";
+import type { KeyDateFromApi } from "@/lib/key-dates";
 import { mintServiceToken } from "@/lib/service-token";
+import { ComingUp } from "@/components/coming-up";
 import { DocumentUpload } from "@/components/document-upload";
 
 export const metadata = { title: "Your contracts", robots: { index: false, follow: false } };
@@ -24,13 +26,34 @@ async function fetchInitialDocuments(email: string) {
   }
 }
 
+/** The dates already saved in this person's documents. Nothing else is read, so this never costs a model call, and any failure just means no countdown. */
+async function fetchKeyDates(email: string): Promise<KeyDateFromApi[]> {
+  const backendUrl = process.env.BACKEND_URL ?? "http://localhost:8000";
+  try {
+    const res = await fetch(`${backendUrl}/me/key-dates`, {
+      headers: { Authorization: `Bearer ${await mintServiceToken(email)}` },
+      cache: "no-store",
+    });
+    if (!res.ok) return [];
+    const body: unknown = await res.json();
+    return Array.isArray(body)
+      ? body.filter(
+          (entry): entry is KeyDateFromApi =>
+            typeof entry?.document_id === "string" && typeof entry?.field === "string" && typeof entry?.value === "string",
+        )
+      : [];
+  } catch {
+    return [];
+  }
+}
+
 export default async function Dashboard() {
   const session = await auth();
   const email = session?.user?.email;
   // The proxy already turns visitors away, and this makes the page safe on its own too: nobody who
   // is not signed in is ever shown the dashboard or has anything fetched for it.
   if (!email) redirect("/");
-  const initialDocuments = await fetchInitialDocuments(email);
+  const [initialDocuments, keyDates] = await Promise.all([fetchInitialDocuments(email), fetchKeyDates(email)]);
 
   return (
     <div className="flex flex-1 flex-col">
@@ -57,6 +80,8 @@ export default async function Dashboard() {
             </span>
           ))}
         </div>
+
+        <ComingUp keyDates={keyDates} documents={initialDocuments} />
 
         <DocumentUpload initialDocuments={initialDocuments} />
 

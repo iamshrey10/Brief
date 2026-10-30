@@ -12,6 +12,7 @@ vi.mock("next/navigation", () => ({
 
 import { auth } from "@/auth";
 import { AppHeader } from "@/components/app-header";
+import { ComingUp } from "@/components/coming-up";
 import Dashboard, { metadata } from "./page";
 
 const authMock = auth as unknown as ReturnType<typeof vi.fn>;
@@ -43,13 +44,59 @@ describe("the dashboard page", () => {
     await expect(Dashboard()).resolves.toBeTruthy();
   });
 
-  it("asks the API for that person's documents, with a token for them", async () => {
+  it("asks the API for that person's documents and for the dates already saved in them, each with a token for them", async () => {
     authMock.mockResolvedValue({ user: { email: "reader@example.com" } });
 
     await Dashboard();
 
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe("Bearer token");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const urls = fetchMock.mock.calls.map(([url]) => url as string).sort();
+    expect(urls[0]).toMatch(/\/documents$/);
+    expect(urls[1]).toMatch(/\/me\/key-dates$/);
+    for (const call of fetchMock.mock.calls) expect(call[1].headers.Authorization).toBe("Bearer token");
+  });
+});
+
+describe("the dashboard coming up strip", () => {
+  const found = [
+    { document_id: "d1", field: "lease_end", label: "Lease ends", value: "December 31, 2099" },
+    { document_id: "d2", field: "lease_end", label: "Lease ends", value: "oops" },
+  ];
+
+  async function keyDatesPassedOn(reply: unknown, ok = true) {
+    authMock.mockResolvedValue({ user: { email: "reader@example.com" } });
+    fetchMock.mockImplementation(async (url: string) =>
+      url.endsWith("/me/key-dates")
+        ? { ok, json: async () => reply }
+        : { ok: true, json: async () => [{ id: "d1", filename: "lease.pdf", doc_type: "lease" }] },
+    );
+    const strip = elements(await Dashboard()).find((node) => node.type === ComingUp) as
+      | { props: { keyDates: unknown[]; documents: unknown[] } }
+      | undefined;
+    return strip?.props;
+  }
+
+  it("is given the dates and the documents they belong to", async () => {
+    const props = await keyDatesPassedOn(found);
+
+    expect(props?.keyDates).toHaveLength(2);
+    expect(props?.documents).toEqual([{ id: "d1", filename: "lease.pdf", doc_type: "lease" }]);
+  });
+
+  it("drops an entry that is not shaped like a date, and anything that is not a list", async () => {
+    expect((await keyDatesPassedOn([...found, null, { field: 3 }, "x"]))?.keyDates).toHaveLength(2);
+    expect((await keyDatesPassedOn({ detail: "nope" }))?.keyDates).toEqual([]);
+  });
+
+  it("shows no countdown, and still shows the page, when the dates cannot be had", async () => {
+    expect((await keyDatesPassedOn({}, false))?.keyDates).toEqual([]);
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.endsWith("/me/key-dates")) throw new TypeError("fetch failed");
+      return { ok: true, json: async () => [] };
+    });
+    authMock.mockResolvedValue({ user: { email: "reader@example.com" } });
+
+    await expect(Dashboard()).resolves.toBeTruthy();
   });
 });
 
