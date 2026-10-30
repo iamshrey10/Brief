@@ -33,6 +33,9 @@ type RecentEdit = { filename: string; doc_type: string; at: number };
 
 type Status = "idle" | "uploading" | "error";
 
+/** A made up lease that ships with the site (web/samples), so Brief can be tried without a real contract. */
+export const SAMPLE_LEASE_URL = "/samples/sample-lease.pdf";
+
 export function DocumentUpload({ initialDocuments }: { initialDocuments: DocumentSummary[] }) {
   const [file, setFile] = useState<File | null>(null);
   const [docType, setDocType] = useState("loan");
@@ -134,8 +137,29 @@ export function DocumentUpload({ initialDocuments }: { initialDocuments: Documen
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    const contentType = file ? contentTypeFor(file) : null;
-    if (!file || !contentType) return;
+    if (!file) return;
+    await upload(file, docType);
+  }
+
+  // Loads the made up lease that ships with the site and sends it through the very same upload as a chosen file.
+  async function trySample() {
+    if (status === "uploading") return;
+    setStatus("uploading");
+    setErrorMessage("");
+    try {
+      const res = await fetch(SAMPLE_LEASE_URL);
+      if (!res.ok) throw new Error("the sample lease could not be loaded");
+      const blob = await res.blob();
+      await upload(new File([blob], "sample-lease.pdf", { type: "application/pdf" }), "lease");
+    } catch (err) {
+      setStatus("error");
+      setErrorMessage(err instanceof Error ? err.message : "something went wrong");
+    }
+  }
+
+  async function upload(target: File, kind: string) {
+    const contentType = contentTypeFor(target);
+    if (!contentType) return;
 
     setStatus("uploading");
     setErrorMessage("");
@@ -145,10 +169,10 @@ export function DocumentUpload({ initialDocuments }: { initialDocuments: Documen
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          filename: file.name,
-          doc_type: docType,
+          filename: target.name,
+          doc_type: kind,
           content_type: contentType,
-          file_size_bytes: file.size,
+          file_size_bytes: target.size,
         }),
       });
       if (!createRes.ok) throw new Error(await startFailureMessage(createRes));
@@ -157,7 +181,7 @@ export function DocumentUpload({ initialDocuments }: { initialDocuments: Documen
       const uploadRes = await fetch(upload_url, {
         method: "PUT",
         headers: { "Content-Type": contentType },
-        body: file,
+        body: target,
       });
       if (!uploadRes.ok) throw new Error("the file upload failed");
 
@@ -267,6 +291,17 @@ export function DocumentUpload({ initialDocuments }: { initialDocuments: Documen
         <Button type="submit" size="lg" disabled={!file || uploading}>
           {uploading ? "Uploading..." : "Upload"}
         </Button>
+        <p className="text-center text-sm text-muted-foreground">
+          No contract handy?{" "}
+          <button
+            type="button"
+            onClick={() => void trySample()}
+            disabled={uploading}
+            className="font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50"
+          >
+            Try a sample lease
+          </button>
+        </p>
       </form>
 
       <DocumentList

@@ -3,7 +3,7 @@ import "@testing-library/jest-dom/vitest";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 import { MAX_POLL_DURATION_MS, POLL_INTERVAL_MS, type DocumentSummary } from "@/lib/documents";
-import { DocumentUpload } from "./document-upload";
+import { DocumentUpload, SAMPLE_LEASE_URL } from "./document-upload";
 
 function doc(
   status: string,
@@ -342,6 +342,43 @@ describe("DocumentUpload form", () => {
     expect(requests.find((r) => r.url === "https://storage.example/upload")?.contentType).toBe(
       "application/pdf",
     );
+  });
+
+  it("tries the made up sample lease in one click, as a lease, through the same upload as a chosen file", async () => {
+    const requests = acceptUploads();
+    const accept = fetchMock.getMockImplementation()!;
+    fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url === SAMPLE_LEASE_URL) {
+        requests.push({ url, method: "GET" });
+        return { ok: true, blob: async () => new Blob(["%PDF-1.7"], { type: "application/pdf" }) } as Response;
+      }
+      return accept(url, init);
+    });
+    render(<DocumentUpload initialDocuments={[]} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Try a sample lease" }));
+    await tick(0);
+
+    expect(requests.map((r) => `${r.method} ${r.url}`)).toEqual([
+      `GET ${SAMPLE_LEASE_URL}`,
+      "POST /api/backend/documents",
+      "PUT https://storage.example/upload",
+      "PATCH /api/backend/documents/d9/confirm",
+    ]);
+    const create = JSON.parse(requests[1].body ?? "{}");
+    expect(create).toMatchObject({ filename: "sample-lease.pdf", doc_type: "lease", content_type: "application/pdf" });
+    expect(requests[2].contentType).toBe("application/pdf");
+  });
+
+  it("says so, and starts no upload, when the sample lease cannot be loaded", async () => {
+    fetchMock.mockResolvedValue({ ok: false } as Response);
+    render(<DocumentUpload initialDocuments={[]} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Try a sample lease" }));
+    await tick(0);
+
+    expect(screen.getByRole("alert")).toHaveTextContent("the sample lease could not be loaded");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("uploads a photo the browser gave no type for as the right kind, not as a PDF", async () => {
