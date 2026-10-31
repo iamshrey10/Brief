@@ -149,3 +149,28 @@ test("Copy summary puts the summary on the clipboard and Download summary saves 
   expect(file).toContain("# Summary of my lease, from Brief");
   expect(file).toContain("## Questions to ask before signing");
 });
+
+test("Find in this document marks matches, steps through them, and stays reachable below the top bar on a long document", async ({ page }) => {
+  await seedDocument(page, { id: "doc-long", filename: "long.pdf", doc_type: "lease", status: "ready" });
+  await page.setViewportSize({ width: 1280, height: 700 });
+  await page.goto("/dashboard/documents/doc-long");
+
+  const box = page.getByRole("searchbox", { name: "Find in this document" });
+  await box.fill("clause 3");
+  // "Clause 3", "Clause 30" to "Clause 39" all contain it.
+  await expect(page.getByRole("status").filter({ hasText: /^1 of 11$/ })).toBeVisible();
+
+  for (let i = 0; i < 6; i++) await box.press("Enter");
+  await expect(page.getByRole("status").filter({ hasText: /^7 of 11$/ })).toBeVisible();
+  await expect(page.locator('mark[data-find-current="true"]')).toBeInViewport();
+
+  await page.evaluate(() => window.scrollTo(0, 1500));
+  const bar = page.getByRole("search").filter({ has: box });
+  const header = page.locator("header").first();
+  await expect(bar).toBeInViewport();
+  const headerBottom = (await header.boundingBox())!.y + (await header.boundingBox())!.height;
+  expect((await bar.boundingBox())!.y).toBeGreaterThanOrEqual(headerBottom - 1);
+
+  await box.press("Escape");
+  await expect(page.locator("mark")).toHaveCount(0);
+});

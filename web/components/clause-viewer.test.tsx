@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 import type { ClauseData } from "@/lib/documents";
 import { ClauseViewer } from "./clause-viewer";
@@ -180,5 +180,116 @@ describe("ClauseViewer headings", () => {
 
     expect(clauseElement("c3").className).toContain("border-l-primary");
     expect(clauseElement("c1").className).toContain("border-l-transparent");
+  });
+});
+
+describe("ClauseViewer find", () => {
+  const FIND_CLAUSES: ClauseData[] = [
+    { id: "f1", clause_index: 0, page_number: 1, text: "A late fee of fifty dollars applies. The late fee is due at once." },
+    { id: "f2", clause_index: 1, page_number: 2, text: "There is no fee for paying early." },
+    { id: "f3", clause_index: 2, page_number: 2, text: "Pay $1,450.00 (see clause (b)) at signing." },
+  ];
+  const box = () => screen.getByRole("searchbox", { name: "Find in this document" });
+  const type = (value: string) => fireEvent.change(box(), { target: { value } });
+  const status = () => screen.getByRole("status").textContent;
+  const marks = () => Array.from(document.querySelectorAll("mark")).map((mark) => mark.textContent);
+
+  beforeEach(() => stubReducedMotion(false));
+
+  it("shows nothing marked, and no count, until something is typed", () => {
+    render(<ClauseViewer clauses={FIND_CLAUSES} />);
+
+    expect(marks()).toEqual([]);
+    expect(status()).toBe("");
+  });
+
+  it("marks every match across the whole document, says which one the reader is on, and starts at the first", () => {
+    render(<ClauseViewer clauses={FIND_CLAUSES} />);
+
+    type("fee");
+
+    expect(marks()).toEqual(["fee", "fee", "fee"]);
+    expect(status()).toBe("1 of 3");
+    expect(document.querySelectorAll('[data-find-current="true"]')).toHaveLength(1);
+    expect(within(clauseElement("f1")).getAllByText("fee")[0]).toHaveAttribute("data-find-current", "true");
+  });
+
+  it("steps to the next and previous match, wrapping round, and scrolls each into the middle of the view", () => {
+    render(<ClauseViewer clauses={FIND_CLAUSES} />);
+    type("fee");
+    scrollIntoView.mockClear();
+
+    fireEvent.click(screen.getByRole("button", { name: "Next match" }));
+    expect(status()).toBe("2 of 3");
+    expect(scrollIntoView).toHaveBeenLastCalledWith({ behavior: "smooth", block: "center" });
+    fireEvent.click(screen.getByRole("button", { name: "Next match" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next match" }));
+    expect(status()).toBe("1 of 3");
+    fireEvent.click(screen.getByRole("button", { name: "Previous match" }));
+    expect(status()).toBe("3 of 3");
+    expect(within(clauseElement("f2")).getByText("fee")).toHaveAttribute("data-find-current", "true");
+  });
+
+  it("uses Enter for the next match, Shift and Enter for the previous one, and Escape to clear", () => {
+    render(<ClauseViewer clauses={FIND_CLAUSES} />);
+    type("fee");
+
+    fireEvent.keyDown(box(), { key: "Enter" });
+    expect(status()).toBe("2 of 3");
+    fireEvent.keyDown(box(), { key: "Enter", shiftKey: true });
+    expect(status()).toBe("1 of 3");
+    fireEvent.keyDown(box(), { key: "Escape" });
+    expect(box()).toHaveValue("");
+    expect(marks()).toEqual([]);
+  });
+
+  it("says when there are no matches, and disables the step buttons", () => {
+    render(<ClauseViewer clauses={FIND_CLAUSES} />);
+
+    type("zebra");
+
+    expect(status()).toBe("No matches");
+    expect(screen.getByRole("button", { name: "Next match" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Previous match" })).toBeDisabled();
+  });
+
+  it("finds figures and brackets exactly as typed, and ignores case", () => {
+    render(<ClauseViewer clauses={FIND_CLAUSES} />);
+
+    type("$1,450.00");
+    expect(marks()).toEqual(["$1,450.00"]);
+    type("(B)");
+    expect(marks()).toEqual(["(b)"]);
+  });
+
+  it("starts again at the first match when the search changes", () => {
+    render(<ClauseViewer clauses={FIND_CLAUSES} />);
+    type("fee");
+    fireEvent.click(screen.getByRole("button", { name: "Next match" }));
+
+    type("late fee");
+
+    expect(status()).toBe("1 of 2");
+  });
+
+  it("does not search for a single letter", () => {
+    render(<ClauseViewer clauses={FIND_CLAUSES} />);
+
+    type("a");
+
+    expect(marks()).toEqual([]);
+    expect(status()).toBe("");
+  });
+
+  it("gives way to the cited quote highlight again once the search is cleared", () => {
+    const { rerender } = render(<ClauseViewer clauses={FIND_CLAUSES} />);
+    rerender(<ClauseViewer clauses={FIND_CLAUSES} activeCitation={{ clauseId: "f2", quote: "paying early" }} />);
+    expect(marks()).toEqual(["paying early"]);
+
+    type("fee");
+    expect(marks()).toEqual(["fee", "fee", "fee"]);
+
+    type("");
+    expect(marks()).toEqual(["paying early"]);
   });
 });
