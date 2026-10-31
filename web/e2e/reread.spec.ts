@@ -5,7 +5,7 @@ import { callsMade, resetFakeApi, seedFailedDocument, signInAsTestReader } from 
 test.beforeEach(async ({ page }) => {
   await resetFakeApi(page);
   await signInAsTestReader(page);
-  await page.goto("/dashboard");
+  await page.goto("/dashboard/documents");
 });
 
 const rowFor = (page: import("@playwright/test").Page, name: string) =>

@@ -8,7 +8,7 @@ test.beforeEach(async ({ page }) => {
 
 test("the Profile section shows who is signed in and where they stand against today's limits", async ({ page }) => {
   const email = await signInAsTestReader(page);
-  await page.goto("/dashboard");
+  await page.goto("/dashboard/documents");
 
   await page.getByRole("navigation", { name: "Sections" }).first().getByRole("link", { name: "Profile" }).click();
 
@@ -31,7 +31,7 @@ test("the sections link to each other, and each marks itself as the current one"
 
   await sections.getByRole("link", { name: "Documents" }).click();
 
-  await expect(page).toHaveURL(/\/dashboard$/);
+  await expect(page).toHaveURL(/\/dashboard\/documents$/);
   await expect(page.getByRole("heading", { name: "Your contracts" })).toBeVisible();
   await expect(sections.getByRole("link", { name: "Documents" })).toHaveAttribute("aria-current", "page");
 });
@@ -50,13 +50,13 @@ test("account deletion is in its own Danger zone and is not on the dashboard", a
 
   await expect(page.getByRole("region", { name: "Danger zone" }).getByRole("button", { name: "Delete my account" })).toBeVisible();
 
-  await page.goto("/dashboard");
+  await page.goto("/dashboard/documents");
   await expect(page.getByRole("button", { name: "Delete my account" })).toHaveCount(0);
 });
 
 test("the dashboard says how many documents there are and how many of each kind", async ({ page }) => {
   await signInAsTestReader(page);
-  await page.goto("/dashboard");
+  await page.goto("/dashboard/documents");
 
   const summary = page.getByRole("group", { name: "Your documents at a glance" });
   await expect(summary.getByText("2 documents")).toBeVisible();
@@ -77,7 +77,7 @@ test("choosing Dark on the Profile page turns the site dark and is kept after a 
 
 test("the dashboard counts down to a clear date and leaves out a loose phrase", async ({ page }) => {
   await signInAsTestReader(page);
-  await page.goto("/dashboard");
+  await page.goto("/dashboard/documents");
 
   const comingUp = page.getByRole("region", { name: "Coming up" });
   await expect(comingUp.getByRole("link", { name: /Lease ends in \d+ days/ })).toBeVisible();

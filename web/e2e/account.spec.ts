@@ -13,7 +13,7 @@ test("signing out returns to the landing page and the dashboard is closed again"
 
   await expect(page).toHaveURL(/\/$/);
   await expect(page.getByRole("button", { name: "Sign in with Google" })).toBeVisible();
-  await page.goto("/dashboard");
+  await page.goto("/dashboard/documents");
   expect(new URL(page.url()).pathname).toBe("/");
   await expect(page.getByRole("button", { name: "Sign in with Google" })).toBeVisible();
 });
@@ -35,7 +35,7 @@ test("deleting the account needs the word DELETE typed, then removes it and sign
   await expect(page.getByRole("button", { name: "Sign in with Google" })).toBeVisible();
   const state = (await (await request.get(`${FAKE_API}/__account-deleted`)).json()) as { deleted: boolean };
   expect(state.deleted).toBe(true);
-  await page.goto("/dashboard");
+  await page.goto("/dashboard/documents");
   expect(new URL(page.url()).pathname).toBe("/");
 });
 
@@ -47,7 +47,7 @@ test("cancelling the account deletion keeps everything and signs nobody out", as
 
   await expect(confirmation).toHaveCount(0);
   expect(new URL(page.url()).pathname).toBe("/dashboard/profile");
-  await page.goto("/dashboard");
+  await page.goto("/dashboard/documents");
   await expect(page.getByRole("region", { name: "Your documents" }).getByText("sample-lease.pdf")).toBeVisible();
   const state = (await (await request.get(`${FAKE_API}/__account-deleted`)).json()) as { deleted: boolean };
   expect(state.deleted).toBe(false);

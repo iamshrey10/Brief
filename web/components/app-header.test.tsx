@@ -32,10 +32,11 @@ describe("the signed in header", () => {
     expect(renderToStaticMarkup(<AppHeader email="a@b.co" current="documents" widthClass="max-w-6xl" />)).toContain("max-w-6xl");
   });
 
-  it("links to the Documents and Profile sections, in that order", () => {
+  it("links to the Dashboard, Documents and Profile sections, in that order", () => {
     const html = renderToStaticMarkup(<AppHeader email="a@b.co" current="documents" />);
 
-    expect(APP_SECTIONS.map((section) => section.href)).toEqual(["/dashboard", "/dashboard/profile"]);
+    expect(APP_SECTIONS.map((section) => section.href)).toEqual(["/dashboard", "/dashboard/documents", "/dashboard/profile"]);
+    expect(html.indexOf(">Dashboard<")).toBeLessThan(html.indexOf(">Documents<"));
     expect(html.indexOf(">Documents<")).toBeLessThan(html.indexOf(">Profile<"));
   });
 

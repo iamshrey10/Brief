@@ -33,7 +33,7 @@ test("the fake API, like the real one, accepts only a token signed with the shar
 test("the tokens the website really sends pass that check", async ({ page }) => {
   await resetFakeApi(page);
   await signInAsTestReader(page);
-  await page.goto("/dashboard");
+  await page.goto("/dashboard/documents");
 
   await expect(page.getByRole("region", { name: "Your documents" }).getByText("sample-lease.pdf")).toBeVisible();
 });

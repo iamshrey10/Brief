@@ -14,7 +14,7 @@ async function sidewaysOverflow(page: Page): Promise<number> {
 }
 
 test("the dashboard fits a phone, with the whole file name readable and no sideways scrolling", async ({ page }) => {
-  await page.goto("/dashboard");
+  await page.goto("/dashboard/documents");
   await expect(page.getByRole("region", { name: "Your documents" }).getByText("sample-lease.pdf")).toBeVisible();
 
   expect(await sidewaysOverflow(page)).toBeLessThanOrEqual(0);
@@ -23,7 +23,7 @@ test("the dashboard fits a phone, with the whole file name readable and no sidew
   expect(name!.x + name!.width).toBeLessThanOrEqual(390);
 });
 
-test("the Profile page fits a phone, with the sections on a row of their own and no sideways scrolling", async ({ page }) => {
+test("the Profile page fits a phone, with the three sections on a row of their own and no sideways scrolling", async ({ page }) => {
   await page.goto("/dashboard/profile");
   await expect(page.getByRole("region", { name: "Today's limits" })).toBeVisible();
 
@@ -31,14 +31,16 @@ test("the Profile page fits a phone, with the sections on a row of their own and
   const sections = page.getByRole("navigation", { name: "Sections" }).filter({ visible: true });
   await expect(sections).toHaveCount(1);
   const links = await sections.getByRole("link").all();
-  expect(links).toHaveLength(2);
-  const [documents, profile] = await Promise.all(links.map((link) => link.boundingBox()));
-  expect(documents!.y).toBe(profile!.y);
-  expect(profile!.x + profile!.width).toBeLessThanOrEqual(390);
+  expect(links).toHaveLength(3);
+  const boxes = await Promise.all(links.map((link) => link.boundingBox()));
+  // All three on one row, and the last one inside the screen.
+  expect(new Set(boxes.map((box) => box!.y)).size).toBe(1);
+  const last = boxes[2]!;
+  expect(last.x + last.width).toBeLessThanOrEqual(390);
 });
 
 test("the dashboard's summary of documents fits a phone", async ({ page }) => {
-  await page.goto("/dashboard");
+  await page.goto("/dashboard/documents");
 
   const summary = page.getByRole("group", { name: "Your documents at a glance" });
   await expect(summary).toBeVisible();
@@ -62,7 +64,7 @@ test("the document page fits a phone on the Ask tab", async ({ page }) => {
 });
 
 test("a delete confirmation fits a phone and its buttons can be reached", async ({ page }) => {
-  await page.goto("/dashboard");
+  await page.goto("/dashboard/documents");
   await page.getByRole("button", { name: "Delete sample-lease.pdf" }).click();
 
   const group = page.getByRole("group", { name: "Delete sample-lease.pdf" });

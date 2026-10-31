@@ -105,7 +105,7 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
     <PageShell email={email}>
       <div className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <Link href="/dashboard" className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline print:hidden">
+          <Link href="/dashboard/documents" className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline print:hidden">
             ← Back to your documents
           </Link>
           {isReadable(document.status) && clauses.length > 0 && <PrintButton />}

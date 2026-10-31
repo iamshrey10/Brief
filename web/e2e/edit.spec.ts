@@ -5,7 +5,7 @@ import { callsMade, resetFakeApi, signInAsTestReader } from "./support/session";
 test.beforeEach(async ({ page }) => {
   await resetFakeApi(page);
   await signInAsTestReader(page);
-  await page.goto("/dashboard");
+  await page.goto("/dashboard/documents");
   await page.getByRole("button", { name: "Edit sample-lease.pdf" }).click();
 });
 
