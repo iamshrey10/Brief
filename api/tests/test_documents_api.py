@@ -2789,3 +2789,82 @@ async def test_key_dates_never_includes_another_persons_dates(client, db_session
 
     assert response.status_code == 200
     assert response.json() == []
+
+
+# --- GET /me/insights ---
+
+
+async def test_insights_summarise_what_was_saved_and_never_call_the_model(client, db_session, test_user, monkeypatch):
+    document = await _ready_document(db_session, test_user)
+    await _add_clause(db_session, document, 0, 1, DEPOSIT_TEXT)
+    await _add_clause(db_session, document, 1, 1, LEASE_RENT_TEXT)
+    await db_session.commit()
+    calls: list = []
+
+    def rent_in_the_second_clause(fields, clauses, seed=None):
+        calls.append(clauses)
+        return ExtractionResponse(
+            fields=[
+                ExtractedField(name="monthly_rent", found=True, value="$2,054.00 a month", clause_ref="C2", quote="Monthly rent is $2,054.00")
+            ]
+        )
+
+    monkeypatch.setattr("app.key_terms.generate_key_terms", rent_in_the_second_clause)
+    _fake_checklist_model(monkeypatch, calls)
+    await client.get(f"/documents/{document.id}/key-terms")
+    await client.get(f"/documents/{document.id}/checklist")
+    calls.clear()
+
+    response = await client.get("/me/insights")
+
+    assert response.status_code == 200
+    [insight] = response.json()
+    assert insight["document_id"] == str(document.id)
+    assert insight["terms_found"] == 1 and insight["terms_total"] > 1
+    assert insight["questions_answered"] == 1
+    assert insight["open_count"] >= 1
+    assert 1 <= len(insight["open_questions"]) <= 4
+    assert all(isinstance(question, str) and question for question in insight["open_questions"])
+    assert calls == []
+
+
+async def test_insights_have_only_the_part_that_was_saved(client, db_session, test_user, monkeypatch):
+    document = await _ready_document(db_session, test_user)
+    await _add_clause(db_session, document, 0, 1, LEASE_RENT_TEXT)
+    await db_session.commit()
+    _fake_key_term_model(monkeypatch, [])
+    await client.get(f"/documents/{document.id}/key-terms")  # key terms only, the questions were never checked
+
+    [insight] = (await client.get("/me/insights")).json()
+
+    assert insight["terms_found"] == 1
+    assert insight["questions_answered"] is None and insight["open_count"] is None
+    assert insight["open_questions"] == []
+
+
+async def test_insights_leave_out_a_document_that_has_not_been_opened_and_read_nothing(client, db_session, test_user, monkeypatch):
+    document = await _ready_document(db_session, test_user)
+    await _add_clause(db_session, document, 0, 1, LEASE_RENT_TEXT)
+    await db_session.commit()
+    calls: list = []
+    _fake_key_term_model(monkeypatch, calls)
+    _fake_checklist_model(monkeypatch, calls)
+
+    response = await client.get("/me/insights")
+
+    assert response.json() == []
+    assert calls == []
+
+
+async def test_insights_never_include_another_persons_documents(client, db_session, test_user, monkeypatch):
+    other_user = User(email=f"{uuid.uuid4()}@example.com")
+    db_session.add(other_user)
+    await db_session.commit()
+    await db_session.refresh(other_user)
+    theirs = await _ready_document(db_session, other_user)
+    await _add_clause(db_session, theirs, 0, 1, LEASE_RENT_TEXT)
+    await db_session.commit()
+    _fake_key_term_model(monkeypatch, [])
+    await main_module.get_key_terms(db_session, theirs.id, theirs.doc_type)
+
+    assert (await client.get("/me/insights")).json() == []

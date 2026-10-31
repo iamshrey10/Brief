@@ -21,6 +21,7 @@ from app.ingestion import ingest_document
 from app.logging_setup import configure_logging
 from app.readiness import check_ready
 from app import request_id
+from app.insights import DocumentInsight, saved_insights
 from app.key_dates import KeyDate, saved_key_dates
 from app.key_terms import KeyTermsGenerationError, KeyTermsResult, get_key_terms, load_key_terms
 from app.models import ChecklistAnswerRow, Clause, Document, Extraction, User
@@ -201,6 +202,23 @@ async def my_key_dates(
 ) -> list[KeyDate]:
     """The dates in this person's documents that are already saved. Looking uses nothing up."""
     return await saved_key_dates(session, user.id)
+
+
+@app.get(
+    "/me/insights",
+    tags=["account"],
+    summary="Show what Brief has worked out about your documents",
+    description=(
+        "Returns, for each document that has been opened, how many key terms were found and how many questions the document answers, with the wording to ask the other side for the important ones it leaves open. Only results that were already saved are included, so this never calls the model and never counts against a daily limit."
+    ),
+    responses=_errors(401),
+)
+async def my_insights(
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> list[DocumentInsight]:
+    """What is already saved about this person's documents. Looking uses nothing up."""
+    return await saved_insights(session, user.id)
 
 
 @app.delete(
