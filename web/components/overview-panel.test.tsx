@@ -496,3 +496,38 @@ describe("OverviewPanel email of questions", () => {
     expect(screen.queryByRole("link", { name: "Email these questions" })).not.toBeInTheDocument();
   });
 });
+
+describe("OverviewPanel summary buttons", () => {
+  it("offers to copy and download a summary once the key terms are in", async () => {
+    setup();
+
+    expect(await screen.findByRole("button", { name: "Copy summary" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Download summary" })).toBeInTheDocument();
+  });
+
+  it("offers nothing to take away while the key terms are still loading, or when they could not be read", async () => {
+    keyTermsMock.mockResolvedValue({ ok: false, message: "failed" });
+    checklistMock.mockResolvedValue({ ok: true, result: CHECKLIST });
+    render(<OverviewPanel filename="lease.pdf" documentId="doc-1" onCitationSelect={vi.fn()} />);
+
+    expect(screen.queryByRole("button", { name: "Copy summary" })).not.toBeInTheDocument();
+    await screen.findByRole("region", { name: "Key terms" });
+    expect(screen.queryByRole("button", { name: "Copy summary" })).not.toBeInTheDocument();
+  });
+
+  it("still offers the summary, without questions, when only the checklist could not be read", async () => {
+    keyTermsMock.mockResolvedValue({ ok: true, result: KEY_TERMS });
+    checklistMock.mockResolvedValue({ ok: false, message: "failed" });
+    render(<OverviewPanel filename="lease.pdf" documentId="doc-1" onCitationSelect={vi.fn()} />);
+
+    expect(await screen.findByRole("button", { name: "Copy summary" })).toBeInTheDocument();
+  });
+
+  it("asks for the key terms and the questions once each, however many sections use them", async () => {
+    setup();
+
+    await screen.findByRole("button", { name: "Copy summary" });
+    expect(keyTermsMock).toHaveBeenCalledTimes(1);
+    expect(checklistMock).toHaveBeenCalledTimes(1);
+  });
+});

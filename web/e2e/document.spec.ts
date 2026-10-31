@@ -128,3 +128,24 @@ test("Email these questions is a link that opens a message with the lease's open
   expect(decoded).toContain("Does this renew automatically, and by what date must I cancel?");
   expect(decoded).not.toContain("sample-lease.pdf");
 });
+
+test("Copy summary puts the summary on the clipboard and Download summary saves it as a Markdown file", async ({ page, context }) => {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  await page.goto("/dashboard/documents/doc-lease");
+  await expect(page.getByRole("region", { name: "Key terms" }).getByText("Security deposit")).toBeVisible();
+
+  await page.getByRole("button", { name: "Copy summary" }).click();
+  await expect(page.getByText("Copied. Paste it anywhere.")).toBeVisible();
+  const copied = await page.evaluate(() => navigator.clipboard.readText());
+  expect(copied).toContain("SUMMARY OF MY LEASE, FROM BRIEF");
+  expect(copied).toContain("* Security deposit: $1,450.00, refundable within 30 days after move-out (page 2)");
+  expect(copied).toContain("Pet policy");
+  expect(copied).toContain("1. Does this renew automatically, and by what date must I cancel?");
+  expect(copied).not.toContain("sample-lease");
+
+  const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Download summary" }).click()]);
+  expect(download.suggestedFilename()).toBe("sample-lease-summary.md");
+  const file = await (await import("node:fs/promises")).readFile((await download.path())!, "utf8");
+  expect(file).toContain("# Summary of my lease, from Brief");
+  expect(file).toContain("## Questions to ask before signing");
+});

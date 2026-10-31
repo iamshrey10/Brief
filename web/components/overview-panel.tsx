@@ -1,6 +1,7 @@
 "use client";
 
 import { CalendarButton } from "@/components/calendar-button";
+import { SummaryActions } from "@/components/summary-actions";
 import { buildQuestionsEmail } from "@/lib/questions-email";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Check, Copy, TriangleAlert } from "lucide-react";
@@ -22,6 +23,9 @@ type LoadState<T> =
   | { status: "loading" }
   | { status: "error"; message: string; reference?: string }
   | { status: "ready"; result: T };
+
+/** What useLoad gives back: where a load stands, and a way to try it again. */
+type Loaded<T> = { state: LoadState<T>; retry: () => void };
 
 /**
  * Loads one thing for a document and exposes a retry. Loading is derived from what has been
@@ -225,14 +229,14 @@ function KeyTermCard({
 function KeyTermsSection({
   documentId,
   filename,
+  load: { state, retry },
   onSelect,
 }: {
   documentId: string;
   filename: string;
+  load: Loaded<KeyTermsResult>;
   onSelect: (citation: ActiveCitation) => void;
 }) {
-  const { state, retry } = useLoad<KeyTermsResult>(documentId, fetchKeyTerms);
-
   return (
     <section aria-label="Key terms" className="flex flex-col gap-3">
       {state.status === "ready" ? (
@@ -360,16 +364,14 @@ function AnsweredCard({
 }
 
 function ChecklistSection({
-  documentId,
   docType,
+  load: { state, retry },
   onSelect,
 }: {
-  documentId: string;
   docType: string;
+  load: Loaded<ChecklistResult>;
   onSelect: (citation: ActiveCitation) => void;
 }) {
-  const { state, retry } = useLoad<ChecklistResult>(documentId, fetchChecklist);
-
   let subtitle: string | undefined;
   if (state.status === "ready") {
     const { gaps, answered } = groupChecklist(state.result.answers);
@@ -490,14 +492,25 @@ export function OverviewPanel({
   docType?: string;
   onCitationSelect: (citation: ActiveCitation) => void;
 }): ReactNode {
+  const keyTerms = useLoad<KeyTermsResult>(documentId, fetchKeyTerms);
+  const checklist = useLoad<ChecklistResult>(documentId, fetchChecklist);
+
   return (
     <section
       aria-label="Overview"
       className="min-h-0 flex-1 overflow-y-auto rounded-lg border border-border bg-background p-4 print:overflow-visible print:border-0 print:p-0"
     >
       <div className="flex flex-col gap-8">
-        <KeyTermsSection documentId={documentId} filename={filename} onSelect={onCitationSelect} />
-        <ChecklistSection documentId={documentId} docType={docType} onSelect={onCitationSelect} />
+        {keyTerms.state.status === "ready" && (
+          <SummaryActions
+            docType={docType}
+            filename={filename}
+            keyTerms={keyTerms.state.result}
+            checklist={checklist.state.status === "ready" ? checklist.state.result : null}
+          />
+        )}
+        <KeyTermsSection documentId={documentId} filename={filename} load={keyTerms} onSelect={onCitationSelect} />
+        <ChecklistSection docType={docType} load={checklist} onSelect={onCitationSelect} />
       </div>
       <p className="mt-8 text-xs text-muted-foreground">
         Explains what the document says. Not legal advice.
