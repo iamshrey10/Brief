@@ -10,7 +10,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test("a signed in person sees their own address and their documents on the dashboard", async ({ page }) => {
-  await page.goto("/dashboard");
+  await page.goto("/dashboard/documents");
 
   await expect(page.getByRole("heading", { name: "Your contracts" })).toBeVisible();
   await expect(page.getByText(reader)).toBeVisible();
@@ -21,7 +21,7 @@ test("a signed in person sees their own address and their documents on the dashb
 });
 
 test("deleting a document asks first, and it is gone after a reload while the other one stays", async ({ page }) => {
-  await page.goto("/dashboard");
+  await page.goto("/dashboard/documents");
 
   await page.getByRole("button", { name: "Delete sample-lease.pdf" }).click();
   const confirmation = page.getByRole("group", { name: "Delete sample-lease.pdf" });
@@ -35,7 +35,7 @@ test("deleting a document asks first, and it is gone after a reload while the ot
 });
 
 test("cancelling a delete keeps the document", async ({ page }) => {
-  await page.goto("/dashboard");
+  await page.goto("/dashboard/documents");
 
   await page.getByRole("button", { name: "Delete sample-lease.pdf" }).click();
   await page.getByRole("group", { name: "Delete sample-lease.pdf" }).getByRole("button", { name: "Cancel" }).click();
@@ -46,7 +46,7 @@ test("cancelling a delete keeps the document", async ({ page }) => {
 });
 
 test("pressing Escape backs out of a delete", async ({ page }) => {
-  await page.goto("/dashboard");
+  await page.goto("/dashboard/documents");
 
   await page.getByRole("button", { name: "Delete sample-lease.pdf" }).click();
   const confirmation = page.getByRole("group", { name: "Delete sample-lease.pdf" });

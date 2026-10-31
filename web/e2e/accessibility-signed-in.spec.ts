@@ -24,7 +24,7 @@ for (const scheme of ["light", "dark"] as const) {
     });
 
     test("the dashboard has no automatically detectable accessibility problems", async ({ page }) => {
-      await page.goto("/dashboard");
+      await page.goto("/dashboard/documents");
       await expect(page.getByRole("region", { name: "Your documents" }).getByText("sample-lease.pdf")).toBeVisible();
 
       expect(await problems(page)).toEqual([]);

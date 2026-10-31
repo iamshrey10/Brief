@@ -5,7 +5,7 @@ import { resetFakeApi, signInAsTestReader } from "./support/session";
 test.beforeEach(async ({ page }) => {
   await resetFakeApi(page);
   await signInAsTestReader(page);
-  await page.goto("/dashboard");
+  await page.goto("/dashboard/documents");
 });
 
 test("opening the edit form puts the keyboard in the Name box, and closing it returns to the Edit button", async ({

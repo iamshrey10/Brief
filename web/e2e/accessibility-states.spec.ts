@@ -47,7 +47,7 @@ for (const scheme of ["light", "dark"] as const) {
     });
 
     test("the edit form", async ({ page }) => {
-      await page.goto("/dashboard");
+      await page.goto("/dashboard/documents");
       await page.getByRole("button", { name: "Edit sample-lease.pdf" }).click();
       await expect(page.getByLabel("Name")).toBeVisible();
 
@@ -55,7 +55,7 @@ for (const scheme of ["light", "dark"] as const) {
     });
 
     test("the delete confirmation", async ({ page }) => {
-      await page.goto("/dashboard");
+      await page.goto("/dashboard/documents");
       await page.getByRole("button", { name: "Delete sample-lease.pdf" }).click();
       await expect(page.getByRole("group", { name: "Delete sample-lease.pdf" })).toBeVisible();
 
@@ -71,7 +71,7 @@ for (const scheme of ["light", "dark"] as const) {
     });
 
     test("an upload with a chosen file and a refusal showing", async ({ page }) => {
-      await page.goto("/dashboard");
+      await page.goto("/dashboard/documents");
       await page.getByLabel("Choose a file to upload").setInputFiles({
         name: "limit-lease.pdf",
         mimeType: "application/pdf",
@@ -84,7 +84,7 @@ for (const scheme of ["light", "dark"] as const) {
     });
 
     test("a failed document with its reason", async ({ page }) => {
-      await page.goto("/dashboard");
+      await page.goto("/dashboard/documents");
       await page.request.post("http://localhost:3101/__seed-failed");
       await page.reload();
       await expect(page.getByText("No text could be found in this file.")).toBeVisible();

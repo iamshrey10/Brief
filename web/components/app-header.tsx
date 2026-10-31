@@ -7,7 +7,8 @@ import { cn } from "@/lib/utils";
 
 /** The sections of the signed in part of the site, in the order the bar shows them. */
 export const APP_SECTIONS = [
-  { id: "documents", href: "/dashboard", label: "Documents" },
+  { id: "dashboard", href: "/dashboard", label: "Dashboard" },
+  { id: "documents", href: "/dashboard/documents", label: "Documents" },
   { id: "profile", href: "/dashboard/profile", label: "Profile" },
 ] as const;
 

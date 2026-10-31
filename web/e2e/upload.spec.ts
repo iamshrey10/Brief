@@ -5,7 +5,7 @@ import { callsMade, resetFakeApi, signInAsTestReader, uploadsReceived } from "./
 test.beforeEach(async ({ page }) => {
   await resetFakeApi(page);
   await signInAsTestReader(page);
-  await page.goto("/dashboard");
+  await page.goto("/dashboard/documents");
 });
 
 const PDF = { name: "new-lease.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.4 a tiny made up file") };
