@@ -69,7 +69,7 @@ Open the lease.
 
 ## 7. Phone and keyboard
 
-- [ ] In the browser's device toolbar, choose a phone width (390 by 844). The dashboard, the Overview and the Ask tab
+- [ ] In the browser's device toolbar, choose a phone width (390 by 844). The Dashboard, the Documents page, the Overview and the Ask tab
       have no sideways scrolling, and a long file name wraps instead of being cut off.
 - [ ] With the keyboard only: Tab reaches every button, opening **Edit** puts the cursor in the Name box, and closing
       it returns to the **Edit** button.
