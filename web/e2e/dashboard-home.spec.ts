@@ -65,3 +65,18 @@ test("the Dashboard shows what is coming up, the recent activity and the mix of 
   await expect(kinds.getByText("Lease", { exact: true })).toBeVisible();
   await expect(kinds.getByText("Education loan", { exact: true })).toBeVisible();
 });
+
+test("the Dashboard gathers the questions still to ask and shows what Brief found in each document", async ({ page }) => {
+  await page.goto("/dashboard");
+
+  const toAsk = page.getByRole("region", { name: "Still to ask" });
+  await expect(toAsk.getByText("2 questions your document leaves open")).toBeVisible();
+  await expect(toAsk.getByText("Does this renew automatically, and by what date must I cancel?")).toBeVisible();
+  await expect(toAsk.getByRole("link", { name: "sample-lease.pdf" })).toHaveAttribute("href", "/dashboard/documents/doc-lease");
+
+  const found = page.getByRole("region", { name: "What Brief found" });
+  await expect(found.getByText("9 of 12 terms")).toBeVisible();
+  await expect(found.getByText("7 answered")).toBeVisible();
+  await expect(found.getByText("nothing open")).toBeVisible();
+  await expect(found.getByRole("progressbar", { name: "Key terms found" }).first()).toHaveAttribute("aria-valuenow", "9");
+});

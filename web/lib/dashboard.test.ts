@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { asDocuments, documentStats, formatAgo, recentActivity } from "./dashboard";
+import { asDocuments, asInsights, documentStats, formatAgo, openQuestionGroups, recentActivity } from "./dashboard";
 
 const status = (value: string) => ({ status: value });
 
@@ -112,5 +112,49 @@ describe("recentActivity", () => {
   it("names a status it does not know as it is, and handles no documents", () => {
     expect(recentActivity([document("x", "mystery", "2026-10-30T11:00:00Z")], NOW)[0].what).toBe("mystery");
     expect(recentActivity([], NOW)).toEqual([]);
+  });
+});
+
+describe("asInsights", () => {
+  const full = { document_id: "d1", terms_found: 9, terms_total: 12, questions_answered: 7, open_count: 2, open_questions: ["Q1?", "Q2?"] };
+
+  it("keeps a complete entry as it is", () => {
+    expect(asInsights([full])).toEqual([full]);
+  });
+
+  it("makes a part that is missing or not a count null, and a missing list empty, instead of dropping the document", () => {
+    expect(asInsights([{ document_id: "d2", terms_found: "9", terms_total: -1, open_questions: "nope" }])).toEqual([
+      { document_id: "d2", terms_found: null, terms_total: null, questions_answered: null, open_count: null, open_questions: [] },
+    ]);
+  });
+
+  it("keeps only real questions, drops entries with no document, and gives nothing for anything not a list", () => {
+    expect(asInsights([{ ...full, open_questions: ["ok?", 3, "", null] }])[0].open_questions).toEqual(["ok?"]);
+    expect(asInsights([null, "x", { terms_found: 1 }])).toEqual([]);
+    expect(asInsights({ detail: "no" })).toEqual([]);
+  });
+});
+
+describe("openQuestionGroups", () => {
+  const insight = (id: string, open: string[], count: number | null = open.length) => ({
+    document_id: id, terms_found: 1, terms_total: 2, questions_answered: 1, open_count: count, open_questions: open,
+  });
+  const documents = [{ id: "a", filename: "a.pdf" }, { id: "b", filename: "b.pdf" }];
+
+  it("groups the open questions by document, the document with the most first", () => {
+    const groups = openQuestionGroups([insight("a", ["A1?"]), insight("b", ["B1?", "B2?"])], documents);
+
+    expect(groups.map((g) => [g.filename, g.total, g.questions])).toEqual([
+      ["b.pdf", 2, ["B1?", "B2?"]],
+      ["a.pdf", 1, ["A1?"]],
+    ]);
+  });
+
+  it("counts the real total when only the first few are named", () => {
+    expect(openQuestionGroups([insight("a", ["A1?", "A2?"], 7)], documents)[0].total).toBe(7);
+  });
+
+  it("leaves out a document with nothing open, and one that is no longer in the list", () => {
+    expect(openQuestionGroups([insight("a", []), insight("gone", ["X?"])], documents)).toEqual([]);
   });
 });

@@ -23,6 +23,18 @@ test("the dashboard fits a phone, with the whole file name readable and no sidew
   expect(name!.x + name!.width).toBeLessThanOrEqual(390);
 });
 
+test("the Dashboard home fits a phone, every section inside the screen and no sideways scrolling", async ({ page }) => {
+  await page.goto("/dashboard");
+  await expect(page.getByRole("region", { name: "What Brief found" })).toBeVisible();
+
+  expect(await sidewaysOverflow(page)).toBeLessThanOrEqual(0);
+  for (const name of ["Your documents at a glance", "Still to ask", "What Brief found", "Recent activity", "By kind"]) {
+    const box = await page.getByRole("region", { name }).boundingBox();
+    expect(box!.x).toBeGreaterThanOrEqual(0);
+    expect(box!.x + box!.width).toBeLessThanOrEqual(390);
+  }
+});
+
 test("the Profile page fits a phone, with the three sections on a row of their own and no sideways scrolling", async ({ page }) => {
   await page.goto("/dashboard/profile");
   await expect(page.getByRole("region", { name: "Today's limits" })).toBeVisible();
