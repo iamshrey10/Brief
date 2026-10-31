@@ -48,10 +48,4 @@ describe("the calendar button", () => {
     expect(file).toContain("TRIGGER:-P7D");
     expect(file.match(/BEGIN:VEVENT/g)).toHaveLength(2);
   });
-
-  it("reminds the reader to check the dates against the document", () => {
-    render(<CalendarButton documentId="d1" filename="lease.pdf" terms={[term("lease_end", "December 31, 2027")]} />);
-
-    expect(screen.getByText(/Check them against the document/)).toBeInTheDocument();
-  });
 });

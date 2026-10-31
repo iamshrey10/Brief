@@ -1,11 +1,9 @@
 "use client";
 
-import { CalendarButton } from "@/components/calendar-button";
 import { SummaryActions } from "@/components/summary-actions";
-import { buildQuestionsEmail } from "@/lib/questions-email";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Check, Copy, TriangleAlert } from "lucide-react";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import type { ActiveCitation } from "@/lib/documents";
 import {
   fetchChecklist,
@@ -227,13 +225,9 @@ function KeyTermCard({
 }
 
 function KeyTermsSection({
-  documentId,
-  filename,
   load: { state, retry },
   onSelect,
 }: {
-  documentId: string;
-  filename: string;
   load: Loaded<KeyTermsResult>;
   onSelect: (citation: ActiveCitation) => void;
 }) {
@@ -252,7 +246,7 @@ function KeyTermsSection({
         <LoadingBlock label="Reading your document. The first time takes a few seconds." />
       )}
       {state.status === "error" && <ErrorBlock message={state.message} reference={state.reference} onRetry={retry} />}
-      {state.status === "ready" && <KeyTermsBody result={state.result} onSelect={onSelect} documentId={documentId} filename={filename} />}
+      {state.status === "ready" && <KeyTermsBody result={state.result} onSelect={onSelect} />}
     </section>
   );
 }
@@ -260,12 +254,8 @@ function KeyTermsSection({
 function KeyTermsBody({
   result,
   onSelect,
-  documentId,
-  filename,
 }: {
   result: KeyTermsResult;
-  documentId: string;
-  filename: string;
   onSelect: (citation: ActiveCitation) => void;
 }) {
   const { found, notMentioned } = splitKeyTerms(result.terms);
@@ -284,9 +274,6 @@ function KeyTermsBody({
           ))}
         </ul>
       )}
-      <div className="print:hidden">
-        <CalendarButton documentId={documentId} filename={filename} terms={result.terms} />
-      </div>
       {notMentioned.length > 0 && (
         <div className="flex flex-col gap-2">
           <p id="not-mentioned-heading" className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
@@ -364,11 +351,9 @@ function AnsweredCard({
 }
 
 function ChecklistSection({
-  docType,
   load: { state, retry },
   onSelect,
 }: {
-  docType: string;
   load: Loaded<ChecklistResult>;
   onSelect: (citation: ActiveCitation) => void;
 }) {
@@ -388,46 +373,23 @@ function ChecklistSection({
         <LoadingBlock label="Checking the questions people most often miss." />
       )}
       {state.status === "error" && <ErrorBlock message={state.message} reference={state.reference} onRetry={retry} />}
-      {state.status === "ready" && <ChecklistBody result={state.result} docType={docType} onSelect={onSelect} />}
+      {state.status === "ready" && <ChecklistBody result={state.result} onSelect={onSelect} />}
     </section>
   );
 }
 
 function ChecklistBody({
   result,
-  docType,
   onSelect,
 }: {
   result: ChecklistResult;
-  docType: string;
   onSelect: (citation: ActiveCitation) => void;
 }) {
   const { gaps, answered, otherNotMentioned } = groupChecklist(result.answers);
-  const email = buildQuestionsEmail(docType, result.answers);
 
   return (
     <>
       {result.truncated && <TruncatedNotice />}
-
-      {email && (
-        <div className="flex flex-col gap-2 rounded-xl border border-border bg-card p-4 print:hidden">
-          <p className="text-sm text-foreground">
-            {email.total === 1 ? "One question" : `${email.total} questions`} to put to the other side, ready to send.
-          </p>
-          <div className="flex flex-wrap items-center gap-2">
-            <a href={email.href} className={buttonVariants({ variant: "default", size: "lg" })}>
-              Email these questions
-            </a>
-            <CopyButton text={email.body} label="all the questions" />
-          </div>
-          <p className="text-xs text-muted-foreground">
-            {email.included < email.total
-              ? `Opens a new message in your own mail program with the first ${email.included}; copy the rest from below. `
-              : "Opens a new message in your own mail program. "}
-            Nothing is sent by Brief, and you choose who it goes to.
-          </p>
-        </div>
-      )}
 
       {gaps.length > 0 && (
         <div className="flex flex-col gap-2">
@@ -503,14 +465,15 @@ export function OverviewPanel({
       <div className="flex flex-col gap-8">
         {keyTerms.state.status === "ready" && (
           <SummaryActions
+            documentId={documentId}
             docType={docType}
             filename={filename}
             keyTerms={keyTerms.state.result}
             checklist={checklist.state.status === "ready" ? checklist.state.result : null}
           />
         )}
-        <KeyTermsSection documentId={documentId} filename={filename} load={keyTerms} onSelect={onCitationSelect} />
-        <ChecklistSection docType={docType} load={checklist} onSelect={onCitationSelect} />
+        <KeyTermsSection load={keyTerms} onSelect={onCitationSelect} />
+        <ChecklistSection load={checklist} onSelect={onCitationSelect} />
       </div>
       <p className="mt-8 text-xs text-muted-foreground">
         Explains what the document says. Not legal advice.

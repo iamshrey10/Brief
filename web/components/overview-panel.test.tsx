@@ -322,7 +322,8 @@ describe("OverviewPanel checklist", () => {
     const { user, onCitationSelect } = setup();
 
     const section = await screen.findByRole("region", { name: "Before you sign" });
-    const buttons = within(section).getAllByRole("button", { name: /What is the interest rate/i });
+    // The section's heading is there while its answers are still loading, so wait for the answers themselves.
+    const buttons = await within(section).findAllByRole("button", { name: /What is the interest rate/i });
     expect(buttons).toHaveLength(2);
 
     await user.click(buttons[1]);
@@ -467,7 +468,6 @@ describe("OverviewPanel email of questions", () => {
 
     expect(link).toHaveAttribute("href", expect.stringMatching(/^mailto:\?subject=/));
     expect(decodeURIComponent(link.getAttribute("href") ?? "")).toContain("Is there any fee if I pay the loan off early?");
-    expect(screen.getByText(/1 question|One question/)).toBeInTheDocument();
     expect(screen.getByText(/Nothing is sent by Brief/)).toBeInTheDocument();
   });
 
@@ -479,12 +479,6 @@ describe("OverviewPanel email of questions", () => {
     const link = await screen.findByRole("link", { name: "Email these questions" });
 
     expect(decodeURIComponent(link.getAttribute("href") ?? "")).toContain("Questions about the lease before I sign");
-  });
-
-  it("offers a copy of every question too", async () => {
-    setup();
-
-    expect(await screen.findByRole("button", { name: "Copy the wording for: all the questions" })).toBeInTheDocument();
   });
 
   it("is not shown when the document leaves nothing important open", async () => {
@@ -502,7 +496,7 @@ describe("OverviewPanel summary buttons", () => {
     setup();
 
     expect(await screen.findByRole("button", { name: "Copy summary" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Download summary" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Download summary (PDF)" })).toBeInTheDocument();
   });
 
   it("offers nothing to take away while the key terms are still loading, or when they could not be read", async () => {

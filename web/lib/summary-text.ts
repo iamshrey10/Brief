@@ -2,52 +2,85 @@ import type { ChecklistResult, KeyTermsResult } from "@/lib/overview";
 
 const KIND_NAMES: Record<string, string> = { lease: "lease", loan: "education loan", offer: "job offer", other: "agreement" };
 
-export type SummaryFormat = "text" | "markdown";
+/** One piece of the summary, before it is written out as text, Markdown or a PDF. */
+export type SummaryBlock =
+  | { kind: "title" | "heading" | "paragraph" | "note"; text: string }
+  | { kind: "bullet"; text: string }
+  | { kind: "numbered"; number: number; text: string };
 
 /**
- * A plain summary of what Brief found in a document, to paste into a message or keep as a file: the terms it found,
- * the ones the document does not mention, and the questions the document leaves open with wording to ask them.
- * It holds no file name and no quotes, only what is shown on the Overview, and it ends by saying it is not legal advice.
- * The checklist may be missing (it failed to load), in which case the questions are simply left out.
+ * What a summary says, as blocks: the terms Brief found, the ones the document does not mention, and the questions it
+ * leaves open with wording to ask them. It holds no file name and no quotes, only what is shown on the Overview, and it
+ * ends by saying it is not legal advice. The checklist may be missing (it failed to load), in which case the questions
+ * are simply left out.
  */
-export function buildSummary(
-  docType: string,
-  keyTerms: KeyTermsResult,
-  checklist: ChecklistResult | null,
-  format: SummaryFormat = "text",
-): string {
+export function summaryBlocks(docType: string, keyTerms: KeyTermsResult, checklist: ChecklistResult | null): SummaryBlock[] {
   const kind = KIND_NAMES[docType] ?? KIND_NAMES.other;
-  const md = format === "markdown";
-  const heading = (text: string, level = 2) => (md ? `${"#".repeat(level)} ${text}` : text.toUpperCase());
-  const bullet = (text: string) => `${md ? "-" : "*"} ${text}`;
-  const lines: string[] = [heading(`Summary of my ${kind}, from Brief`, 1), ""];
+  const blocks: SummaryBlock[] = [{ kind: "title", text: `Summary of my ${kind}, from Brief` }];
 
   const found = keyTerms.terms.filter((term) => term.found && term.value);
   const missing = keyTerms.terms.filter((term) => !term.found);
   if (found.length > 0) {
-    lines.push(heading("Key terms"));
+    blocks.push({ kind: "heading", text: "Key terms" });
     for (const term of found) {
       const page = term.page_number ? ` (page ${term.page_number})` : "";
-      lines.push(bullet(`${term.label}: ${term.value}${page}`));
+      blocks.push({ kind: "bullet", text: `${term.label}: ${term.value}${page}` });
     }
-    lines.push("");
   }
   if (missing.length > 0) {
-    lines.push(heading("Not mentioned in the document"));
-    lines.push(bullet(missing.map((term) => term.label).join(", ")));
-    lines.push("");
+    blocks.push({ kind: "heading", text: "Not mentioned in the document" });
+    blocks.push({ kind: "bullet", text: missing.map((term) => term.label).join(", ") });
   }
 
   const open = (checklist?.answers ?? []).filter((answer) => answer.status === "not_mentioned" && answer.gap && answer.ask_them);
   if (open.length > 0) {
-    lines.push(heading("Questions to ask before signing"));
-    open.forEach((answer, index) => lines.push(`${index + 1}. ${answer.ask_them}`));
-    lines.push("");
+    blocks.push({ kind: "heading", text: "Questions to ask before signing" });
+    open.forEach((answer, index) => blocks.push({ kind: "numbered", number: index + 1, text: answer.ask_them as string }));
   }
 
   if (keyTerms.truncated || checklist?.truncated) {
-    lines.push("Note: the document was too long to read in full, so something marked as not mentioned may be in the part that was not read.", "");
+    blocks.push({
+      kind: "note",
+      text: "The document was too long to read in full, so something marked as not mentioned may be in the part that was not read.",
+    });
   }
-  lines.push("Explained by Brief. This is an explanation of the document, not legal advice. Check everything against the document itself.");
+  blocks.push({
+    kind: "paragraph",
+    text: "Explained by Brief. This is an explanation of the document, not legal advice. Check everything against the document itself.",
+  });
+  return blocks;
+}
+
+/** The summary written out as plain text, to paste into a message. */
+export function buildSummary(docType: string, keyTerms: KeyTermsResult, checklist: ChecklistResult | null): string {
+  const lines: string[] = [];
+  const blankLine = () => {
+    if (lines.length > 0 && lines[lines.length - 1] !== "") lines.push("");
+  };
+  for (const block of summaryBlocks(docType, keyTerms, checklist)) {
+    switch (block.kind) {
+      case "title":
+        lines.push(block.text.toUpperCase(), "");
+        break;
+      case "heading":
+        blankLine();
+        lines.push(block.text.toUpperCase());
+        break;
+      case "bullet":
+        lines.push(`* ${block.text}`);
+        break;
+      case "numbered":
+        lines.push(`${block.number}. ${block.text}`);
+        break;
+      case "note":
+        blankLine();
+        lines.push(`Note: ${block.text}`);
+        break;
+      case "paragraph":
+        blankLine();
+        lines.push(block.text);
+        break;
+    }
+  }
   return lines.join("\n") + "\n";
 }

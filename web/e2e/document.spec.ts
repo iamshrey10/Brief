@@ -129,7 +129,7 @@ test("Email these questions is a link that opens a message with the lease's open
   expect(decoded).not.toContain("sample-lease.pdf");
 });
 
-test("Copy summary puts the summary on the clipboard and Download summary saves it as a Markdown file", async ({ page, context }) => {
+test("Copy summary puts the summary on the clipboard and Download summary saves it as a PDF", async ({ page, context }) => {
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   await page.goto("/dashboard/documents/doc-lease");
   await expect(page.getByRole("region", { name: "Key terms" }).getByText("Security deposit")).toBeVisible();
@@ -143,11 +143,14 @@ test("Copy summary puts the summary on the clipboard and Download summary saves 
   expect(copied).toContain("1. Does this renew automatically, and by what date must I cancel?");
   expect(copied).not.toContain("sample-lease");
 
-  const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Download summary" }).click()]);
-  expect(download.suggestedFilename()).toBe("sample-lease-summary.md");
-  const file = await (await import("node:fs/promises")).readFile((await download.path())!, "utf8");
-  expect(file).toContain("# Summary of my lease, from Brief");
-  expect(file).toContain("## Questions to ask before signing");
+  const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Download summary (PDF)" }).click()]);
+  expect(download.suggestedFilename()).toBe("sample-lease-summary.pdf");
+  const bytes = await (await import("node:fs/promises")).readFile((await download.path())!);
+  const text = bytes.toString("latin1");
+  expect(text.startsWith("%PDF-1.4")).toBe(true);
+  expect(text.trimEnd().endsWith("%%EOF")).toBe(true);
+  expect(bytes.length).toBeGreaterThan(1500);
+  expect(text).not.toContain("sample-lease");
 });
 
 test("Find in this document marks matches, steps through them, and stays reachable below the top bar on a long document", async ({ page }) => {

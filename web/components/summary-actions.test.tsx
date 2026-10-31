@@ -3,13 +3,13 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/lib/download", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/download")>()), downloadTextFile: vi.fn() }));
+vi.mock("@/lib/download", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/download")>()), downloadBytes: vi.fn() }));
 
-import { downloadTextFile } from "@/lib/download";
+import { downloadBytes } from "@/lib/download";
 import type { ChecklistResult, KeyTermsResult } from "@/lib/overview";
 import { SummaryActions } from "./summary-actions";
 
-const download = vi.mocked(downloadTextFile);
+const download = vi.mocked(downloadBytes);
 const KEY_TERMS: KeyTermsResult = {
   terms: [{ name: "monthly_rent", label: "Monthly rent", found: true, value: "$1,650.00", clause_id: "c1", page_number: 1, quote: "q", evidence: [] }],
   truncated: false,
@@ -31,7 +31,7 @@ afterEach(() => {
 
 describe("the summary buttons", () => {
   it("copies the summary as plain text and says it was copied", async () => {
-    render(<SummaryActions docType="lease" filename="Maple Court.pdf" keyTerms={KEY_TERMS} checklist={CHECKLIST} />);
+    render(<SummaryActions documentId="d1" docType="lease" filename="Maple Court.pdf" keyTerms={KEY_TERMS} checklist={CHECKLIST} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Copy summary" }));
 
@@ -45,28 +45,53 @@ describe("the summary buttons", () => {
 
   it("says so, and does not claim it copied, when the browser refuses", async () => {
     writeText.mockRejectedValue(new Error("denied"));
-    render(<SummaryActions docType="lease" filename="a.pdf" keyTerms={KEY_TERMS} checklist={null} />);
+    render(<SummaryActions documentId="d1" docType="lease" filename="a.pdf" keyTerms={KEY_TERMS} checklist={null} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Copy summary" }));
 
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("would not allow copying"));
   });
 
-  it("saves a Markdown file named after the document, which the file's own text does not repeat", () => {
-    render(<SummaryActions docType="loan" filename="Loan Sanction Letter pdf.pdf" keyTerms={KEY_TERMS} checklist={CHECKLIST} />);
+  it("saves a PDF named after the document, which the PDF's own text does not repeat", () => {
+    render(<SummaryActions documentId="d1" docType="loan" filename="Loan Sanction Letter pdf.pdf" keyTerms={KEY_TERMS} checklist={CHECKLIST} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Download summary" }));
+    fireEvent.click(screen.getByRole("button", { name: "Download summary (PDF)" }));
 
-    const [name, text, type] = download.mock.calls[0];
-    expect(name).toBe("Loan-Sanction-Letter-pdf-summary.md");
-    expect(type).toBe("text/markdown");
-    expect(text).toContain("# Summary of my education loan, from Brief");
+    const [name, bytes, type] = download.mock.calls[0];
+    expect(name).toBe("Loan-Sanction-Letter-pdf-summary.pdf");
+    expect(type).toBe("application/pdf");
+    const text = new TextDecoder("latin1").decode(bytes);
+    expect(text.startsWith("%PDF-1.4")).toBe(true);
+    expect(text).toContain("/Title <FEFF");
     expect(text).not.toContain("Sanction");
+    expect(text).toContain("/Type /Page ");
   });
 
   it("is left off the printed page", () => {
-    const { container } = render(<SummaryActions docType="lease" filename="a.pdf" keyTerms={KEY_TERMS} checklist={null} />);
+    const { container } = render(<SummaryActions documentId="d1" docType="lease" filename="a.pdf" keyTerms={KEY_TERMS} checklist={null} />);
 
     expect(container.firstChild).toHaveClass("print:hidden");
+  });
+
+  it("sits calendar and email beside copy and download, as one row of actions", () => {
+    const withDate: KeyTermsResult = {
+      terms: [{ name: "lease_end", label: "Lease end date", found: true, value: "December 31, 2027", clause_id: "c1", page_number: 1, quote: "q", evidence: [] }],
+      truncated: false,
+    };
+    render(<SummaryActions documentId="d1" docType="lease" filename="a.pdf" keyTerms={withDate} checklist={CHECKLIST} />);
+
+    const names = [...screen.getAllByRole("button"), ...screen.getAllByRole("link")].map((el) => el.textContent);
+    expect(names).toEqual(["Copy summary", "Download summary (PDF)", "Add this date to your calendar", "Email these questions"]);
+    expect(screen.getByRole("link", { name: "Email these questions" })).toHaveAttribute("href", expect.stringMatching(/^mailto:\?subject=/));
+    expect(screen.getByText(/Nothing is sent by Brief/)).toBeInTheDocument();
+    expect(screen.getByText(/only when the document states them clearly/)).toBeInTheDocument();
+  });
+
+  it("leaves out the calendar when no date is clear and the email when nothing important is open", () => {
+    render(<SummaryActions documentId="d1" docType="lease" filename="a.pdf" keyTerms={KEY_TERMS} checklist={null} />);
+
+    expect(screen.queryByRole("button", { name: /calendar/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Email these questions" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Nothing is sent by Brief/)).not.toBeInTheDocument();
   });
 });

@@ -39,19 +39,16 @@ describe("buildSummary as text", () => {
     expect(text).not.toContain("SECRET QUOTE");
   });
 
+  it("puts one blank line before each section and none doubled", () => {
+    expect(text).toContain("FROM BRIEF\n\nKEY TERMS\n* ");
+    expect(text).toContain("(page 1)\n\nNOT MENTIONED IN THE DOCUMENT\n");
+    expect(text).toContain("Utilities\n\nQUESTIONS TO ASK BEFORE SIGNING\n1. ");
+    expect(text).toContain("rent go up?\n\nExplained by Brief.");
+    expect(text).not.toContain("\n\n\n");
+  });
+
   it("uses no em dash", () => {
     expect(text).not.toContain("—");
-  });
-});
-
-describe("buildSummary as Markdown", () => {
-  it("uses headings and dashes", () => {
-    const md = buildSummary("loan", TERMS, CHECKLIST, "markdown");
-
-    expect(md.startsWith("# Summary of my education loan, from Brief\n")).toBe(true);
-    expect(md).toContain("## Key terms");
-    expect(md).toContain("- Monthly rent: $1,650.00 (page 2)");
-    expect(md).toContain("## Questions to ask before signing");
   });
 });
 

@@ -1,6 +1,11 @@
-/** Saves text as a file on the person's computer, through a link the browser clicks by itself. */
+/** Saves text as a file on the person's computer. */
 export function downloadTextFile(filename: string, text: string, type: string): void {
-  const url = URL.createObjectURL(new Blob([text], { type }));
+  downloadBytes(filename, new TextEncoder().encode(text), type);
+}
+
+/** Saves bytes, such as a PDF, as a file on the person's computer. */
+export function downloadBytes(filename: string, bytes: Uint8Array, type: string): void {
+  const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type }));
   const link = document.createElement("a");
   link.href = url;
   link.download = filename;
