@@ -49,3 +49,19 @@ test("a document's page leads back to the documents list", async ({ page }) => {
 
   await expect(page).toHaveURL(/\/dashboard\/documents$/);
 });
+
+test("the Dashboard shows what is coming up, the recent activity and the mix of kinds", async ({ page }) => {
+  await page.goto("/dashboard");
+
+  await expect(page.getByRole("region", { name: "Coming up" }).getByRole("link", { name: /Lease ends in \d+ days/ })).toBeVisible();
+  const activity = page.getByRole("region", { name: "Recent activity" });
+  await expect(activity.getByText("sample-lease.pdf")).toBeVisible();
+  await expect(activity.getByText("Ready to open").first()).toBeVisible();
+  await activity.getByRole("link", { name: /sample-lease\.pdf/ }).click();
+  await expect(page).toHaveURL(/\/dashboard\/documents\/doc-lease$/);
+
+  await page.goBack();
+  const kinds = page.getByRole("region", { name: "By kind" });
+  await expect(kinds.getByText("Lease", { exact: true })).toBeVisible();
+  await expect(kinds.getByText("Education loan", { exact: true })).toBeVisible();
+});

@@ -76,4 +76,32 @@ describe("the dashboard home", () => {
     expect(html).toContain("Dashboard");
     expect(html).toMatch(/Documents<\/span><span[^>]*>0</);
   });
+
+  it("asks for the documents and the saved dates, each once", async () => {
+    await page();
+
+    expect(getMock.mock.calls.map(([, path]) => path).sort()).toEqual(["/documents", "/me/key-dates"]);
+  });
+
+  it("shows the recent activity and the mix of kinds when there are documents, and neither when there are none", async () => {
+    getMock.mockImplementation(async (_email: string, path: string) =>
+      path === "/documents" ? [{ ...doc("a", "ready"), created_at: "2026-10-30T10:00:00Z", status_changed_at: "2026-10-30T10:00:00Z" }] : [],
+    );
+    const withDocuments = await page();
+
+    expect(withDocuments).toContain('aria-labelledby="activity-heading"');
+    expect(withDocuments).toContain('aria-labelledby="kinds-heading"');
+    expect(withDocuments).toContain("a.pdf");
+
+    getMock.mockResolvedValue([]);
+    const empty = await page();
+    expect(empty).not.toContain("activity-heading");
+    expect(empty).not.toContain("kinds-heading");
+  });
+
+  it("drops entries that are not shaped like dates and still shows the page", async () => {
+    getMock.mockImplementation(async (_email: string, path: string) => (path === "/documents" ? [doc("a", "ready")] : [null, { field: 3 }, "x"]));
+
+    await expect(page()).resolves.toContain("Dashboard");
+  });
 });

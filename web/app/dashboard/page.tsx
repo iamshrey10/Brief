@@ -3,12 +3,26 @@ import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
 import { AppHeader } from "@/components/app-header";
+import { ComingUp } from "@/components/coming-up";
 import { DashboardStats } from "@/components/dashboard-stats";
+import { KindBreakdown } from "@/components/kind-breakdown";
+import { RecentActivity } from "@/components/recent-activity";
 import { buttonVariants } from "@/components/ui/button";
 import { backendGet } from "@/lib/backend";
-import { asDocuments, documentStats } from "@/lib/dashboard";
+import { asDocuments, documentStats, recentActivity } from "@/lib/dashboard";
+import type { KeyDateFromApi } from "@/lib/key-dates";
 
 export const metadata = { title: "Dashboard", robots: { index: false, follow: false } };
+
+/** The dates from the backend's answer, leaving out anything not shaped like one. */
+function asKeyDates(body: unknown): KeyDateFromApi[] {
+  return Array.isArray(body)
+    ? body.filter(
+        (entry): entry is KeyDateFromApi =>
+          typeof entry?.document_id === "string" && typeof entry?.field === "string" && typeof entry?.value === "string",
+      )
+    : [];
+}
 
 /** The first thing a person sees after signing in: where their documents stand, and what needs doing. */
 export default async function DashboardHome() {
@@ -16,7 +30,9 @@ export default async function DashboardHome() {
   // The proxy already turns visitors away, and this makes the page safe on its own too.
   if (!email) redirect("/");
 
-  const documents = asDocuments(await backendGet(email, "/documents"));
+  const [documentsBody, keyDatesBody] = await Promise.all([backendGet(email, "/documents"), backendGet(email, "/me/key-dates")]);
+  const documents = asDocuments(documentsBody);
+  const keyDates = asKeyDates(keyDatesBody);
   const stats = documentStats(documents);
 
   return (
@@ -34,6 +50,13 @@ export default async function DashboardHome() {
         </div>
 
         <DashboardStats stats={stats} />
+
+        <ComingUp keyDates={keyDates} documents={documents} />
+
+        <div className="grid gap-6 md:grid-cols-2">
+          <RecentActivity items={recentActivity(documents)} />
+          <KindBreakdown documents={documents} />
+        </div>
       </div>
     </div>
   );
