@@ -6,7 +6,7 @@ real contract, a real email address other than your own, or the API's logs.
 ## Before recording
 
 - [ ] Start everything as in `docs/MANUAL-TEST.md` and confirm `http://localhost:8000/health/ready` says `"ready": true`.
-- [ ] A clean browser window at 1280 by 720 in dark mode, bookmarks bar hidden, and a throwaway account signed in with an empty dashboard. The top bar of every signed in page shows that account's email address, so never record with your own.
+- [ ] A clean browser window at 1280 by 720 in dark mode, bookmarks bar hidden, and a throwaway account signed in with no documents yet. The top bar of every signed in page shows that account's email address, so never record with your own.
 - [ ] A made up lease with a security deposit in two sentences, a made up education loan, and a made up job offer (the files in
       `~/Developer/brief-test-files`).
 - [ ] Do one dry run first. The first read after a restart is slower, and on the free Gemini tier a long document can take a minute.
@@ -28,7 +28,7 @@ and it is not legal advice. Say that last one out loud.
 ## Screenshots to take
 
 1. Landing page, dark and light: the top of the page, and the whole page scrolled to show What you get and How it works.
-2. The dashboard with three documents, one of them Processing.
+2. The Dashboard home with a few documents read (counts, Coming up, Still to ask, What Brief found), and the Documents page with three documents, one of them Processing.
 3. The Overview with the Security deposit card showing its two quote buttons.
 4. "Before you sign" with a gap open.
 5. An answer with its source highlighted in the clause.

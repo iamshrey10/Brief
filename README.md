@@ -93,6 +93,16 @@ the ingestion pipeline (text extraction, or cleanup and OCR for photos and for t
 and embedding them), hybrid search, grounded answers, and key-term extraction, all backed by
 Postgres.
 
+## What a signed in person sees
+
+- **Dashboard** (`/dashboard`), the first screen after signing in: how many documents are ready, being read or need attention,
+  the soonest dates, the questions still to ask across every document with the wording to ask, what Brief found in each
+  document, recent activity and the mix of kinds. It reads only what is already saved, so opening it never calls the model.
+- **Documents** (`/dashboard/documents`): upload, search, sort, rename, read again and delete, and the sample lease.
+- **A document**: key terms, the questions to ask before signing, the Ask tab, the clause text with Find, and one row of
+  actions: copy or download the summary (a PDF), add the dates to a calendar, email the questions, print.
+- **Profile** (`/dashboard/profile`): the account, today's daily limits, light or dark, and deleting the account.
+
 ## Security
 
 Brief holds private documents, so each layer limits what it can reach. What is in place today:
