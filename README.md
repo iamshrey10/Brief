@@ -89,7 +89,7 @@ The frontend is a Next.js app that handles Google sign-in and acts as a thin
 backend-for-frontend, it never talks to Postgres or R2 directly. For each request it checks the
 session, applies a per-user rate limit through Redis, then mints a short-lived signed token and
 calls the FastAPI service. FastAPI owns everything else: user lookup, document storage in R2,
-the ingestion pipeline (text extraction, or cleanup and OCR for photos, then splitting into clauses
+the ingestion pipeline (text extraction, or cleanup and OCR for photos and for the pages of a scanned PDF, then splitting into clauses
 and embedding them), hybrid search, grounded answers, and key-term extraction, all backed by
 Postgres.
 
@@ -182,7 +182,7 @@ read, its row shows how many parts are done so far.
 
 ## Running locally
 
-You will need Docker, Python 3.12, Node 22 with pnpm, and Tesseract for reading photos of pages
+You will need Docker, Python 3.12, Node 22 with pnpm, and Tesseract for reading photos and scanned pages
 (`brew install tesseract` on a Mac, `sudo apt-get install tesseract-ocr` on Ubuntu).
 
 Start the shared services:

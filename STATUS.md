@@ -28,7 +28,7 @@ The extras (Word files, several files at once, sharper photo handling) would add
 | API endpoints | 19 |
 | Database tables | 8 |
 | Evaluations | 5 (search, question answering on three documents, key terms, must-ask checklist, steadiness) |
-| Documents it can read | text PDFs and phone photos or scans (JPG, PNG, HEIC) |
+| Documents it can read | PDFs (including scanned ones, read by OCR), and phone photos or scans (JPG, PNG, HEIC) |
 | Limits | 50 MB a file, 25 documents a person, 100 pages a document |
 | Time to answer a question | about 2.5 seconds on average |
 | Time to read a whole document (key terms or the checklist) | about 10 and 30 seconds on my test documents, since each is now read three times |
