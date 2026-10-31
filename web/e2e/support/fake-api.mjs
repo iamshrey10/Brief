@@ -221,6 +221,13 @@ const server = createServer(async (request, response) => {
     return send(response, 200, visible(document));
   }
   if (method === "GET" && path === "/me/usage") return send(response, 200, usageFor(reader));
+  // What is already worked out about this reader's documents: terms found, questions answered, and what is left open.
+  if (method === "GET" && path === "/me/insights") {
+    return send(response, 200, [
+      { document_id: "doc-lease", terms_found: 9, terms_total: 12, questions_answered: 7, open_count: 2, open_questions: ["Does this renew automatically, and by what date must I cancel?", "Can the rent go up during the lease, and by how much?"] },
+      { document_id: "doc-loan", terms_found: 10, terms_total: 13, questions_answered: 6, open_count: 0, open_questions: [] },
+    ]);
+  }
   // The dates already saved in this reader's documents. One is clear, and one is a loose phrase the website must leave out.
   if (method === "GET" && path === "/me/key-dates") {
     return send(response, 200, [

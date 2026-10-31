@@ -5,11 +5,13 @@ import { auth } from "@/auth";
 import { AppHeader } from "@/components/app-header";
 import { ComingUp } from "@/components/coming-up";
 import { DashboardStats } from "@/components/dashboard-stats";
+import { DocumentAnalysis } from "@/components/document-analysis";
 import { KindBreakdown } from "@/components/kind-breakdown";
+import { OpenQuestions } from "@/components/open-questions";
 import { RecentActivity } from "@/components/recent-activity";
 import { buttonVariants } from "@/components/ui/button";
 import { backendGet } from "@/lib/backend";
-import { asDocuments, documentStats, recentActivity } from "@/lib/dashboard";
+import { asDocuments, asInsights, documentStats, openQuestionGroups, recentActivity } from "@/lib/dashboard";
 import type { KeyDateFromApi } from "@/lib/key-dates";
 
 export const metadata = { title: "Dashboard", robots: { index: false, follow: false } };
@@ -30,8 +32,13 @@ export default async function DashboardHome() {
   // The proxy already turns visitors away, and this makes the page safe on its own too.
   if (!email) redirect("/");
 
-  const [documentsBody, keyDatesBody] = await Promise.all([backendGet(email, "/documents"), backendGet(email, "/me/key-dates")]);
+  const [documentsBody, keyDatesBody, insightsBody] = await Promise.all([
+    backendGet(email, "/documents"),
+    backendGet(email, "/me/key-dates"),
+    backendGet(email, "/me/insights"),
+  ]);
   const documents = asDocuments(documentsBody);
+  const insights = asInsights(insightsBody);
   const keyDates = asKeyDates(keyDatesBody);
   const stats = documentStats(documents);
 
@@ -52,6 +59,10 @@ export default async function DashboardHome() {
         <DashboardStats stats={stats} />
 
         <ComingUp keyDates={keyDates} documents={documents} />
+
+        <OpenQuestions groups={openQuestionGroups(insights, documents)} />
+
+        <DocumentAnalysis insights={insights} documents={documents} />
 
         <div className="grid gap-6 md:grid-cols-2">
           <RecentActivity items={recentActivity(documents)} />

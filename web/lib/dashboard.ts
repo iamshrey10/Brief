@@ -64,3 +64,50 @@ export function recentActivity(documents: DocumentSummary[], now: Date = new Dat
       openable: isReadable(document.status),
     }));
 }
+
+/** What the backend says it has already worked out about one document. A part is null until Brief has done that part. */
+export type InsightFromApi = {
+  document_id: string;
+  terms_found: number | null;
+  terms_total: number | null;
+  questions_answered: number | null;
+  open_count: number | null;
+  open_questions: string[];
+};
+
+const isCount = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value) && value >= 0;
+const countOrNull = (value: unknown): number | null => (isCount(value) ? value : null);
+
+/** The insights from the backend's answer, each one cleaned up, and anything not shaped like one left out. */
+export function asInsights(body: unknown): InsightFromApi[] {
+  if (!Array.isArray(body)) return [];
+  const insights: InsightFromApi[] = [];
+  for (const entry of body) {
+    if (typeof entry?.document_id !== "string") continue;
+    insights.push({
+      document_id: entry.document_id,
+      terms_found: countOrNull(entry.terms_found),
+      terms_total: countOrNull(entry.terms_total),
+      questions_answered: countOrNull(entry.questions_answered),
+      open_count: countOrNull(entry.open_count),
+      open_questions: Array.isArray(entry.open_questions) ? entry.open_questions.filter((q: unknown): q is string => typeof q === "string" && q.length > 0) : [],
+    });
+  }
+  return insights;
+}
+
+export type OpenQuestionGroup = { documentId: string; filename: string; total: number; questions: string[] };
+
+/** The questions still to ask, grouped by document, the document with the most first. Only documents that are still in the list, and have some. */
+export function openQuestionGroups(insights: InsightFromApi[], documents: Pick<DocumentSummary, "id" | "filename">[]): OpenQuestionGroup[] {
+  const names = new Map(documents.map((document) => [document.id, document.filename]));
+  return insights
+    .filter((insight) => names.has(insight.document_id) && insight.open_questions.length > 0)
+    .map((insight) => ({
+      documentId: insight.document_id,
+      filename: names.get(insight.document_id) as string,
+      total: insight.open_count ?? insight.open_questions.length,
+      questions: insight.open_questions,
+    }))
+    .sort((a, b) => b.total - a.total);
+}

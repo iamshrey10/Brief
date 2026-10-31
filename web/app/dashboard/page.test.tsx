@@ -77,10 +77,10 @@ describe("the dashboard home", () => {
     expect(html).toMatch(/Documents<\/span><span[^>]*>0</);
   });
 
-  it("asks for the documents and the saved dates, each once", async () => {
+  it("asks for the documents, the saved dates and what is worked out about each, each once", async () => {
     await page();
 
-    expect(getMock.mock.calls.map(([, path]) => path).sort()).toEqual(["/documents", "/me/key-dates"]);
+    expect(getMock.mock.calls.map(([, path]) => path).sort()).toEqual(["/documents", "/me/insights", "/me/key-dates"]);
   });
 
   it("shows the recent activity and the mix of kinds when there are documents, and neither when there are none", async () => {
@@ -103,5 +103,31 @@ describe("the dashboard home", () => {
     getMock.mockImplementation(async (_email: string, path: string) => (path === "/documents" ? [doc("a", "ready")] : [null, { field: 3 }, "x"]));
 
     await expect(page()).resolves.toContain("Dashboard");
+  });
+
+  it("shows the questions still to ask and what Brief found, from what is already worked out", async () => {
+    getMock.mockImplementation(async (_email: string, path: string) => {
+      if (path === "/documents") return [doc("a", "ready")];
+      if (path === "/me/insights") {
+        return [{ document_id: "a", terms_found: 9, terms_total: 12, questions_answered: 7, open_count: 1, open_questions: ["Does it renew automatically?"] }];
+      }
+      return [];
+    });
+
+    const html = await page();
+
+    expect(html).toContain('aria-labelledby="still-to-ask-heading"');
+    expect(html).toContain("Does it renew automatically?");
+    expect(html).toContain('aria-labelledby="analysis-heading"');
+  });
+
+  it("leaves both out, and still shows the page, when nothing is worked out yet or it cannot be had", async () => {
+    getMock.mockImplementation(async (_email: string, path: string) => (path === "/documents" ? [doc("a", "ready")] : null));
+
+    const html = await page();
+
+    expect(html).toContain("Dashboard");
+    expect(html).not.toContain("still-to-ask-heading");
+    expect(html).not.toContain("analysis-heading");
   });
 });
