@@ -131,9 +131,24 @@ def get_genai_client() -> genai.Client:
         return _client
 
 
+# A page with fewer letters than this has no text of its own, it is a picture of a page, so it is read by OCR.
+MIN_TEXT_CHARS_PER_PAGE = 20
+# The resolution a scanned page is drawn at before it is read. Higher is slower and reads small print better.
+OCR_PAGE_DPI = 200
+
+
+def _ocr_pdf_page(page: pymupdf.Page) -> tuple[str, float]:
+    """Reads a page that is only a picture: draws it as an image, then reads the image like a photo."""
+    return ocr_image(page.get_pixmap(dpi=OCR_PAGE_DPI).tobytes("png"))
+
+
 def extract_pages(file_bytes: bytes, content_type: str) -> tuple[list[str], float | None]:
-    """Returns (page_texts, ocr_confidence). Confidence is None for born-digital PDFs,
-    which don't go through OCR at all."""
+    """Returns (page_texts, ocr_confidence). Confidence is None when no page needed OCR.
+
+    A photo is read by OCR. A PDF is read for its own text, and any page of it that has none, which is how a
+    scanned document is saved, is read by OCR too, so a scan saved as a PDF works like a photo of it. The
+    confidence is the average over the pages that were read by OCR and found words, so a blank page in a scan does not
+    pull it down. Slow for a long scan, so run this off the event loop."""
     if content_type.startswith("image/"):
         try:
             text, confidence = ocr_image(file_bytes)
@@ -150,7 +165,17 @@ def extract_pages(file_bytes: bytes, content_type: str) -> tuple[list[str], floa
             raise UnreadableFileError("the PDF is protected with a password")
         if len(doc) > MAX_PAGES:
             raise TooLongError(f"the document has {len(doc)} pages and the limit is {MAX_PAGES}")
-        return [page_text(page) for page in doc], None
+        texts: list[str] = []
+        confidences: list[float] = []
+        for page in doc:
+            text = page_text(page)
+            if len(text.strip()) < MIN_TEXT_CHARS_PER_PAGE:
+                ocr_text, confidence = _ocr_pdf_page(page)
+                if ocr_text.strip():
+                    text = ocr_text
+                    confidences.append(confidence)
+            texts.append(text)
+        return texts, (sum(confidences) / len(confidences) if confidences else None)
     finally:
         doc.close()
 
@@ -227,8 +252,10 @@ async def ingest_document(document_id: uuid.UUID) -> None:
             _set_status(document, "processing")
             await session.commit()
 
-            file_bytes = download_file(document.storage_key)
-            pages, ocr_confidence = extract_pages(file_bytes, document.content_type)
+            # Off the event loop: reading a long scanned PDF by OCR takes minutes, and doing it here would freeze
+            # every other request the server is handling.
+            file_bytes = await asyncio.to_thread(download_file, document.storage_key)
+            pages, ocr_confidence = await asyncio.to_thread(extract_pages, file_bytes, document.content_type)
             document.ocr_confidence = ocr_confidence
 
             chunk_records: list[tuple[int, int, int, str]] = []

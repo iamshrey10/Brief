@@ -881,3 +881,130 @@ def test_each_embedding_call_is_timed_and_a_refused_one_is_logged_as_failed(monk
     lines = [r.getMessage().split(" in ")[0] for r in caplog.records if r.name == "app.telemetry"]
     assert lines == ["model call embed failed", "model call embed ok"]
     assert "one" not in caplog.text.replace("model call embed", "")  # none of the text sent is logged
+
+
+# --- scanned PDFs: a PDF whose pages are only pictures is read by OCR, like a photo ---
+
+
+def _scanned_pdf(pages: list[str | None]) -> bytes:
+    """A PDF with no text of its own: each page is one picture of a line of text, or empty when None."""
+    doc = pymupdf.open()
+    for text in pages:
+        page = doc.new_page()
+        if text is not None:
+            page.insert_image(pymupdf.Rect(40, 60, 555, 230), stream=_make_image_bytes(text))
+    return doc.tobytes()
+
+
+def test_a_scanned_pdf_is_read_by_ocr_page_by_page_with_a_confidence():
+    pdf = _scanned_pdf(["Late fee is two hundred dollars", "Rent is due on the first"])
+
+    assert all(page.get_text().strip() == "" for page in pymupdf.open(stream=pdf, filetype="pdf"))
+    texts, confidence = extract_pages(pdf, "application/pdf")
+
+    assert len(texts) == 2
+    assert "fee" in texts[0].lower() and "dollars" in texts[0].lower()
+    assert "rent" in texts[1].lower() and "first" in texts[1].lower()
+    assert confidence is not None and confidence > 50
+
+
+def test_a_pdf_with_real_text_is_never_run_through_ocr(monkeypatch):
+    def refuse(page):
+        raise AssertionError("OCR ran on a page that has its own text")
+
+    monkeypatch.setattr("app.ingestion._ocr_pdf_page", refuse)
+
+    texts, confidence = extract_pages(_make_pdf_bytes(["Rent is due on the first of the month."]), "application/pdf")
+
+    assert "Rent is due" in texts[0]
+    assert confidence is None
+
+
+def test_a_pdf_with_some_pages_of_text_and_some_scanned_keeps_the_real_text_and_reads_only_the_rest():
+    doc = pymupdf.open()
+    doc.new_page().insert_text((72, 72), "Page one has its own text, which is long enough to count.")
+    doc.new_page().insert_image(pymupdf.Rect(40, 60, 555, 230), stream=_make_image_bytes("Deposit is one month"))
+
+    texts, confidence = extract_pages(doc.tobytes(), "application/pdf")
+
+    assert texts[0].startswith("Page one has its own text")
+    assert "deposit" in texts[1].lower()
+    assert confidence is not None
+
+
+def test_a_blank_page_inside_a_scan_does_not_pull_the_confidence_down():
+    with_blank = extract_pages(_scanned_pdf(["Late fee is two hundred dollars", None]), "application/pdf")
+    without = extract_pages(_scanned_pdf(["Late fee is two hundred dollars"]), "application/pdf")
+
+    assert with_blank[1] == without[1]
+    assert with_blank[0][1].strip() == ""
+
+
+async def test_a_scanned_pdf_becomes_a_ready_document_with_a_confidence(db_session, test_user, monkeypatch):
+    document = _make_document(test_user, filename="scan.pdf", content_type="application/pdf", storage_key="fake/scan.pdf")
+    db_session.add(document)
+    await db_session.commit()
+    await db_session.refresh(document)
+    pdf = _scanned_pdf(["Late fee is two hundred dollars"])
+    monkeypatch.setattr("app.ingestion.download_file", lambda storage_key: pdf)
+    monkeypatch.setattr("app.ingestion.embed_texts", lambda texts, on_progress=None: [[0.1] * EMBEDDING_DIM for _ in texts])
+
+    await ingest_document(document.id)
+
+    await db_session.refresh(document)
+    assert document.status == "ready"
+    assert document.ocr_confidence is not None and document.ocr_confidence > 50
+
+
+async def test_a_poorly_scanned_pdf_is_flagged_to_be_retaken_not_trusted(db_session, test_user, monkeypatch):
+    document = _make_document(test_user, filename="scan.pdf", content_type="application/pdf", storage_key="fake/scan.pdf")
+    db_session.add(document)
+    await db_session.commit()
+    await db_session.refresh(document)
+    pdf = _scanned_pdf(["whatever"])
+    monkeypatch.setattr("app.ingestion.download_file", lambda storage_key: pdf)
+    monkeypatch.setattr("app.ingestion.ocr_image", lambda image_bytes: ("some garbled text", 25.0))
+    monkeypatch.setattr("app.ingestion.embed_texts", lambda texts, on_progress=None: [[0.1] * EMBEDDING_DIM for _ in texts])
+
+    await ingest_document(document.id)
+
+    await db_session.refresh(document)
+    assert document.status == "needs_retake"
+    assert document.ocr_confidence == 25.0
+
+
+async def test_a_scan_that_is_all_blank_pages_still_fails_with_no_text(db_session, test_user, monkeypatch):
+    document = _make_document(test_user, filename="blank.pdf", content_type="application/pdf", storage_key="fake/blank.pdf")
+    db_session.add(document)
+    await db_session.commit()
+    await db_session.refresh(document)
+    pdf = _scanned_pdf([None, None])
+    monkeypatch.setattr("app.ingestion.download_file", lambda storage_key: pdf)
+
+    await ingest_document(document.id)
+
+    await db_session.refresh(document)
+    assert (document.status, document.failure_reason) == ("failed", "no_text")
+
+
+async def test_reading_a_file_happens_off_the_event_loop_so_a_long_scan_cannot_freeze_the_server(db_session, test_user, monkeypatch):
+    import threading
+
+    document = _make_document(test_user, filename="scan.pdf", content_type="application/pdf", storage_key="fake/scan.pdf")
+    db_session.add(document)
+    await db_session.commit()
+    await db_session.refresh(document)
+    threads: list[str] = []
+
+    def reading(file_bytes, content_type):
+        threads.append(threading.current_thread().name)
+        return ["Rent is due on the first of the month."], None
+
+    main = threading.current_thread().name
+    monkeypatch.setattr("app.ingestion.download_file", lambda storage_key: b"x")
+    monkeypatch.setattr("app.ingestion.extract_pages", reading)
+    monkeypatch.setattr("app.ingestion.embed_texts", lambda texts, on_progress=None: [[0.1] * EMBEDDING_DIM for _ in texts])
+
+    await ingest_document(document.id)
+
+    assert threads and threads[0] != main
