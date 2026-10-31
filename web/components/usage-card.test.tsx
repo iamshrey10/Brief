@@ -46,4 +46,10 @@ describe("the today's limits card", () => {
     expect(missing).toContain("Your usage is not available right now");
     expect(missing).not.toContain("progressbar");
   });
+
+  it("says under each limit what uses it up, since a name such as Overviews does not", () => {
+    expect(html).toContain("Each question you ask in the Ask tab.");
+    expect(html).toContain("Each upload, Try again or Read again.");
+    expect(html).toContain("Opening them again is free.");
+  });
 });

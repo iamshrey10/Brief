@@ -55,14 +55,21 @@ export const USAGE_LABELS: Record<UsageKind, string> = {
   analyze: "Overviews",
 };
 
-export type UsageRow = { kind: UsageKind; label: string; used: number; limit: number; left: number; percent: number };
+/** One line under each limit saying what uses it up, since a name such as Overviews does not say. */
+export const USAGE_HINTS: Record<UsageKind, string> = {
+  ask: "Each question you ask in the Ask tab.",
+  read: "Each upload, Try again or Read again.",
+  analyze: "The first time a document's key terms and questions are built. Opening them again is free.",
+};
+
+export type UsageRow = { kind: UsageKind; label: string; hint: string; used: number; limit: number; left: number; percent: number };
 
 /** One row per daily limit for the Profile page, in a fixed order. The bar never goes past full, whatever the numbers say. */
 export function usageRows(usage: Usage): UsageRow[] {
   return KINDS.map((kind) => {
     const { used, limit, left } = usage[kind];
     const percent = limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : 100;
-    return { kind, label: USAGE_LABELS[kind], used, limit, left, percent };
+    return { kind, label: USAGE_LABELS[kind], hint: USAGE_HINTS[kind], used, limit, left, percent };
   });
 }
 

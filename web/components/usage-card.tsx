@@ -23,6 +23,7 @@ export function UsageCard({ usage }: { usage: Usage | null }) {
                   {row.used} of {row.limit} used
                 </span>
               </div>
+              <p className="mt-0.5 text-xs text-muted-foreground">{row.hint}</p>
               <div
                 role="progressbar"
                 aria-label={`${row.label} used today`}

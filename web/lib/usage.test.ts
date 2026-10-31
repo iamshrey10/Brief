@@ -134,6 +134,14 @@ describe("usageRows", () => {
     expect(usageRows({ ...usage, ask: { used: 0, limit: 0, left: 0 } })[0].percent).toBe(100);
   });
 
+  it("gives each row a plain line about what uses it up", () => {
+    expect(usageRows(usage).map((row) => row.hint)).toEqual([
+      expect.stringContaining("Ask tab"),
+      expect.stringContaining("Try again"),
+      expect.stringContaining("free"),
+    ]);
+  });
+
   it("passes the counts through unchanged", () => {
     expect(usageRows(usage)[0]).toMatchObject({ used: 25, limit: 100, left: 75 });
   });
