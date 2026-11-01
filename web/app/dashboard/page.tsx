@@ -10,6 +10,7 @@ import { DocumentAnalysis } from "@/components/document-analysis";
 import { KindBreakdown } from "@/components/kind-breakdown";
 import { OpenQuestions } from "@/components/open-questions";
 import { RecentActivity } from "@/components/recent-activity";
+import { Rise } from "@/components/rise";
 import { buttonVariants } from "@/components/ui/button";
 import { backendGet } from "@/lib/backend";
 import { asDocuments, asInsights, documentStats, openQuestionGroups, recentActivity } from "@/lib/dashboard";
@@ -57,20 +58,30 @@ export default async function DashboardHome() {
           </Link>
         </div>
 
-        <DashboardUpload hasDocuments={documents.length > 0} />
+        <Rise order={1}>
+          <DashboardUpload hasDocuments={documents.length > 0} />
+        </Rise>
 
-        <DashboardStats stats={stats} />
+        <Rise order={2}>
+          <DashboardStats stats={stats} />
+        </Rise>
 
-        <ComingUp keyDates={keyDates} documents={documents} />
+        <Rise order={3}>
+          <ComingUp keyDates={keyDates} documents={documents} />
+        </Rise>
 
-        <OpenQuestions groups={openQuestionGroups(insights, documents)} />
+        <Rise order={4}>
+          <OpenQuestions groups={openQuestionGroups(insights, documents)} />
+        </Rise>
 
-        <DocumentAnalysis insights={insights} documents={documents} />
+        <Rise order={5}>
+          <DocumentAnalysis insights={insights} documents={documents} />
+        </Rise>
 
-        <div className="grid gap-6 md:grid-cols-2">
+        <Rise order={6} className="grid gap-6 md:grid-cols-2">
           <RecentActivity items={recentActivity(documents)} />
           <KindBreakdown documents={documents} />
-        </div>
+        </Rise>
       </div>
     </div>
   );

@@ -107,3 +107,18 @@ test("the way to add a document comes before the numbers on the Dashboard", asyn
   const numbers = await page.getByRole("region", { name: "Your documents at a glance" }).boundingBox();
   expect(upload!.y).toBeLessThan(numbers!.y);
 });
+
+test("the sections rise into place, and end fully visible, and do not move for a reader who prefers less motion", async ({ page }) => {
+  const wrapper = () => page.getByRole("region", { name: "Your documents at a glance" }).locator("xpath=..");
+  const animation = () => wrapper().evaluate((el) => getComputedStyle(el).animationName);
+
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.goto("/dashboard");
+  expect(await animation()).not.toBe("none");
+  await expect.poll(async () => wrapper().evaluate((el) => getComputedStyle(el).opacity)).toBe("1");
+
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/dashboard");
+  expect(await animation()).toBe("none");
+  await expect(page.getByRole("region", { name: "Your documents at a glance" })).toBeVisible();
+});
