@@ -56,9 +56,9 @@ describe("the dashboard home", () => {
 
     const html = await page();
 
-    expect(html).toMatch(/Documents<\/span><span[^>]*>3</);
-    expect(html).toMatch(/Ready to open<\/span><span[^>]*>2</);
-    expect(html).toMatch(/Needs attention<\/span><span[^>]*>1</);
+    expect(html).toMatch(/Documents<\/span>[\s\S]*?<span class="font-heading[^>]*>3</);
+    expect(html).toMatch(/Ready to open<\/span>[\s\S]*?<span class="font-heading[^>]*>2</);
+    expect(html).toMatch(/Needs attention<\/span>[\s\S]*?<span class="font-heading[^>]*>1</);
     expect(getMock).toHaveBeenCalledWith("reader@example.com", "/documents");
   });
 
@@ -81,7 +81,7 @@ describe("the dashboard home", () => {
     const html = await page();
 
     expect(html).toContain("Dashboard");
-    expect(html).toMatch(/Documents<\/span><span[^>]*>0</);
+    expect(html).toMatch(/Documents<\/span>[\s\S]*?<span class="font-heading[^>]*>0</);
   });
 
   it("asks for the documents, the saved dates and what is worked out about each, each once", async () => {
