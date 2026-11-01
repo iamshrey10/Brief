@@ -137,4 +137,13 @@ describe("the dashboard home", () => {
     expect(html).not.toContain("still-to-ask-heading");
     expect(html).not.toContain("analysis-heading");
   });
+
+  it("lets the sections rise into place one after another, the way to add a document first", async () => {
+    const html = await page();
+
+    expect(html.match(/motion-safe:animate-in/g)?.length).toBeGreaterThanOrEqual(6);
+    const delays = [...html.matchAll(/animation-delay:(\d+)ms/g)].map((match) => Number(match[1]));
+    expect(delays).toEqual([...delays].sort((a, b) => a - b));
+    expect(delays.length).toBeGreaterThanOrEqual(5);
+  });
 });
