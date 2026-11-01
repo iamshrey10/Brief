@@ -213,6 +213,28 @@
 [data-reveal="shown"] .hiw-s1 .hiw-drop { animation: hiw-drop 5.5s cubic-bezier(0.3, 0.7, 0.3, 1) infinite both; }
 [data-reveal="shown"] .hiw-s1 .hiw-fill { animation: hiw-fill 5.5s ease-in-out infinite both; }
 [data-reveal="shown"] .hiw-s1 .hiw-pop { animation: hiw-pop 5.5s ease-out infinite both; }
+@keyframes hiw-mark {
+  0% { transform: scaleX(0); opacity: 0.95; }
+  10% { transform: scaleX(1); opacity: 0.95; }
+  34% { transform: scaleX(1); opacity: 0.95; }
+  48%, 100% { transform: scaleX(1); opacity: 0.35; }
+}
+@keyframes hiw-tag {
+  0%, 2% { transform: scale(1); }
+  8% { transform: scale(1.5); }
+  16%, 100% { transform: scale(1); }
+}
+@keyframes hiw-beam {
+  0% { transform: translateY(0); opacity: 0; }
+  6% { opacity: 1; }
+  88% { opacity: 1; }
+  100% { transform: translateY(var(--travel, 76px)); opacity: 0; }
+}
+.hiw-mark { opacity: 0.35; }
+.hiw-beam { opacity: 0; }
+[data-reveal="shown"] .hiw-s2 .hiw-mark { animation: hiw-mark 5.5s ease-out infinite both; animation-delay: calc(var(--n) * 0.7s); }
+[data-reveal="shown"] .hiw-s2 .hiw-tag { animation: hiw-tag 5.5s ease-out infinite both; animation-delay: calc(var(--n) * 0.7s); }
+[data-reveal="shown"] .hiw-s2 .hiw-beam { animation: hiw-beam 3.8s linear infinite; }
 [data-active="false"] .hiw-art *,
 [data-active="false"] .hiw-art {
   animation-play-state: paused !important;

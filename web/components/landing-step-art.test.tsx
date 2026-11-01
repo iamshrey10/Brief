@@ -23,3 +23,23 @@ describe("the How it works scenes", () => {
     expect(renderToStaticMarkup(<StepArt index={7} />)).toBe("");
   });
 });
+
+describe("the read every clause scene", () => {
+  const second = renderToStaticMarkup(<StepArt index={1} />);
+
+  it("draws a page of five clauses, each with a number dot and a mark that lights up, and a beam reading down it", () => {
+    expect(second).toContain("hiw-s2");
+    expect(second.match(/hiw-mark/g)).toHaveLength(5);
+    expect(second.match(/hiw-tag/g)).toHaveLength(5);
+    expect(second).toContain("hiw-beam");
+  });
+
+  it("lights the clauses one after another, by a number each carries", () => {
+    for (const n of [0, 1, 2, 3, 4]) expect(second).toContain(`--n:${n}`);
+  });
+
+  it("is decoration with no words", () => {
+    expect(second).toContain('aria-hidden="true"');
+    expect(second.replace(/<[^>]*>/g, "")).toBe("");
+  });
+});
