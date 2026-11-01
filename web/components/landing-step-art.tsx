@@ -61,9 +61,47 @@ function ReadClausesScene() {
   );
 }
 
+/** Ask, then check: a question, a typing moment, an answer with a page citation, and the quoted words lighting up in the clause. */
+function AskAndCheckScene() {
+  return (
+    <Frame scene="hiw-s3">
+      <div className="hiw-q absolute top-3 right-5 flex w-28 flex-col gap-1 rounded-xl rounded-tr-sm bg-primary px-3 py-2 shadow-sm">
+        <span className="h-1 w-full rounded-full bg-primary-foreground/80" />
+        <span className="h-1 w-2/3 rounded-full bg-primary-foreground/60" />
+      </div>
+      <div className="hiw-dots absolute top-[3.6rem] left-5 flex gap-1 rounded-full bg-card px-2.5 py-1.5 shadow-sm">
+        <span className="size-1.5 rounded-full bg-muted-foreground/70" />
+        <span className="size-1.5 rounded-full bg-muted-foreground/70" />
+        <span className="size-1.5 rounded-full bg-muted-foreground/70" />
+      </div>
+      <div className="hiw-a absolute top-[3.1rem] left-5 flex w-32 flex-col gap-1 rounded-xl rounded-tl-sm border border-border bg-background px-3 py-2 shadow-sm">
+        <span className="h-1 w-full rounded-full bg-foreground/25" />
+        <span className="h-1 w-4/5 rounded-full bg-foreground/20" />
+        <span className="hiw-chip mt-0.5 flex w-fit items-center gap-1 rounded-full bg-accent px-1.5 py-0.5">
+          <span className="size-1.5 rounded-sm bg-primary" />
+          <span className="h-1 w-5 rounded-full bg-primary/60" />
+        </span>
+      </div>
+      <div className="absolute right-5 bottom-3 left-[10.5rem] flex flex-col gap-1.5">
+        <span className="h-1 w-full rounded-full bg-foreground/10" />
+        <span className="relative h-1.5 w-11/12 rounded-full bg-foreground/10">
+          <span className="hiw-hl absolute inset-0 origin-left rounded-full bg-amber-300" />
+          <span className="hiw-ok absolute -top-2 -right-3 flex size-5 items-center justify-center rounded-full bg-emerald-600 text-white shadow-sm">
+            <svg viewBox="0 0 24 24" fill="none" className="size-3">
+              <path d="M5 13l4 4L19 7" stroke="currentColor" strokeWidth={3.5} strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </span>
+        </span>
+        <span className="h-1 w-3/4 rounded-full bg-foreground/10" />
+      </div>
+    </Frame>
+  );
+}
+
 /** The scene for one How it works step, by its place in the list, or nothing for a step that has none. */
 export function StepArt({ index }: { index: number }) {
   if (index === 0) return <AddDocumentScene />;
   if (index === 1) return <ReadClausesScene />;
+  if (index === 2) return <AskAndCheckScene />;
   return null;
 }

@@ -43,3 +43,25 @@ describe("the read every clause scene", () => {
     expect(second.replace(/<[^>]*>/g, "")).toBe("");
   });
 });
+
+describe("the ask then check scene", () => {
+  const third = renderToStaticMarkup(<StepArt index={2} />);
+
+  it("draws a question, a typing moment, an answer with a citation chip, and a quoted line lighting up with a check", () => {
+    expect(third).toContain("hiw-s3");
+    for (const part of ["hiw-q", "hiw-dots", "hiw-a", "hiw-chip", "hiw-hl", "hiw-ok"]) expect(third).toContain(part);
+    expect(third).toContain("<svg");
+  });
+
+  it("is decoration with no words", () => {
+    expect(third).toContain('aria-hidden="true"');
+    expect(third.replace(/<[^>]*>/g, "")).toBe("");
+  });
+
+  it("gives all three steps a scene, each its own", () => {
+    const scenes = [0, 1, 2].map((i) => renderToStaticMarkup(<StepArt index={i} />));
+
+    expect(new Set(scenes).size).toBe(3);
+    expect(scenes.map((scene) => /hiw-s([123])/.exec(scene)?.[1])).toEqual(["1", "2", "3"]);
+  });
+});
