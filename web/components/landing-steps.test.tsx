@@ -30,4 +30,25 @@ describe("the how it works section", () => {
 
     expect(text).not.toContain("—");
   });
+
+  it("is complete and visible as the server sends it, with nothing waiting for a scroll", () => {
+    expect(html).toContain('data-reveal="idle"');
+    for (const step of STEPS) {
+      expect(html).toContain(step.title);
+      expect(html).toContain(step.body);
+    }
+  });
+
+  it("gives each card its place in the order they come in, a line that draws across and a number that settles in", () => {
+    expect(html.match(/hiw-card/g)).toHaveLength(STEPS.length);
+    expect(html.match(/hiw-rule/g)).toHaveLength(STEPS.length);
+    expect(html.match(/hiw-number/g)).toHaveLength(STEPS.length);
+    expect(html).toContain("--i:0");
+    expect(html).toContain("--i:1");
+    expect(html).toContain("--i:2");
+  });
+
+  it("hides the drawn lines from a screen reader, since they carry no meaning", () => {
+    expect(html.match(/<span aria-hidden="true" class="hiw-rule/g)).toHaveLength(STEPS.length);
+  });
 });
