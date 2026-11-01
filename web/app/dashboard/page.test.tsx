@@ -7,6 +7,7 @@ vi.mock("next/navigation", () => ({
   redirect: vi.fn((to: string) => {
     throw new Error(`NEXT_REDIRECT:${to}`);
   }),
+  useRouter: () => ({ refresh: vi.fn() }),
 }));
 
 import { auth } from "@/auth";
@@ -61,11 +62,17 @@ describe("the dashboard home", () => {
     expect(getMock).toHaveBeenCalledWith("reader@example.com", "/documents");
   });
 
-  it("invites a new person to add a first document, and an existing one to add or open", async () => {
-    expect(await page()).toContain("Add your first document");
+  it("puts the way to add a document first, open for a new person and as one button for someone with documents", async () => {
+    const empty = await page();
+    expect(empty).toContain('aria-labelledby="add-document-heading"');
+    expect(empty).toContain("Drop a contract here");
+    expect(empty.indexOf("add-document-heading")).toBeLessThan(empty.indexOf("Your documents at a glance"));
 
     getMock.mockResolvedValue([doc("a", "ready")]);
-    expect(await page()).toContain("Add or open documents");
+    const existing = await page();
+    expect(existing).toContain('aria-labelledby="add-document-heading"');
+    expect(existing).not.toContain("Drop a contract here");
+    expect(existing).toContain("Add a document</button>");
   });
 
   it("still shows the page, with zeros, when the backend cannot be reached", async () => {

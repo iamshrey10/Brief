@@ -5,6 +5,7 @@ import { auth } from "@/auth";
 import { AppHeader } from "@/components/app-header";
 import { ComingUp } from "@/components/coming-up";
 import { DashboardStats } from "@/components/dashboard-stats";
+import { DashboardUpload } from "@/components/dashboard-upload";
 import { DocumentAnalysis } from "@/components/document-analysis";
 import { KindBreakdown } from "@/components/kind-breakdown";
 import { OpenQuestions } from "@/components/open-questions";
@@ -51,10 +52,12 @@ export default async function DashboardHome() {
             <h1 className="font-heading text-3xl font-semibold tracking-tight text-foreground md:text-4xl">Dashboard</h1>
             <p className="mt-2 max-w-xl text-muted-foreground">Where your documents stand, and what needs doing next.</p>
           </div>
-          <Link href="/dashboard/documents" className={buttonVariants({ size: "lg" })}>
-            {stats.total === 0 ? "Add your first document" : "Add or open documents"}
+          <Link href="/dashboard/documents" className={buttonVariants({ variant: "outline", size: "lg" })}>
+            All documents
           </Link>
         </div>
+
+        <DashboardUpload hasDocuments={documents.length > 0} />
 
         <DashboardStats stats={stats} />
 
