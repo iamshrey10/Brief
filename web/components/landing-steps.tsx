@@ -1,3 +1,7 @@
+import type { CSSProperties } from "react";
+
+import { RevealOnView } from "@/components/reveal-on-view";
+
 /** The path from a file to a checked answer, in the order a person meets it. Each step is something the app does today. */
 export const STEPS = [
   {
@@ -25,17 +29,20 @@ export function LandingSteps() {
           </h2>
           <p className="mt-3 text-lg text-muted-foreground">From a file to an answer you can check, in three steps.</p>
         </div>
-        <ol className="mt-10 grid gap-10 md:grid-cols-3 md:gap-8">
-          {STEPS.map((step, index) => (
-            <li key={step.title} className="flex flex-col gap-3 border-t-2 border-primary/30 pt-5">
-              <span className="font-heading text-sm font-semibold tracking-wide text-primary">
-                {String(index + 1).padStart(2, "0")}
-              </span>
-              <h3 className="text-xl font-semibold tracking-tight text-balance text-foreground">{step.title}</h3>
-              <p className="text-sm leading-relaxed text-muted-foreground">{step.body}</p>
-            </li>
-          ))}
-        </ol>
+        <RevealOnView className="mt-10">
+          <ol className="grid gap-10 md:grid-cols-3 md:gap-8">
+            {STEPS.map((step, index) => (
+              <li key={step.title} style={{ "--i": index } as CSSProperties} className="hiw-card flex flex-col gap-3">
+                <span aria-hidden="true" className="hiw-rule block h-0.5 w-full origin-left rounded-full bg-primary/35" />
+                <span className="hiw-number inline-block origin-left font-heading text-sm font-semibold tracking-wide text-primary">
+                  {String(index + 1).padStart(2, "0")}
+                </span>
+                <h3 className="text-xl font-semibold tracking-tight text-balance text-foreground">{step.title}</h3>
+                <p className="text-sm leading-relaxed text-muted-foreground">{step.body}</p>
+              </li>
+            ))}
+          </ol>
+        </RevealOnView>
       </div>
     </section>
   );

@@ -51,3 +51,35 @@ test("a shared link shows Brief's own card image and the page has Brief's own ic
   const icon = await page.locator('link[rel="icon"][type="image/svg+xml"]').getAttribute("href");
   expect((await request.get(icon!)).status()).toBe(200);
 });
+
+test("How it works waits for you to reach it, then brings its three cards in one after another, with every word as before", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.setViewportSize({ width: 1280, height: 700 });
+  await page.goto("/");
+  const section = page.locator("#how [data-reveal]");
+  const cards = page.locator("#how .hiw-card");
+  const opacity = (index: number) => cards.nth(index).evaluate((el) => getComputedStyle(el).opacity);
+
+  // Below the first screen, the cards are ready and waiting, not yet shown.
+  await expect(section).toHaveAttribute("data-reveal", "armed");
+  expect(await opacity(0)).toBe("0");
+
+  await page.locator("#how").scrollIntoViewIfNeeded();
+  await expect(section).toHaveAttribute("data-reveal", "shown");
+  for (const index of [0, 1, 2]) await expect.poll(() => opacity(index)).toBe("1");
+
+  await expect(page.getByRole("heading", { level: 3, name: "Add your document" })).toBeVisible();
+  await expect(page.getByText("A blurry photo is flagged instead of quietly accepted.")).toBeVisible();
+  await expect(page.getByRole("heading", { level: 3, name: "Ask, then check" })).toBeVisible();
+});
+
+test("for a reader who prefers less motion, How it works is simply there, with nothing waiting for a scroll", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.setViewportSize({ width: 1280, height: 700 });
+  await page.goto("/");
+
+  await expect(page.locator("#how [data-reveal]")).toHaveAttribute("data-reveal", "shown");
+  for (const index of [0, 1, 2]) {
+    expect(await page.locator("#how .hiw-card").nth(index).evaluate((el) => getComputedStyle(el).opacity)).toBe("1");
+  }
+});

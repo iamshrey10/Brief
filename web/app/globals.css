@@ -137,3 +137,48 @@
     @apply font-heading;
   }
 }
+
+/*
+ * How it works on the landing page. Until a script has run, and for a reader who prefers less motion, nothing here applies and
+ * every card is simply there. Otherwise the section is armed (cards waiting) and shown when it scrolls into view, and the
+ * cards come in one after another by their --i, with each top line drawing across and each number settling into place.
+ */
+[data-reveal="armed"] .hiw-card {
+  opacity: 0;
+  transform: translateY(18px);
+}
+[data-reveal="shown"] .hiw-card {
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity 600ms ease,
+    transform 700ms cubic-bezier(0.2, 0.7, 0.2, 1);
+  transition-delay: calc(var(--i, 0) * 140ms);
+}
+[data-reveal="armed"] .hiw-rule {
+  transform: scaleX(0);
+}
+[data-reveal="shown"] .hiw-rule {
+  transform: scaleX(1);
+  transition: transform 900ms cubic-bezier(0.2, 0.7, 0.2, 1);
+  transition-delay: calc(var(--i, 0) * 140ms + 200ms);
+}
+[data-reveal="armed"] .hiw-number {
+  opacity: 0;
+  transform: scale(0.6);
+}
+[data-reveal="shown"] .hiw-number {
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity 400ms ease,
+    transform 500ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition-delay: calc(var(--i, 0) * 140ms + 450ms);
+}
+@media (prefers-reduced-motion: reduce) {
+  .hiw-card,
+  .hiw-rule,
+  .hiw-number {
+    transition: none !important;
+  }
+}
