@@ -83,3 +83,28 @@ test("for a reader who prefers less motion, How it works is simply there, with n
     expect(await page.locator("#how .hiw-card").nth(index).evaluate((el) => getComputedStyle(el).opacity)).toBe("1");
   }
 });
+
+test("the three scenes in How it works play while it is on screen, and stand still in their finished picture for a reader who prefers less motion", async ({ browser }) => {
+  const scenes = [".hiw-s1 .hiw-drop", ".hiw-s2 .hiw-mark", ".hiw-s3 .hiw-ok"];
+  const animationOf = (page: import("@playwright/test").Page, selector: string) =>
+    page.locator(`#how ${selector}`).first().evaluate((el) => getComputedStyle(el).animationName);
+
+  const moving = await (await browser.newContext({ reducedMotion: "no-preference", viewport: { width: 1280, height: 700 } })).newPage();
+  await moving.goto("/");
+  // Off screen, the scenes have not started.
+  for (const scene of scenes) expect(await animationOf(moving, scene)).toBe("none");
+  await moving.locator("#how").scrollIntoViewIfNeeded();
+  for (const scene of scenes) await expect.poll(() => animationOf(moving, scene)).not.toBe("none");
+  // Three scenes, one for each card, each with its own shape.
+  await expect(moving.locator("#how .hiw-art")).toHaveCount(3);
+  // Scrolled out of sight again, they pause instead of running for nobody.
+  await moving.evaluate(() => window.scrollTo(0, 0));
+  await expect.poll(() => moving.locator("#how .hiw-s1 .hiw-drop").evaluate((el) => getComputedStyle(el).animationPlayState)).toBe("paused");
+
+  const still = await (await browser.newContext({ reducedMotion: "reduce", viewport: { width: 1280, height: 700 } })).newPage();
+  await still.goto("/");
+  for (const scene of scenes) expect(await animationOf(still, scene)).toBe("none");
+  // The finished picture is there: the check in the first scene and the bar full.
+  expect(await still.locator("#how .hiw-s1 .hiw-pop").evaluate((el) => getComputedStyle(el).opacity)).toBe("1");
+  expect(await still.locator("#how .hiw-s1 .hiw-fill").evaluate((el) => getComputedStyle(el).transform)).toMatch(/^(none|matrix\(1, 0, 0, 1, 0, 0\))$/);
+});
