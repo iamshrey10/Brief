@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 
 import { RevealOnView } from "@/components/reveal-on-view";
+import { StepArt } from "@/components/landing-step-art";
 
 /** The path from a file to a checked answer, in the order a person meets it. Each step is something the app does today. */
 export const STEPS = [
@@ -37,6 +38,7 @@ export function LandingSteps() {
                 <span className="hiw-number inline-block origin-left font-heading text-sm font-semibold tracking-wide text-primary">
                   {String(index + 1).padStart(2, "0")}
                 </span>
+                <StepArt index={index} />
                 <h3 className="text-xl font-semibold tracking-tight text-balance text-foreground">{step.title}</h3>
                 <p className="text-sm leading-relaxed text-muted-foreground">{step.body}</p>
               </li>
