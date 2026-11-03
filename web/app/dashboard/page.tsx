@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
@@ -11,7 +10,6 @@ import { KindBreakdown } from "@/components/kind-breakdown";
 import { OpenQuestions } from "@/components/open-questions";
 import { RecentActivity } from "@/components/recent-activity";
 import { Rise } from "@/components/rise";
-import { buttonVariants } from "@/components/ui/button";
 import { backendGet } from "@/lib/backend";
 import { asDocuments, asInsights, documentStats, openQuestionGroups, recentActivity } from "@/lib/dashboard";
 import type { KeyDateFromApi } from "@/lib/key-dates";
@@ -48,14 +46,9 @@ export default async function DashboardHome() {
     <div className="flex flex-1 flex-col">
       <AppHeader email={email} current="dashboard" />
       <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-8 px-6 py-10">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <h1 className="font-heading text-3xl font-semibold tracking-tight text-foreground md:text-4xl">Dashboard</h1>
-            <p className="mt-2 max-w-xl text-muted-foreground">Where your documents stand, and what needs doing next.</p>
-          </div>
-          <Link href="/dashboard/documents" className={buttonVariants({ variant: "outline", size: "lg" })}>
-            All documents
-          </Link>
+        <div>
+          <h1 className="font-heading text-3xl font-semibold tracking-tight text-foreground md:text-4xl">Dashboard</h1>
+          <p className="mt-2 max-w-xl text-muted-foreground">Where your documents stand, and what needs doing next.</p>
         </div>
 
         <Rise order={1}>
