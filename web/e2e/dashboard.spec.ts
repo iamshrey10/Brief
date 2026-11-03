@@ -25,7 +25,7 @@ test("deleting a document asks first, and it is gone after a reload while the ot
 
   await page.getByRole("button", { name: "Delete sample-lease.pdf" }).click();
   const confirmation = page.getByRole("group", { name: "Delete sample-lease.pdf" });
-  await expect(confirmation.getByText("It can't be undone.")).toBeVisible();
+  await expect(confirmation.getByText(/moves to the Bin/)).toBeVisible();
   await confirmation.getByRole("button", { name: "Delete", exact: true }).click();
 
   await expect(page.getByRole("region", { name: "Your documents" }).getByText("sample-lease.pdf")).toHaveCount(0);
