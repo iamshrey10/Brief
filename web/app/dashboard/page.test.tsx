@@ -146,4 +146,11 @@ describe("the dashboard home", () => {
     expect(delays).toEqual([...delays].sort((a, b) => a - b));
     expect(delays.length).toBeGreaterThanOrEqual(5);
   });
+
+  it("has no All documents button, since Documents is one click away in the top bar", async () => {
+    const html = await page();
+
+    expect(html).not.toContain("All documents");
+    expect(html).toContain('href="/dashboard/documents"');
+  });
 });
