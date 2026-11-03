@@ -108,3 +108,24 @@ test("the three scenes in How it works play while it is on screen, and stand sti
   expect(await still.locator("#how .hiw-s1 .hiw-pop").evaluate((el) => getComputedStyle(el).opacity)).toBe("1");
   expect(await still.locator("#how .hiw-s1 .hiw-fill").evaluate((el) => getComputedStyle(el).transform)).toMatch(/^(none|matrix\(1, 0, 0, 1, 0, 0\))$/);
 });
+
+for (const [name, width, height] of [["a laptop", 1440, 900], ["a wide monitor", 1920, 1080], ["a small laptop", 1280, 720], ["a tablet", 820, 1180], ["a phone", 390, 844]] as const)
+  test(`on ${name} the first screen of the landing page fits the window, and the next section is just below it`, async ({ browser }) => {
+    const page = await (await browser.newContext({ viewport: { width, height }, reducedMotion: "reduce" })).newPage();
+    await page.goto("/");
+    const header = (await page.locator("header").first().boundingBox())!;
+    const hero = (await page.locator("section").first().boundingBox())!;
+    const next = (await page.locator("#features").boundingBox())!;
+
+    // The first section starts right under the top bar and is at least as tall as what is left of the window.
+    expect(Math.abs(hero.y - (header.y + header.height))).toBeLessThanOrEqual(2);
+    expect(hero.height).toBeGreaterThanOrEqual(height - (header.y + header.height) - 2);
+    // The next section follows straight on, with no gap.
+    expect(Math.abs(next.y - (hero.y + hero.height))).toBeLessThanOrEqual(2);
+    // The headline and the way in are both inside that first screen, and nothing runs off the side.
+    const heading = (await page.getByRole("heading", { level: 1 }).boundingBox())!;
+    const signIn = (await page.getByRole("button", { name: "Sign in with Google" }).boundingBox())!;
+    expect(heading.y + heading.height).toBeLessThanOrEqual(hero.y + hero.height);
+    if (height >= 720 && width >= 820) expect(signIn.y + signIn.height).toBeLessThanOrEqual(height);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+  });

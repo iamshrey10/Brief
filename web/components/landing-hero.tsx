@@ -22,7 +22,7 @@ function Check() {
 /** The first screen of the landing page: what Brief is, one way in, and the proof underneath. */
 export function LandingHero({ signedIn }: { signedIn: boolean }) {
   return (
-    <section className="mx-auto grid w-full max-w-6xl items-center gap-14 px-6 py-16 md:px-8 md:py-24 lg:grid-cols-[1.1fr_0.9fr]">
+    <section className="mx-auto grid min-h-[calc(100svh-4.0625rem)] w-full max-w-6xl content-center items-center gap-12 px-6 py-10 md:px-8 md:py-12 lg:grid-cols-[1.1fr_0.9fr]">
       <div className="flex flex-col items-start gap-6">
         <p className="rounded-full border border-border bg-accent px-3 py-1 text-xs font-medium text-accent-foreground">
           For loans, leases and job offers
