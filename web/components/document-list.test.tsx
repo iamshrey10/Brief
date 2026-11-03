@@ -450,6 +450,24 @@ describe("DocumentList", () => {
     });
   });
 
+  describe("viewing the original", () => {
+    it("opens the original file in a new tab, without letting that tab reach back to Brief", async () => {
+      const open = vi.spyOn(window, "open").mockReturnValue(null);
+      render(<DocumentList documents={[doc("ready", "a", "one.pdf")]} />);
+
+      await userEvent.click(screen.getByRole("button", { name: "View original one.pdf" }));
+
+      expect(open).toHaveBeenCalledExactlyOnceWith("/api/backend/documents/a/file", "_blank", "noopener,noreferrer");
+      open.mockRestore();
+    });
+
+    it("is not offered while a document is still being read, because there is nothing to show yet", () => {
+      render(<DocumentList documents={[doc("pending", "a", "one.pdf")]} />);
+
+      expect(screen.queryByRole("button", { name: "View original one.pdf" })).not.toBeInTheDocument();
+    });
+  });
+
   describe("editing", () => {
     async function openEdit(documents = [doc("ready", "a", "Lease.pdf", { doc_type: "lease" })]) {
       const user = userEvent.setup();
