@@ -123,3 +123,15 @@ test("the sections rise into place, and end fully visible, and do not move for a
   expect(await animation()).toBe("none");
   await expect(page.getByRole("region", { name: "Your documents at a glance" })).toBeVisible();
 });
+
+test("the Dashboard puts what Brief found and the recent activity above the questions still to ask, which come last", async ({ page }) => {
+  await page.goto("/dashboard");
+  const top = async (name: string) => (await page.getByRole("region", { name }).boundingBox())!.y;
+
+  const found = await top("What Brief found");
+  const activity = await top("Recent activity");
+  const toAsk = await top("Still to ask");
+
+  expect(found).toBeLessThan(activity);
+  expect(activity).toBeLessThan(toAsk);
+});

@@ -63,17 +63,17 @@ export default async function DashboardHome() {
           <ComingUp keyDates={keyDates} documents={documents} />
         </Rise>
 
-        <Rise order={4}>
-          <OpenQuestions groups={openQuestionGroups(insights, documents)} />
-        </Rise>
-
-        <Rise order={5}>
+        <Rise order={3}>
           <DocumentAnalysis insights={insights} documents={documents} />
         </Rise>
 
-        <Rise order={6} className="grid gap-6 md:grid-cols-2">
+        <Rise order={4} className="grid gap-6 md:grid-cols-2">
           <RecentActivity items={recentActivity(documents)} />
           <KindBreakdown documents={documents} />
+        </Rise>
+
+        <Rise order={5}>
+          <OpenQuestions groups={openQuestionGroups(insights, documents)} />
         </Rise>
       </div>
     </div>
