@@ -3,29 +3,28 @@
 A plain account of what works today, what is still missing, and how long the rest should take. I
 update it every week, so you can hold my pace against my promises.
 
-**Last updated:** October 28, 2026 (day 38 of building)
+**Last updated:** November 2, 2026 (day 42 of building)
 
 ## The short version
 
-Brief is about **85% of the way** to a finished first version, counting working days: 38 done and about 6
-to go. You can upload a contract, see its key terms and the questions it leaves unanswered on one screen,
-ask questions, and get an answer with a checked quote. The website now has a proper landing page and
-signed in screens. The parts still ahead are putting it online, a step that retries a weak search, and a
-recorded demo.
+Brief is about **88% of the way** to a finished first version, counting working days: 42 done and about 6 to go. You can sign in
+and land on a Dashboard that shows where your documents stand and what is coming up, upload a contract, a scan or a photo,
+see its key terms and the questions it leaves unanswered, ask questions and get an answer with a checked quote, and take the
+summary away as a PDF. The parts still ahead are putting it online, a step that retries a weak search, and a recorded demo.
 
-**Expected finish for the core product: around November 7**, with a realistic window of November 3 to
-November 13. **That is four days later than I said last week, and the reason is in the calendar section.**
-The extras (Word files, several files at once, sharper photo handling) would add about 4 more working days.
+**Expected finish for the core product: around November 11**, with a realistic window of November 6 to November 17.
+**That is four days later than I said last week, and the reason is in the calendar section.** The extras (Word files, several
+files at once, sharper photo handling) would add about 4 more working days.
 
 ## By the numbers
 
 | | |
 |---|---|
-| Working days so far | 38 |
-| Commits | 404 |
-| Tests | 1,853 (959 backend, 792 frontend, 102 in a real browser), run on every push |
-| Lines of code vs lines of tests | about 7,900 vs 18,800 (tests count the browser test helpers) |
-| API endpoints | 19 |
+| Working days so far | 42 |
+| Commits | 471 |
+| Tests | 2,230 (987 backend, 1,104 frontend, 139 in a real browser), run on every pull request |
+| Lines of code vs lines of tests | about 10,400 vs 22,600 (tests count the browser test helpers) |
+| API endpoints | 21 |
 | Database tables | 8 |
 | Evaluations | 5 (search, question answering on three documents, key terms, must-ask checklist, steadiness) |
 | Documents it can read | PDFs (including scanned ones, read by OCR), and phone photos or scans (JPG, PNG, HEIC) |
@@ -35,6 +34,13 @@ The extras (Word files, several files at once, sharper photo handling) would add
 
 ## What works today
 
+- **A Dashboard** as the first screen after sign in: counts of documents ready, being read or needing attention, the soonest
+  dates, the questions still to ask across every document, what Brief found in each, recent activity, and a place to add a
+  document right there. It reads only what is already saved, so opening it never calls the model.
+- **Scanned PDFs** are read by OCR page by page, like a photo, so a document saved as pictures works.
+- **Actions on a document:** copy the summary, download it as a PDF, add its clear dates to a calendar, email the questions it
+  leaves open, print it, and find words in the clause text.
+- **A sample lease** to try without uploading anything.
 - **Sign in** with Google, and every request checked twice, once in the web app and once in the API.
 - **Upload** a PDF or a photo of a page. Scans get cleaned up and read, and a blurry one is flagged
   instead of quietly accepted.
@@ -96,19 +102,17 @@ heavier on polish and proof than the first.
 
 ## How long, in calendar time
 
-At five working days a week, 6 days from Wednesday October 28 would end around November 4. I add a quarter on
-top for the things that always go wrong, which lands around November 7, so call it **about November 7**. A
-fast run at six days a week could finish near November 3, and a slow one at four days a week would reach
-November 13. Adding the extras moves each of those by about a week. A first version people can try only needs
-the backend online, which is about two days of work once the accounts exist and the decision about paying for
-Gemini is made.
+At five working days a week, 6 days from Tuesday November 3 would end around November 10. I add a quarter on top for the things
+that always go wrong, which lands around November 11, so call it **about November 11**. A fast run at six days a week could finish
+near November 9, and a slow one at four days a week would reach November 17. Adding the extras moves each of those by about a week.
+A first version people can try only needs the backend online, which is about two days of work once the accounts exist and the
+decision about paying for Gemini is made.
 
-**Why the date moved.** Last week I said November 3. Since then five working days went on things that were
-not the list: two more question sets for the evaluation (and a change to the answering instruction that I
-measured on all three before keeping), a check on how the site's top bar, landing page and signed in screens
-look and work on a phone, a rewrite of the whole landing page and signed in header, and guards so that no commit
-message credits a tool. Deployment, the one item that would have moved the date back, was not started. The list of
-what is left did not grow.
+**Why the date moved.** Last week I said November 7. Since then four working days went on things that were not on the list: a
+Dashboard and a rebuilt landing page with animation, summary actions (a PDF built in the browser, calendar and email), reading
+scanned PDFs after a real one failed, a real file test of every kind of document, and a branch and pull request workflow with a
+protected main. Deployment, the one item that would move the date back, still has not started because it waits on accounts. The
+list of what is left did not grow.
 
 These are estimates, not promises. I will say so in the update log if they move.
 
@@ -168,5 +172,6 @@ These are estimates, not promises. I will say so in the update log if they move.
 | Oct 16 | Daily limits, abandoned upload cleanup, timing of every model call, and a build that fails if a recorded quality score drops (Oct 11 to 12). A browser test of the whole app by hand found a rate limit failure with nothing in the log, a deposit missing from key terms, and one tap sign in; each was fixed, and a key term can now rest on up to three checked quotes (Oct 13). Browser tests of the pages anyone can reach, a health check that says whether the server can do real work, request ids, and a short reference code on failure messages (Oct 14 to 16). 240 commits, 1,377 tests. About 75 percent, finish still around October 30. |
 | Oct 21 | Answer traces (what each question used, ids only, found from a reference code), documentation of every route checked against the code, example settings files, a script for the storage upload rules, a deployment checklist, and a test-only sign in with a fake API that lets the signed in screens be tested in a real browser: 88 browser tests, accessibility scans of every main screen and state, and four real problems they found fixed. 313 commits, 1,588 tests. About 80 percent, and the finish moved from about October 30 to about November 3 for the reason given above. |
 | Oct 28 | The landing page was rebuilt (top bar, hero, what you get, how it works, footer) and the signed in screens got one shared top bar; the Overview and Ask tabs are clearer. A third question set (an education loan) was added and the answering instruction gained a rule for "which one" questions, measured on all three before it was kept (a second rule for simple arithmetic was tried and removed because it cost an answer). The website file `middleware` was renamed to `proxy`, and a check, run in CI too, now refuses any commit message that credits a tool. 404 commits, 1,853 tests. About 85 percent, and the finish moved from about November 3 to about November 7 for the reason given above. |
+| Nov 2 | A Dashboard became the first screen, with a place to add a document, counts, dates, the questions still to ask and what Brief found in each document. Scanned PDFs are now read by OCR after a real scan failed. A document has one row of actions (copy or download the summary as a PDF, calendar, email, print) and a find box. Real files of each kind were run through the real services: PDF, photos of a lease, a job offer and a loan, and a deliberately smeared photo, which was refused with a clear reason. Work now goes in through short branches and pull requests, and main is protected. 471 commits, 2,230 tests. About 88 percent, and the finish moved from about November 7 to about November 11 for the reason given above. |
 
 Thanks for reading. If something here looks wrong or unclear, please open an issue.
