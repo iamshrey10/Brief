@@ -50,6 +50,21 @@ def create_presigned_upload_url(storage_key: str, content_type: str) -> str:
     )
 
 
+def create_presigned_view_url(storage_key: str, content_type: str, filename: str) -> str:
+    """A short-lived link that shows the original file in the browser (inline, not as a download)."""
+    safe_name = "".join(ch for ch in filename if ch.isalnum() or ch in " ._-") or "document"
+    return get_client().generate_presigned_url(
+        "get_object",
+        Params={
+            "Bucket": settings.r2_bucket_name,
+            "Key": storage_key,
+            "ResponseContentType": content_type,
+            "ResponseContentDisposition": f'inline; filename="{safe_name}"',
+        },
+        ExpiresIn=PRESIGNED_URL_EXPIRY_SECONDS,
+    )
+
+
 class UploadMissingError(Exception):
     """The file the browser said it uploaded is not in storage."""
 
