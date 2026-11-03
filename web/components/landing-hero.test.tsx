@@ -41,4 +41,11 @@ describe("the landing page hero", () => {
       expect(promise).not.toContain("—");
     }
   });
+
+  it("fills the screen below the top bar, with its content centered, so the first screen is complete and not cut off", () => {
+    const html = renderToStaticMarkup(<LandingHero signedIn={false} />);
+
+    expect(html).toContain("min-h-[calc(100svh-4.0625rem)]");
+    expect(html).toContain("content-center");
+  });
 });
