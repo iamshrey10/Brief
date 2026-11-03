@@ -152,4 +152,20 @@ describe("the dashboard home", () => {
     expect(html).not.toContain("All documents");
     expect(html).toContain('href="/dashboard/documents"');
   });
+
+  it("orders the sections by how often they are wanted: what Brief found and recent activity up high, still to ask last", async () => {
+    getMock.mockImplementation(async (_email: string, path: string) => {
+      if (path === "/documents") return [{ ...doc("a", "ready"), created_at: "2026-10-30T10:00:00Z", status_changed_at: "2026-10-30T10:00:00Z" }];
+      if (path === "/me/insights") {
+        return [{ document_id: "a", terms_found: 9, terms_total: 12, questions_answered: 7, open_count: 1, open_questions: ["Does it renew automatically?"] }];
+      }
+      return [];
+    });
+
+    const html = await page();
+    const order = ["Add documents", "Your documents at a glance", "analysis-heading", "activity-heading", "kinds-heading", "still-to-ask-heading"].map((marker) => html.indexOf(marker));
+
+    expect(order.every((position) => position > 0)).toBe(true);
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+  });
 });
