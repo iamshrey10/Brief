@@ -5,11 +5,13 @@ import { AppHeader } from "@/components/app-header";
 import { DashboardStats } from "@/components/dashboard-stats";
 import { DashboardUpload } from "@/components/dashboard-upload";
 import { DocumentAnalysis } from "@/components/document-analysis";
+import { LeaseCountdown } from "@/components/lease-countdown";
 import { KindBreakdown } from "@/components/kind-breakdown";
 import { OpenQuestions } from "@/components/open-questions";
 import { RecentActivity } from "@/components/recent-activity";
 import { Rise } from "@/components/rise";
 import { backendGet } from "@/lib/backend";
+import { asKeyDates, nextLeaseEnd } from "@/lib/lease-end";
 import { asDocuments, asInsights, documentStats, openQuestionGroups, recentActivity } from "@/lib/dashboard";
 
 export const metadata = { title: "Dashboard", robots: { index: false, follow: false } };
@@ -20,10 +22,15 @@ export default async function DashboardHome() {
   // The proxy already turns visitors away, and this makes the page safe on its own too.
   if (!email) redirect("/");
 
-  const [documentsBody, insightsBody] = await Promise.all([backendGet(email, "/documents"), backendGet(email, "/me/insights")]);
+  const [documentsBody, insightsBody, datesBody] = await Promise.all([
+    backendGet(email, "/documents"),
+    backendGet(email, "/me/insights"),
+    backendGet(email, "/me/key-dates"),
+  ]);
   const documents = asDocuments(documentsBody);
   const insights = asInsights(insightsBody);
   const stats = documentStats(documents);
+  const lease = nextLeaseEnd(asKeyDates(datesBody), documents);
 
   return (
     <div className="flex flex-1 flex-col">
@@ -41,6 +48,12 @@ export default async function DashboardHome() {
         <Rise order={2}>
           <DashboardStats stats={stats} />
         </Rise>
+
+        {lease && (
+          <Rise order={3}>
+            <LeaseCountdown lease={lease} />
+          </Rise>
+        )}
 
         <Rise order={3}>
           <DocumentAnalysis insights={insights} documents={documents} />
