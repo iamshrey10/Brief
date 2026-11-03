@@ -83,10 +83,10 @@ describe("the dashboard home", () => {
     expect(html).toMatch(/Documents<\/span>[\s\S]*?<span class="font-heading[^>]*>0</);
   });
 
-  it("asks for the documents, the saved dates and what is worked out about each, each once", async () => {
+  it("asks for the documents and what is worked out about each, each once", async () => {
     await page();
 
-    expect(getMock.mock.calls.map(([, path]) => path).sort()).toEqual(["/documents", "/me/insights", "/me/key-dates"]);
+    expect(getMock.mock.calls.map(([, path]) => path).sort()).toEqual(["/documents", "/me/insights"]);
   });
 
   it("shows the recent activity and the mix of kinds when there are documents, and neither when there are none", async () => {
@@ -105,10 +105,8 @@ describe("the dashboard home", () => {
     expect(empty).not.toContain("kinds-heading");
   });
 
-  it("drops entries that are not shaped like dates and still shows the page", async () => {
-    getMock.mockImplementation(async (_email: string, path: string) => (path === "/documents" ? [doc("a", "ready")] : [null, { field: 3 }, "x"]));
-
-    await expect(page()).resolves.toContain("Dashboard");
+  it("has no Coming up section", async () => {
+    expect(await page()).not.toContain("Coming up");
   });
 
   it("shows the questions still to ask and what Brief found, from what is already worked out", async () => {
@@ -140,10 +138,10 @@ describe("the dashboard home", () => {
   it("lets the sections rise into place one after another, the way to add a document first", async () => {
     const html = await page();
 
-    expect(html.match(/motion-safe:animate-in/g)?.length).toBeGreaterThanOrEqual(6);
+    expect(html.match(/motion-safe:animate-in/g)?.length).toBeGreaterThanOrEqual(5);
     const delays = [...html.matchAll(/animation-delay:(\d+)ms/g)].map((match) => Number(match[1]));
     expect(delays).toEqual([...delays].sort((a, b) => a - b));
-    expect(delays.length).toBeGreaterThanOrEqual(5);
+    expect(delays.length).toBeGreaterThanOrEqual(4);
   });
 
   it("has no All documents button, since Documents is one click away in the top bar", async () => {

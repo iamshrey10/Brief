@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
 import { AppHeader } from "@/components/app-header";
-import { ComingUp } from "@/components/coming-up";
 import { DashboardStats } from "@/components/dashboard-stats";
 import { DashboardUpload } from "@/components/dashboard-upload";
 import { DocumentAnalysis } from "@/components/document-analysis";
@@ -12,19 +11,8 @@ import { RecentActivity } from "@/components/recent-activity";
 import { Rise } from "@/components/rise";
 import { backendGet } from "@/lib/backend";
 import { asDocuments, asInsights, documentStats, openQuestionGroups, recentActivity } from "@/lib/dashboard";
-import type { KeyDateFromApi } from "@/lib/key-dates";
 
 export const metadata = { title: "Dashboard", robots: { index: false, follow: false } };
-
-/** The dates from the backend's answer, leaving out anything not shaped like one. */
-function asKeyDates(body: unknown): KeyDateFromApi[] {
-  return Array.isArray(body)
-    ? body.filter(
-        (entry): entry is KeyDateFromApi =>
-          typeof entry?.document_id === "string" && typeof entry?.field === "string" && typeof entry?.value === "string",
-      )
-    : [];
-}
 
 /** The first thing a person sees after signing in: where their documents stand, and what needs doing. */
 export default async function DashboardHome() {
@@ -32,14 +20,9 @@ export default async function DashboardHome() {
   // The proxy already turns visitors away, and this makes the page safe on its own too.
   if (!email) redirect("/");
 
-  const [documentsBody, keyDatesBody, insightsBody] = await Promise.all([
-    backendGet(email, "/documents"),
-    backendGet(email, "/me/key-dates"),
-    backendGet(email, "/me/insights"),
-  ]);
+  const [documentsBody, insightsBody] = await Promise.all([backendGet(email, "/documents"), backendGet(email, "/me/insights")]);
   const documents = asDocuments(documentsBody);
   const insights = asInsights(insightsBody);
-  const keyDates = asKeyDates(keyDatesBody);
   const stats = documentStats(documents);
 
   return (
@@ -57,10 +40,6 @@ export default async function DashboardHome() {
 
         <Rise order={2}>
           <DashboardStats stats={stats} />
-        </Rise>
-
-        <Rise order={3}>
-          <ComingUp keyDates={keyDates} documents={documents} />
         </Rise>
 
         <Rise order={3}>
