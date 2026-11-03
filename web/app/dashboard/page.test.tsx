@@ -86,7 +86,25 @@ describe("the dashboard home", () => {
   it("asks for the documents and what is worked out about each, each once", async () => {
     await page();
 
-    expect(getMock.mock.calls.map(([, path]) => path).sort()).toEqual(["/documents", "/me/insights"]);
+    expect(getMock.mock.calls.map(([, path]) => path).sort()).toEqual(["/documents", "/me/insights", "/me/key-dates"]);
+  });
+
+  it("shows how long the lease has left when a clear end date was found, and no card when none was", async () => {
+    const end = new Date();
+    end.setDate(end.getDate() + 30);
+    const value = `${end.toLocaleString("en-US", { month: "long" })} ${end.getDate()}, ${end.getFullYear()}`;
+    getMock.mockImplementation(async (_email: string, path: string) => {
+      if (path === "/documents") return [doc("a", "ready")];
+      if (path === "/me/key-dates") return [{ document_id: "a", field: "lease_end", label: "Lease ends", value }];
+      return [];
+    });
+
+    const withLease = await page();
+    expect(withLease).toContain('aria-label="Lease remaining"');
+    expect(withLease).toContain("30 days left");
+
+    getMock.mockResolvedValue([]);
+    expect(await page()).not.toContain("Lease remaining");
   });
 
   it("shows the recent activity and the mix of kinds when there are documents, and neither when there are none", async () => {

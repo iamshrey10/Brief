@@ -135,3 +135,12 @@ test("the Dashboard puts what Brief found and the recent activity above the ques
   expect(found).toBeLessThan(activity);
   expect(activity).toBeLessThan(toAsk);
 });
+
+test("the Dashboard shows how long the lease has left, linking to that lease", async ({ page }) => {
+  await page.goto("/dashboard");
+
+  const card = page.getByRole("region", { name: "Lease remaining" });
+  await expect(card).toContainText(/\d[\d,]* days left/);
+  await expect(card).toContainText("Ends December 31, 2099");
+  await expect(card.getByRole("link", { name: "sample-lease.pdf" })).toHaveAttribute("href", "/dashboard/documents/doc-lease");
+});
