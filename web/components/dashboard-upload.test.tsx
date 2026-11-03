@@ -19,12 +19,22 @@ beforeEach(() => refresh.mockReset());
 afterEach(cleanup);
 
 describe("the dashboard add documents card", () => {
-  it("is one button and nothing else: no heading and no description", () => {
+  it("shows an icon and one button and no other words: no heading and no description", () => {
     const { container } = render(<DashboardUpload />);
 
     expect(screen.getByRole("button", { name: "Add documents" })).toBeInTheDocument();
     expect(container.textContent).toBe("Add documents");
     expect(screen.queryByRole("heading")).not.toBeInTheDocument();
+    expect(container.querySelector("svg")).not.toBeNull();
+  });
+
+  it("has the polished look: a tinted gradient card with a raised icon tile, hidden from a screen reader", () => {
+    const { container } = render(<DashboardUpload />);
+
+    expect(container.querySelector("section")?.className).toContain("bg-gradient-to-br");
+    const tile = container.querySelector('span[aria-hidden="true"]');
+    expect(tile?.className).toContain("bg-primary");
+    expect(tile?.className).toContain("shadow-md");
   });
 
   it("is a section named Add documents", () => {

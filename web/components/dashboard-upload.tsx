@@ -9,8 +9,9 @@ import { UploadPanel } from "@/components/upload-panel";
 import { Button } from "@/components/ui/button";
 
 /**
- * Where to add a document, on the Dashboard: one button and nothing else. Pressing it opens the upload form in place, and
- * Cancel puts it away. After a document is accepted the page's numbers are refreshed and one short line says so.
+ * Where to add a document, on the Dashboard: an icon and one button, "Add documents", and no other words. Pressing it opens the
+ * upload form in place, and Cancel puts it away. After a document is accepted the page's numbers are refreshed and one short
+ * line says so.
  */
 export function DashboardUpload() {
   const router = useRouter();
@@ -18,11 +19,16 @@ export function DashboardUpload() {
   const [added, setAdded] = useState<string | null>(null);
 
   return (
-    <section aria-label="Add documents" className="rounded-2xl border border-dashed border-primary/40 bg-accent/40 p-5">
+    <section
+      aria-label="Add documents"
+      className="rounded-2xl border border-primary/25 bg-gradient-to-br from-accent/90 via-card to-card p-6 shadow-sm"
+    >
       {!open && (
-        <div className="flex justify-center">
-          <Button type="button" size="lg" className="h-12 gap-2 px-6 text-base" aria-expanded={false} aria-controls="dashboard-upload-form" onClick={() => setOpen(true)}>
-            <CloudUpload aria-hidden="true" className="size-5" />
+        <div className="flex items-center justify-center gap-4">
+          <span aria-hidden="true" className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-md shadow-primary/25">
+            <CloudUpload className="size-7" />
+          </span>
+          <Button type="button" size="lg" className="h-12 px-7 text-base shadow-sm" aria-expanded={false} aria-controls="dashboard-upload-form" onClick={() => setOpen(true)}>
             Add documents
           </Button>
         </div>
