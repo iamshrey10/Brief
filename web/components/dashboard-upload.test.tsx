@@ -18,49 +18,59 @@ import { DashboardUpload } from "./dashboard-upload";
 beforeEach(() => refresh.mockReset());
 afterEach(cleanup);
 
-describe("the dashboard upload card", () => {
-  it("has the form open for a person with no documents, and no button to open it", () => {
-    render(<DashboardUpload hasDocuments={false} />);
+describe("the dashboard add documents card", () => {
+  it("is one button and nothing else: no heading and no description", () => {
+    const { container } = render(<DashboardUpload />);
 
-    expect(screen.getByRole("button", { name: "finish an upload" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Add a document" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add documents" })).toBeInTheDocument();
+    expect(container.textContent).toBe("Add documents");
+    expect(screen.queryByRole("heading")).not.toBeInTheDocument();
   });
 
-  it("is one short bar with one button for a person who has documents, and the button opens the form", () => {
-    render(<DashboardUpload hasDocuments />);
+  it("is a section named Add documents", () => {
+    render(<DashboardUpload />);
 
+    expect(screen.getByRole("region", { name: "Add documents" })).toBeInTheDocument();
+  });
+
+  it("opens the form in place when the button is pressed, and the button gives way to it", () => {
+    render(<DashboardUpload />);
+    const button = screen.getByRole("button", { name: "Add documents" });
+    expect(button).toHaveAttribute("aria-expanded", "false");
+
+    fireEvent.click(button);
+
+    expect(screen.getByRole("button", { name: "finish an upload" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Add documents" })).not.toBeInTheDocument();
+  });
+
+  it("puts the form away again with Cancel, uploading nothing", () => {
+    render(<DashboardUpload />);
+    fireEvent.click(screen.getByRole("button", { name: "Add documents" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(screen.getByRole("button", { name: "Add documents" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "finish an upload" })).not.toBeInTheDocument();
-    const open = screen.getByRole("button", { name: "Add a document" });
-    expect(open).toHaveAttribute("aria-expanded", "false");
-
-    fireEvent.click(open);
-
-    expect(screen.getByRole("button", { name: "finish an upload" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Add a document" })).not.toBeInTheDocument();
+    expect(refresh).not.toHaveBeenCalled();
   });
 
-  it("is a section named by its heading, which says what to add and in what form", () => {
-    render(<DashboardUpload hasDocuments />);
-
-    expect(screen.getByRole("region", { name: "Add a document" })).toBeInTheDocument();
-    expect(screen.getByText(/as a PDF or a photo/)).toBeInTheDocument();
-  });
-
-  it("says which document was added, what happens next and where to follow it, and refreshes the page's numbers", () => {
-    render(<DashboardUpload hasDocuments={false} />);
+  it("says which document was added with a way to Documents, closes the form, and refreshes the page's numbers", () => {
+    render(<DashboardUpload />);
+    fireEvent.click(screen.getByRole("button", { name: "Add documents" }));
 
     fireEvent.click(screen.getByRole("button", { name: "finish an upload" }));
 
-    const message = screen.getByRole("status");
-    expect(message).toHaveTextContent("maple-lease.pdf was added and Brief is reading it now.");
+    expect(screen.getByRole("status")).toHaveTextContent("maple-lease.pdf was added.");
     expect(screen.getByRole("link", { name: "Open Documents" })).toHaveAttribute("href", "/dashboard/documents");
+    expect(screen.queryByRole("button", { name: "finish an upload" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add documents" })).toBeInTheDocument();
     expect(refresh).toHaveBeenCalledTimes(1);
   });
 
   it("shows no message before anything is added", () => {
-    render(<DashboardUpload hasDocuments={false} />);
+    render(<DashboardUpload />);
 
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
-    expect(refresh).not.toHaveBeenCalled();
   });
 });

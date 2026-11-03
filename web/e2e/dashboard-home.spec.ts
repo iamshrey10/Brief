@@ -83,17 +83,18 @@ test("the Dashboard gathers the questions still to ask and shows what Brief foun
 
 test("a person can add a document right from the Dashboard, and the numbers update by themselves", async ({ page }) => {
   await page.goto("/dashboard");
-  const card = page.getByRole("region", { name: "Add a document" });
-  // This person already has documents, so the way in is one button, and it is the first thing on the page.
+  const card = page.getByRole("region", { name: "Add documents" });
+  // The card is one button, and it is the first thing on the page.
   await expect(card).toBeVisible();
-  await card.getByRole("button", { name: "Add a document" }).click();
+  await expect(card).toHaveText("Add documents");
+  await card.getByRole("button", { name: "Add documents" }).click();
   await expect(page.getByText("Drop a contract here")).toBeVisible();
 
   await page.getByLabel("Choose a file to upload").setInputFiles({ name: "new-lease.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.4 a tiny made up file") });
   await card.getByText("Lease", { exact: true }).click();
   await page.getByRole("button", { name: "Upload", exact: true }).click();
 
-  await expect(card.getByRole("status")).toContainText("new-lease.pdf was added and Brief is reading it now.");
+  await expect(card.getByRole("status")).toContainText("new-lease.pdf was added.");
   const documents = page.getByRole("region", { name: "Your documents at a glance" }).locator("li").filter({ hasText: "Documents" }).first();
   await expect(documents.getByText("3", { exact: true })).toBeVisible();
   await card.getByRole("link", { name: "Open Documents" }).click();
@@ -103,7 +104,7 @@ test("a person can add a document right from the Dashboard, and the numbers upda
 test("the way to add a document comes before the numbers on the Dashboard", async ({ page }) => {
   await page.goto("/dashboard");
 
-  const upload = await page.getByRole("region", { name: "Add a document" }).boundingBox();
+  const upload = await page.getByRole("region", { name: "Add documents" }).boundingBox();
   const numbers = await page.getByRole("region", { name: "Your documents at a glance" }).boundingBox();
   expect(upload!.y).toBeLessThan(numbers!.y);
 });

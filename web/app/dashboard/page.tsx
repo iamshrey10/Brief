@@ -52,7 +52,7 @@ export default async function DashboardHome() {
         </div>
 
         <Rise order={1}>
-          <DashboardUpload hasDocuments={documents.length > 0} />
+          <DashboardUpload />
         </Rise>
 
         <Rise order={2}>
