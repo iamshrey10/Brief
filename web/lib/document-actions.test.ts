@@ -1,8 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   deleteDocument,
+  deleteForGood,
   messageForDeleteFailure,
+  messageForRestoreFailure,
   messageForUpdateFailure,
+  restoreDocument,
   updateDocument,
 } from "./document-actions";
 
@@ -171,5 +174,74 @@ describe("updateDocument", () => {
       expect(messageForUpdateFailure(status)).not.toMatch(/\b(401|404|422|429|500)\b/);
       expect(messageForDeleteFailure(status)).not.toMatch(/\b(401|404|422|429|500)\b/);
     }
+  });
+});
+
+describe("restoreDocument", () => {
+  const BACK = { id: "d1", filename: "a.pdf", doc_type: "lease", status: "ready", ocr_confidence: null };
+
+  it("sends a POST to that document's restore route and hands back the document as it was", async () => {
+    fetchMock.mockResolvedValue(response(BACK));
+
+    expect(await restoreDocument("a/b c")).toEqual({ ok: true, result: BACK });
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("/api/backend/documents/a%2Fb%20c/restore");
+    expect(init.method).toBe("POST");
+  });
+
+  it.each([
+    [401, /session expired/i],
+    [404, /no longer in the bin.*seven days/i],
+    [409, /most documents you can keep/i],
+    [429, /too many requests/i],
+    [502, /still in the bin/i],
+  ])("explains a %i in plain words, and says the document is safe where it is", async (status, pattern) => {
+    fetchMock.mockResolvedValue(response({ detail: "x" }, status));
+
+    const outcome = await restoreDocument("d1");
+
+    expect(outcome.ok).toBe(false);
+    if (!outcome.ok) expect(outcome.message).toMatch(pattern);
+  });
+
+  it("adds the reference after the message when the server sent one", async () => {
+    fetchMock.mockResolvedValue(response({ detail: "boom" }, 502, ID));
+
+    expect(await restoreDocument("d1")).toEqual({ ok: false, message: `${messageForRestoreFailure(502)} Reference: 3f2b8c1e` });
+  });
+
+  it("says it could not restore when the network fails", async () => {
+    fetchMock.mockRejectedValue(new TypeError("offline"));
+
+    expect(await restoreDocument("d1")).toEqual({ ok: false, message: messageForRestoreFailure(0) });
+  });
+});
+
+describe("deleteForGood", () => {
+  it("sends a DELETE to that document's permanent route", async () => {
+    fetchMock.mockResolvedValue({ ok: true, status: 204 } as Response);
+
+    expect(await deleteForGood("a/b c")).toEqual({ ok: true, result: null });
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("/api/backend/documents/a%2Fb%20c/permanent");
+    expect(init.method).toBe("DELETE");
+  });
+
+  it("counts a document that is already gone as done", async () => {
+    fetchMock.mockResolvedValue(response({ detail: "document not found" }, 404));
+
+    expect(await deleteForGood("d1")).toEqual({ ok: true, result: null });
+  });
+
+  it("explains a failure in plain words, with the reference, and says nothing was removed", async () => {
+    fetchMock.mockResolvedValue(response({ detail: "x" }, 502, ID));
+
+    expect(await deleteForGood("d1")).toEqual({ ok: false, message: `${messageForDeleteFailure(502)} Reference: 3f2b8c1e` });
+  });
+
+  it("says it could not delete when the network fails", async () => {
+    fetchMock.mockRejectedValue(new TypeError("offline"));
+
+    expect(await deleteForGood("d1")).toEqual({ ok: false, message: messageForDeleteFailure(0) });
   });
 });

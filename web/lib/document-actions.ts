@@ -35,7 +35,23 @@ export function messageForUpdateFailure(status: number): string {
 
 export const MAX_FILENAME_LENGTH = 200;
 
-/** Deletes a document, its file, and everything Brief read from it. */
+/** Plain-language messages for each way bringing a document back from the bin can fail. */
+export function messageForRestoreFailure(status: number): string {
+  switch (status) {
+    case 401:
+      return "Your session expired. Sign in again to restore this.";
+    case 404:
+      return "That document is no longer in the bin. It may have been here longer than seven days.";
+    case 409:
+      return "You already have the most documents you can keep. Delete one you no longer need, then restore this.";
+    case 429:
+      return "Too many requests at once. Wait a few seconds and try again.";
+    default:
+      return "Couldn't restore that just now. It is still in the bin, so try again in a moment.";
+  }
+}
+
+/** Moves a document to the bin. Its file and everything Brief read from it stay, and it can be restored for seven days. */
 export async function deleteDocument(documentId: string): Promise<ActionOutcome<null>> {
   try {
     const res = await fetch(`/api/backend/documents/${encodeURIComponent(documentId)}`, {
@@ -68,5 +84,27 @@ export async function updateDocument(
     return { ok: true, result: (await res.json()) as DocumentSummary };
   } catch {
     return { ok: false, message: messageForUpdateFailure(0) };
+  }
+}
+
+/** Brings a document back from the bin, as it was. */
+export async function restoreDocument(documentId: string): Promise<ActionOutcome<DocumentSummary>> {
+  try {
+    const res = await fetch(`/api/backend/documents/${encodeURIComponent(documentId)}/restore`, { method: "POST" });
+    if (res.ok) return { ok: true, result: await res.json() };
+    return { ok: false, message: withReference(messageForRestoreFailure(res.status), referenceFrom(res)) };
+  } catch {
+    return { ok: false, message: messageForRestoreFailure(0) };
+  }
+}
+
+/** Deletes a document from the bin for good: its file, and everything Brief read from it. A document that is already gone counts as done. */
+export async function deleteForGood(documentId: string): Promise<ActionOutcome<null>> {
+  try {
+    const res = await fetch(`/api/backend/documents/${encodeURIComponent(documentId)}/permanent`, { method: "DELETE" });
+    if (res.status === 204 || res.status === 404) return { ok: true, result: null };
+    return { ok: false, message: withReference(messageForDeleteFailure(res.status), referenceFrom(res)) };
+  } catch {
+    return { ok: false, message: messageForDeleteFailure(0) };
   }
 }
