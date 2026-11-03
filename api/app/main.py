@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 import logging
 import re
 import time
@@ -15,8 +16,14 @@ from app.auth import get_current_user
 from app.config import settings
 from app.docs_urls import docs_urls
 from app.checklist import ChecklistGenerationError, ChecklistResult, get_checklist, load_checklist
-from app.db import get_session
-from app.housekeeping import remove_abandoned_uploads, remove_old_traces
+from app.db import async_session, get_session
+from app.housekeeping import (
+    purge_expired_trash,
+    remove_abandoned_uploads,
+    remove_document_for_good,
+    remove_old_traces,
+    trash_days_left,
+)
 from app.ingestion import ingest_document
 from app.logging_setup import configure_logging
 from app.readiness import check_ready
@@ -59,7 +66,37 @@ MAX_DOCUMENTS_PER_USER = 25
 # plenty of room before anyone can start a second read.
 STUCK_AFTER = timedelta(minutes=15)
 
+# How often the bin is swept for documents past their time, whoever owns them.
+TRASH_SWEEP_EVERY_SECONDS = 3600
+
+
+async def sweep_trash_forever() -> None:
+    """Removes expired bin documents now and then, for as long as the server runs, so a document goes on time even when its owner
+    never comes back. A failed sweep is logged and tried again at the next one."""
+    while True:
+        try:
+            async with async_session() as session:
+                removed = await purge_expired_trash(session)
+            if removed:
+                logger.info("removed expired documents from the bin")
+        except Exception:
+            logger.exception("the sweep of the bin failed")
+        await asyncio.sleep(TRASH_SWEEP_EVERY_SECONDS)
+
+
+@contextlib.asynccontextmanager
+async def lifespan(_app: FastAPI):
+    sweeper = asyncio.create_task(sweep_trash_forever())
+    try:
+        yield
+    finally:
+        sweeper.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await sweeper
+
+
 app = FastAPI(
+    lifespan=lifespan,
     title="Brief API",
     description=(
         "The API behind Brief, which explains a contract and shows the exact words behind every answer. "
@@ -337,9 +374,8 @@ async def create_upload(
     # now that the request is known to be valid, so a refused request changes nothing.
     await remove_abandoned_uploads(session, user.id)
     await remove_old_traces(session, user.id)
-    kept = await session.scalar(
-        select(func.count()).select_from(Document).where(Document.user_id == user.id)
-    )
+    await purge_expired_trash(session, user_id=user.id)
+    kept = await _live_document_count(session, user)
     if kept >= MAX_DOCUMENTS_PER_USER:
         raise HTTPException(
             status_code=409,
@@ -405,9 +441,18 @@ class DocumentSummary(BaseModel):
         )
 
 
+async def _live_document_count(session: AsyncSession, user: User) -> int:
+    """How many documents the person has in use. The ones in the bin do not count, so moving one there frees a place."""
+    return await session.scalar(
+        select(func.count()).select_from(Document).where(Document.user_id == user.id, Document.deleted_at.is_(None))
+    )
+
+
 async def _get_owned_document(
-    document_id: str, user: User, session: AsyncSession
+    document_id: str, user: User, session: AsyncSession, *, in_bin: bool = False
 ) -> Document:
+    """The person's own document, or a 404. A document in the bin is, to everything else, not there at all: it is found only
+    when the bin itself asks for it with `in_bin`, and a document in use is then not found, so each caller gets one or the other."""
     try:
         doc_uuid = uuid.UUID(document_id)
     except ValueError:
@@ -416,7 +461,7 @@ async def _get_owned_document(
     result = await session.execute(select(Document).where(Document.id == doc_uuid))
     document = result.scalar_one_or_none()
 
-    if document is None or document.user_id != user.id:
+    if document is None or document.user_id != user.id or (document.deleted_at is not None) != in_bin:
         raise HTTPException(status_code=404, detail="document not found")
 
     return document
@@ -634,35 +679,114 @@ async def update_document(
     "/documents/{document_id}",
     status_code=204,
     tags=["documents"],
-    summary="Delete a document",
+    summary="Move a document to the bin",
     description=(
-        "Removes the stored file first and then the document and everything read from it. Deleting something already gone is not an error."
+        "Hides the document everywhere and keeps its file and everything read from it, so it can be restored from the bin for seven days. After that it is removed for good. Moving something that is already in the bin is a 404."
     ),
-    responses=_errors(401, 404, 502),
+    responses=_errors(401, 404),
 )
 async def delete_document(
     document_id: str,
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> Response:
-    """Deletes a document: its file, and everything read from it (pieces, embeddings, key terms,
-    and checklist answers).
-
-    The file goes first. If storage fails, the document is kept, so the delete can simply be tried
-    again and nothing is left behind where nobody can see it. Deleting a file that is already gone
-    succeeds, so a retry after a half finished delete is safe."""
+    """Moves a document to the bin. Nothing is removed: the file, the pieces, the embeddings, the key terms and the checklist
+    answers stay where they are, so a restore brings back exactly what was there, in the same kind and with the same name."""
     document = await _get_owned_document(document_id, user, session)
-
-    try:
-        await asyncio.to_thread(delete_file, document.storage_key)
-    except Exception as exc:
-        logger.exception("could not remove the file for document %s", document.id)
-        raise HTTPException(
-            status_code=502, detail="could not remove the file, nothing was deleted"
-        ) from exc
-
-    await session.delete(document)
+    document.deleted_at = datetime.now(timezone.utc)
     await session.commit()
+    return Response(status_code=204)
+
+
+class TrashedDocument(BaseModel):
+    id: str
+    filename: str
+    doc_type: str
+    deleted_at: datetime
+    # Whole days left to restore it, counting a part of a day as a day.
+    days_left: int
+
+
+@app.get(
+    "/trash",
+    tags=["documents"],
+    summary="List the documents in your bin",
+    description=(
+        "Returns the signed-in person's documents that were moved to the bin, the most recently deleted first, with when each was deleted and how many days are left to restore it. Documents past their seven days are removed for good before the list is made."
+    ),
+    responses=_errors(401),
+)
+async def list_trash(
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> list[TrashedDocument]:
+    await purge_expired_trash(session, user_id=user.id)
+    result = await session.execute(
+        select(Document)
+        .where(Document.user_id == user.id, Document.deleted_at.is_not(None))
+        .order_by(Document.deleted_at.desc())
+    )
+    now = datetime.now(timezone.utc)
+    return [
+        TrashedDocument(
+            id=str(document.id),
+            filename=document.filename,
+            doc_type=document.doc_type,
+            deleted_at=document.deleted_at,
+            days_left=trash_days_left(document.deleted_at, now),
+        )
+        for document in result.scalars().all()
+    ]
+
+
+@app.post(
+    "/documents/{document_id}/restore",
+    tags=["documents"],
+    summary="Restore a document from the bin",
+    description=(
+        "Brings a document back from the bin, with its name, kind and everything read from it as they were. Refused when the person already has the most documents they can keep, and not found once the document has been in the bin longer than it is kept."
+    ),
+    responses=_errors(401, 404, 409),
+)
+async def restore_document(
+    document_id: str,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> DocumentSummary:
+    document = await _get_owned_document(document_id, user, session, in_bin=True)
+    if trash_days_left(document.deleted_at) == 0:
+        # Past its time. It is removed at the next sweep, and until then it cannot be brought back.
+        raise HTTPException(status_code=404, detail="document not found")
+    if await _live_document_count(session, user) >= MAX_DOCUMENTS_PER_USER:
+        raise HTTPException(
+            status_code=409,
+            detail=f"You can keep up to {MAX_DOCUMENTS_PER_USER} documents. Move one to the bin to restore this one.",
+        )
+    document.deleted_at = None
+    await session.commit()
+    await session.refresh(document)
+    return DocumentSummary.from_document(document)
+
+
+@app.delete(
+    "/documents/{document_id}/permanent",
+    status_code=204,
+    tags=["documents"],
+    summary="Delete a document from the bin for good",
+    description=(
+        "Removes the stored file first and then the document and everything read from it. Only a document that is in the bin can be removed this way, so a document in use is never deleted by one click."
+    ),
+    responses=_errors(401, 404, 502),
+)
+async def delete_document_for_good(
+    document_id: str,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> Response:
+    """The file goes first. If storage fails, the document is kept in the bin, so this can simply be tried again."""
+    document = await _get_owned_document(document_id, user, session, in_bin=True)
+    if not await remove_document_for_good(session, document):
+        raise HTTPException(status_code=502, detail="could not remove the file, nothing was deleted")
     return Response(status_code=204)
 
 
@@ -680,7 +804,9 @@ async def list_documents(
     session: AsyncSession = Depends(get_session),
 ) -> list[DocumentSummary]:
     result = await session.execute(
-        select(Document).where(Document.user_id == user.id).order_by(Document.created_at.desc())
+        select(Document)
+        .where(Document.user_id == user.id, Document.deleted_at.is_(None))
+        .order_by(Document.created_at.desc())
     )
     documents = result.scalars().all()
 

@@ -1229,10 +1229,19 @@ async def _counts(db_session, document_id) -> dict:
 def _record_file_deletes(monkeypatch) -> list[str]:
     removed: list[str] = []
     monkeypatch.setattr(main_module, "delete_file", lambda key: removed.append(key))
+    # Removing a document for good is done by the housekeeping code, which has its own reference to the function.
+    monkeypatch.setattr("app.housekeeping.delete_file", lambda key: removed.append(key))
     return removed
 
 
-async def test_delete_removes_the_document_its_file_and_everything_read_from_it(
+async def _remove_for_good(client, document_id):
+    """Moves a document to the bin and then removes it from there, which is how a document is deleted for good."""
+    moved = await client.delete(f"/documents/{document_id}")
+    assert moved.status_code == 204
+    return await client.delete(f"/documents/{document_id}/permanent")
+
+
+async def test_deleting_for_good_removes_the_document_its_file_and_everything_read_from_it(
     client, db_session, test_user, monkeypatch
 ):
     removed = _record_file_deletes(monkeypatch)
@@ -1242,7 +1251,7 @@ async def test_delete_removes_the_document_its_file_and_everything_read_from_it(
         "document": 1, "clauses": 1, "embeddings": 1, "key_terms": 1, "checklist": 1,
     }
 
-    response = await client.delete(f"/documents/{document_id}")
+    response = await _remove_for_good(client, document_id)
 
     assert response.status_code == 204
     assert response.content == b""
@@ -1271,29 +1280,29 @@ async def test_delete_leaves_every_other_document_untouched(client, db_session, 
     assert listed == ["kept.pdf"]
 
 
-async def test_delete_works_for_a_document_that_never_finished_reading(
+async def test_deleting_for_good_works_for_a_document_that_never_finished_reading(
     client, db_session, test_user, monkeypatch
 ):
     removed = _record_file_deletes(monkeypatch)
     document = await _document_with(db_session, test_user, "failed")
 
-    response = await client.delete(f"/documents/{document.id}")
+    response = await _remove_for_good(client, document.id)
 
     assert response.status_code == 204
     assert removed == ["fake/doc.pdf"]
 
 
-async def test_delete_keeps_the_document_when_the_file_cannot_be_removed(
+async def test_deleting_for_good_keeps_the_document_in_the_bin_when_the_file_cannot_be_removed(
     client, db_session, test_user, monkeypatch
 ):
     def failing(key):
         raise RuntimeError("storage is down")
 
-    monkeypatch.setattr(main_module, "delete_file", failing)
+    monkeypatch.setattr("app.housekeeping.delete_file", failing)
     document = await _document_with_everything(db_session, test_user)
     document_id = document.id
 
-    response = await client.delete(f"/documents/{document_id}")
+    response = await _remove_for_good(client, document_id)
 
     assert response.status_code == 502
     assert "nothing was deleted" in response.json()["detail"]
@@ -1304,7 +1313,7 @@ async def test_delete_keeps_the_document_when_the_file_cannot_be_removed(
     }
 
 
-async def test_delete_can_be_retried_after_a_storage_failure(client, db_session, test_user, monkeypatch):
+async def test_deleting_for_good_can_be_retried_after_a_storage_failure(client, db_session, test_user, monkeypatch):
     attempts = {"count": 0}
 
     def flaky(key):
@@ -1312,11 +1321,12 @@ async def test_delete_can_be_retried_after_a_storage_failure(client, db_session,
         if attempts["count"] == 1:
             raise RuntimeError("storage hiccup")
 
-    monkeypatch.setattr(main_module, "delete_file", flaky)
+    monkeypatch.setattr("app.housekeeping.delete_file", flaky)
     document = await _document_with_everything(db_session, test_user)
+    await client.delete(f"/documents/{document.id}")
 
-    first = await client.delete(f"/documents/{document.id}")
-    second = await client.delete(f"/documents/{document.id}")
+    first = await client.delete(f"/documents/{document.id}/permanent")
+    second = await client.delete(f"/documents/{document.id}/permanent")
 
     assert (first.status_code, second.status_code) == (502, 204)
 
