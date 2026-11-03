@@ -62,17 +62,16 @@ describe("the dashboard home", () => {
     expect(getMock).toHaveBeenCalledWith("reader@example.com", "/documents");
   });
 
-  it("puts the way to add a document first, open for a new person and as one button for someone with documents", async () => {
-    const empty = await page();
-    expect(empty).toContain('aria-labelledby="add-document-heading"');
-    expect(empty).toContain("Drop a contract here");
-    expect(empty.indexOf("add-document-heading")).toBeLessThan(empty.indexOf("Your documents at a glance"));
+  it("puts the way to add documents first, as one button, whether or not there are documents", async () => {
+    for (const documents of [[], [doc("a", "ready")]]) {
+      getMock.mockResolvedValue(documents);
+      const html = await page();
 
-    getMock.mockResolvedValue([doc("a", "ready")]);
-    const existing = await page();
-    expect(existing).toContain('aria-labelledby="add-document-heading"');
-    expect(existing).not.toContain("Drop a contract here");
-    expect(existing).toContain("Add a document</button>");
+      expect(html).toContain('aria-label="Add documents"');
+      expect(html).toContain("Add documents</button>");
+      expect(html).not.toContain("Drop a contract here");
+      expect(html.indexOf('aria-label="Add documents"')).toBeLessThan(html.indexOf("Your documents at a glance"));
+    }
   });
 
   it("still shows the page, with zeros, when the backend cannot be reached", async () => {
