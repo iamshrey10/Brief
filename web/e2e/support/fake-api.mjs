@@ -160,6 +160,8 @@ const server = createServer(async (request, response) => {
     state.documents.push({ ocr_confidence: null, created_at: "2026-10-04T12:00:00Z", status_changed_at: "2026-10-04T12:01:00Z", ...seeded });
     return send(response, 204);
   }
+  // What the short-lived link from storage would show: the original file.
+  if (path.startsWith("/__original/")) return send(response, 200, { original: path.slice(12) });
   if (path === "/__account-deleted") return send(response, 200, { deleted: state.accountDeleted });
 
   // Where a browser sends the file itself: storage, not the API, so it needs no token but does need permission.
@@ -267,6 +269,9 @@ const server = createServer(async (request, response) => {
     const [, id, part] = match;
     const document = state.documents.find((candidate) => candidate.id === id);
     if (!document) return send(response, method === "DELETE" ? 204 : 404, method === "DELETE" ? undefined : { detail: "document not found" });
+    if (method === "GET" && part === "file") {
+      return send(response, 200, { url: `http://localhost:${response.req.socket.localPort}/__original/${document.id}`, content_type: "application/pdf" });
+    }
     if (method === "GET" && !part) {
       if (document.id === "doc-down") return send(response, 500, { detail: "the database is unavailable" });
       return send(response, 200, visible(document));

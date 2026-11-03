@@ -7,6 +7,7 @@ import {
   ChevronRight,
   CircleCheck,
   CircleX,
+  Eye,
   LoaderCircle,
   Pencil,
   RotateCw,
@@ -463,6 +464,19 @@ function DocumentRow({
             onClick={retry}
           >
             {retrying ? "Starting..." : "Try again"}
+          </Button>
+        )}
+        {readable && (
+          // Opens in the same moment as the press, so the browser does not treat the new tab as a pop-up.
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            aria-label={`View original ${doc.filename}`}
+            title="View the original file"
+            onClick={() => window.open(`/api/backend/documents/${doc.id}/file`, "_blank", "noopener,noreferrer")}
+          >
+            <Eye aria-hidden />
           </Button>
         )}
         {readable && (

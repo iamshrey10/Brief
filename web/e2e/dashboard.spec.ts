@@ -56,3 +56,15 @@ test("pressing Escape backs out of a delete", async ({ page }) => {
   await expect(confirmation).toHaveCount(0);
   await expect(page.getByRole("region", { name: "Your documents" }).getByText("sample-lease.pdf")).toBeVisible();
 });
+
+test("the eye button opens the original file in a new tab", async ({ page }) => {
+  await page.goto("/dashboard/documents");
+
+  const [original] = await Promise.all([
+    page.waitForEvent("popup"),
+    page.getByRole("button", { name: "View original sample-lease.pdf" }).click(),
+  ]);
+  await original.waitForLoadState();
+
+  expect(original.url()).toContain("/__original/doc-lease");
+});
