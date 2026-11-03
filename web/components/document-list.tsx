@@ -232,7 +232,7 @@ function ConfirmDelete({
     >
       <p className="text-sm font-medium text-foreground">Delete &ldquo;{doc.filename}&rdquo;?</p>
       <p className="mt-1 text-sm text-muted-foreground">
-        This removes the file and everything Brief read from it. It can&apos;t be undone.
+        It moves to the Bin, where you can restore it for 7 days. After that it is deleted for good.
       </p>
       {error && (
         <p role="alert" className="mt-2 text-xs text-destructive">

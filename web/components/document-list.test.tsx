@@ -797,13 +797,14 @@ describe("DocumentList", () => {
       return { user, onDeleted };
     }
 
-    it("asks first, naming the file and saying what is lost and that it cannot be undone", async () => {
+    it("asks first, naming the file and saying it moves to the Bin for 7 days rather than vanishing", async () => {
       await openDelete();
 
       const question = screen.getByRole("group", { name: "Delete Lease.pdf" });
       expect(question).toHaveTextContent("Delete “Lease.pdf”?");
-      expect(question).toHaveTextContent("removes the file and everything Brief read from it");
-      expect(question).toHaveTextContent("can't be undone");
+      expect(question).toHaveTextContent("moves to the Bin");
+      expect(question).toHaveTextContent("restore it for 7 days");
+      expect(question).not.toHaveTextContent("can't be undone");
       expect(deleteMock).not.toHaveBeenCalled();
     });
 
