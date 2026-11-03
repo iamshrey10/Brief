@@ -45,6 +45,7 @@ const LONG_CLAUSES = Array.from({ length: 40 }, (_, index) => ({
 }));
 
 const fresh = () => ({
+  trash: [],
   documents: [
     { id: "doc-lease", filename: "sample-lease.pdf", doc_type: "lease", status: "ready", ocr_confidence: null, created_at: "2026-10-01T12:00:00Z", status_changed_at: "2026-10-01T12:01:00Z" },
     { id: "doc-loan", filename: "sample-loan.pdf", doc_type: "loan", status: "ready", ocr_confidence: null, created_at: "2026-10-02T12:00:00Z", status_changed_at: "2026-10-02T12:01:00Z" },
@@ -241,6 +242,26 @@ const server = createServer(async (request, response) => {
     return send(response, 204);
   }
 
+  // The bin: deleted documents wait here for 7 days. Restoring puts one back; deleting for good removes it.
+  if (method === "GET" && path === "/trash") {
+    return send(response, 200, state.trash.map(({ id, filename, doc_type }) => ({ id, filename, doc_type, deleted_at: new Date().toISOString(), days_left: 7 })));
+  }
+  const binned = /^\/documents\/([^/]+)\/(restore|permanent)$/.exec(path);
+  if (binned) {
+    const [, id, action] = binned;
+    const found = state.trash.find((candidate) => candidate.id === id);
+    if (!found) return send(response, action === "permanent" && method === "DELETE" ? 204 : 404, action === "permanent" ? undefined : { detail: "document not found" });
+    if (action === "restore" && method === "POST") {
+      state.trash = state.trash.filter((candidate) => candidate.id !== id);
+      state.documents.unshift(found);
+      return send(response, 200, visible(found));
+    }
+    if (action === "permanent" && method === "DELETE") {
+      state.trash = state.trash.filter((candidate) => candidate.id !== id);
+      return send(response, 204);
+    }
+  }
+
   const match = /^\/documents\/([^/]+)(?:\/([a-z-]+))?$/.exec(path);
   if (match) {
     const [, id, part] = match;
@@ -275,6 +296,7 @@ const server = createServer(async (request, response) => {
     }
     if (method === "DELETE" && !part) {
       state.documents = state.documents.filter((candidate) => candidate.id !== id);
+      state.trash.unshift(document);
       return send(response, 204);
     }
     if (method === "POST" && part === "ask") {
