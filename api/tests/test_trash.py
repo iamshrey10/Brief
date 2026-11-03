@@ -462,3 +462,52 @@ async def test_the_sweep_starts_with_the_server_and_stops_with_it(monkeypatch):
         assert not cancelled.is_set()
 
     assert cancelled.is_set()
+
+
+async def test_the_owner_gets_a_link_to_view_the_original_file(client, db_session, test_user, monkeypatch):
+    document = await _ready_document(db_session, test_user)
+    asked = []
+    monkeypatch.setattr(main_module, "create_presigned_view_url", lambda *args: asked.append(args) or "https://files.example/view")
+
+    response = await client.get(f"/documents/{document.id}/file")
+
+    assert response.status_code == 200
+    assert response.json() == {"url": "https://files.example/view", "content_type": "application/pdf"}
+    assert asked == [("fake/key.pdf", "application/pdf", "lease.pdf")]
+
+
+async def test_another_persons_file_cannot_be_viewed(client, db_session, monkeypatch):
+    other = User(email=f"{uuid.uuid4()}@example.com")
+    db_session.add(other)
+    await db_session.commit()
+    theirs = await _ready_document(db_session, other)
+    monkeypatch.setattr(main_module, "create_presigned_view_url", lambda *args: pytest.fail("made a link"))
+
+    assert (await client.get(f"/documents/{theirs.id}/file")).status_code == 404
+
+
+async def test_a_file_in_the_bin_cannot_be_viewed(client, db_session, test_user, monkeypatch):
+    document = await _ready_document(db_session, test_user)
+    document.deleted_at = NOW
+    await db_session.commit()
+    monkeypatch.setattr(main_module, "create_presigned_view_url", lambda *args: pytest.fail("made a link"))
+
+    assert (await client.get(f"/documents/{document.id}/file")).status_code == 404
+
+
+def test_the_view_link_is_inline_and_cleans_the_file_name(monkeypatch):
+    from app import storage
+
+    seen = {}
+
+    class Client:
+        def generate_presigned_url(self, operation, Params, ExpiresIn):
+            seen.update(operation=operation, params=Params, expires=ExpiresIn)
+            return "u"
+
+    monkeypatch.setattr(storage, "get_client", lambda: Client())
+
+    assert storage.create_presigned_view_url("k", "application/pdf", 'a"b\r\nc.pdf') == "u"
+    assert seen["operation"] == "get_object"
+    assert seen["params"]["ResponseContentDisposition"] == 'inline; filename="abc.pdf"'
+    assert seen["expires"] == 300

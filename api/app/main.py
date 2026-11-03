@@ -42,6 +42,7 @@ from app.storage import (
     MAX_FILE_SIZE_BYTES,
     build_storage_key,
     create_presigned_upload_url,
+    create_presigned_view_url,
     UploadMissingError,
     delete_file,
     file_matches_type,
@@ -705,6 +706,32 @@ class TrashedDocument(BaseModel):
     deleted_at: datetime
     # Whole days left to restore it, counting a part of a day as a day.
     days_left: int
+
+
+class DocumentFileLink(BaseModel):
+    url: str
+    content_type: str
+
+
+@app.get(
+    "/documents/{document_id}/file",
+    tags=["documents"],
+    summary="Get a short-lived link to view the original file",
+    description=(
+        "Returns a link, valid for five minutes, that shows the document exactly as it was uploaded. Only the person who owns the document can ask, and a document in the bin cannot be viewed."
+    ),
+    responses=_errors(401, 404),
+)
+async def view_document_file(
+    document_id: str,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> DocumentFileLink:
+    document = await _get_owned_document(document_id, user, session)
+    url = await asyncio.to_thread(
+        create_presigned_view_url, document.storage_key, document.content_type, document.filename
+    )
+    return DocumentFileLink(url=url, content_type=document.content_type)
 
 
 @app.get(
