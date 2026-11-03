@@ -34,7 +34,6 @@ for (const scheme of ["light", "dark"] as const) {
       await page.goto("/dashboard");
       await expect(page.getByRole("region", { name: "What Brief found" })).toBeVisible();
       await expect(page.getByRole("region", { name: "Still to ask" })).toBeVisible();
-      await expect(page.getByRole("region", { name: "Coming up" })).toBeVisible();
       // The sections rise into place when the page appears. Colors are judged on the page as it rests, not part way through a fade.
       await page.evaluate(() => Promise.all(document.getAnimations().map((animation) => animation.finished)));
 

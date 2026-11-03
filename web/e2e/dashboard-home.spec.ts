@@ -50,10 +50,10 @@ test("a document's page leads back to the documents list", async ({ page }) => {
   await expect(page).toHaveURL(/\/dashboard\/documents$/);
 });
 
-test("the Dashboard shows what is coming up, the recent activity and the mix of kinds", async ({ page }) => {
+test("the Dashboard shows the recent activity and the mix of kinds", async ({ page }) => {
   await page.goto("/dashboard");
 
-  await expect(page.getByRole("region", { name: "Coming up" }).getByRole("link", { name: /Lease ends in \d+ days/ })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Coming up" })).toHaveCount(0);
   const activity = page.getByRole("region", { name: "Recent activity" });
   await expect(activity.getByText("sample-lease.pdf")).toBeVisible();
   await expect(activity.getByText("Ready to open").first()).toBeVisible();
