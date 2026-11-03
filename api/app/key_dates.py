@@ -34,7 +34,9 @@ async def saved_key_dates(session: AsyncSession, user_id: uuid.UUID) -> list[Key
     only partly saved, simply contributes nothing.
     """
     result = await session.execute(
-        select(Document).where(Document.user_id == user_id).order_by(Document.created_at.desc())
+        select(Document)
+        .where(Document.user_id == user_id, Document.deleted_at.is_(None))
+        .order_by(Document.created_at.desc())
     )
     dates: list[KeyDate] = []
     for document in result.scalars().all():

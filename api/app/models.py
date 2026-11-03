@@ -61,6 +61,9 @@ class Document(Base):
     status_changed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # When the person moved the document to the bin, or null while it is in use. A document in the bin is hidden
+    # everywhere, keeps its file and everything read from it, and can be restored until the retention time passes.
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
     # Why a document failed to read, as a short code the page turns into plain words. Only set while
     # the status is "failed", and cleared on a retry and on success.
     failure_reason: Mapped[str | None] = mapped_column(String(50), nullable=True)
