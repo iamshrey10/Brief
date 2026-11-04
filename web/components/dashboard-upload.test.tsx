@@ -28,13 +28,14 @@ describe("the dashboard add documents card", () => {
     expect(container.querySelector("svg")).not.toBeNull();
   });
 
-  it("has the polished look: a tinted gradient card with a raised icon tile, hidden from a screen reader", () => {
+  it("has the polished look: a tinted gradient card with a dashed edge and a raised icon tile, hidden from a screen reader", () => {
     const { container } = render(<DashboardUpload />);
 
     expect(container.querySelector("section")?.className).toContain("bg-gradient-to-br");
     const tile = container.querySelector('span[aria-hidden="true"]');
     expect(tile?.className).toContain("bg-primary");
-    expect(tile?.className).toContain("shadow-md");
+    expect(tile?.className).toContain("shadow-lg");
+    expect(container.querySelector("section")?.className).toContain("border-dashed");
   });
 
   it("is a section named Add documents", () => {

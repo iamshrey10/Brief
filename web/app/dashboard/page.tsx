@@ -9,12 +9,14 @@ import { DocumentAnalysis } from "@/components/document-analysis";
 import { LeaseCountdown } from "@/components/lease-countdown";
 import { KindBreakdown } from "@/components/kind-breakdown";
 import { OpenQuestions } from "@/components/open-questions";
+import { SharedWithYou } from "@/components/shared-with-you";
 import { RecentActivity } from "@/components/recent-activity";
 import { buttonVariants } from "@/components/ui/button";
 import { Rise } from "@/components/rise";
 import { backendGet } from "@/lib/backend";
 import { asKeyDates, nextLeaseEnd } from "@/lib/lease-end";
 import { needsName } from "@/lib/profile";
+import { asSharedWithMe } from "@/lib/sharing";
 import { asDocuments, asInsights, documentStats, openQuestionGroups, recentActivity } from "@/lib/dashboard";
 
 export const metadata = { title: "Dashboard", robots: { index: false, follow: false } };
@@ -25,32 +27,44 @@ export default async function DashboardHome() {
   // The proxy already turns visitors away, and this makes the page safe on its own too.
   if (!email) redirect("/");
 
-  const [documentsBody, insightsBody, datesBody, meBody] = await Promise.all([
+  const [documentsBody, insightsBody, datesBody, meBody, sharedBody] = await Promise.all([
     backendGet(email, "/documents"),
     backendGet(email, "/me/insights"),
     backendGet(email, "/me/key-dates"),
     backendGet(email, "/me"),
+    backendGet(email, "/shared"),
   ]);
   // Someone's first visit: ask for their name before showing anything else.
   if (needsName(meBody)) redirect("/dashboard/welcome");
   const documents = asDocuments(documentsBody);
   const insights = asInsights(insightsBody);
   const stats = documentStats(documents);
+  const sharedWithMe = asSharedWithMe(sharedBody);
   const lease = nextLeaseEnd(asKeyDates(datesBody), documents);
 
   return (
     <div className="flex flex-1 flex-col">
       <AppHeader email={email} current="dashboard" />
       <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-8 px-6 py-10">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h1 className="font-heading text-3xl font-semibold tracking-tight text-foreground md:text-4xl">Dashboard</h1>
-            <p className="mt-2 max-w-xl text-muted-foreground">Where your documents stand, and what needs doing next.</p>
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary to-primary/80 px-7 py-8 text-primary-foreground shadow-lg shadow-primary/20 md:px-10 md:py-10">
+          <div aria-hidden="true" className="pointer-events-none absolute -top-16 -right-10 size-56 rounded-full bg-white/10" />
+          <div aria-hidden="true" className="pointer-events-none absolute -bottom-20 right-24 size-44 rounded-full bg-white/5" />
+          <div className="relative flex flex-wrap items-end justify-between gap-6">
+            <div>
+              <h1 className="font-heading text-4xl font-semibold tracking-tight md:text-5xl">Dashboard</h1>
+              <p className="mt-3 max-w-xl text-base text-primary-foreground md:text-lg">Where your documents stand, and what needs doing next.</p>
+            </div>
+            <Link href="/dashboard/profile#sharing" className={buttonVariants({ variant: "secondary", size: "lg" })}>
+              Share dashboard
+            </Link>
           </div>
-          <Link href="/dashboard/profile#sharing" className={buttonVariants({ variant: "outline", size: "lg" })}>
-            Share dashboard
-          </Link>
         </div>
+
+        {sharedWithMe.length > 0 && (
+          <Rise order={1}>
+            <SharedWithYou items={sharedWithMe} />
+          </Rise>
+        )}
 
         <Rise order={1}>
           <DashboardUpload />
