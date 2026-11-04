@@ -22,6 +22,11 @@ code, both stored only as keyed hashes. Five wrong codes end the invitation, an 
 seven days, at most five people can have access, the owner approves each person and can remove access at once, and a
 viewer is given the dashboard's summary and never the files or any route that changes or asks about a document.
 
+Files are kept in the person's own part of storage, in one of five fixed folders (Lease, Education_Loan, Job_Offers,
+Personal_Documents, Other). A folder is only ever one of those names, so nothing typed can build a path into someone
+else's files, and moving a file copies it and checks the copy before the original goes. Files stored before folders
+existed are filed with `python -m app.filing`, which can be run again safely.
+
 ## Known gaps
 
 These are not done yet, and are listed so nobody has to find them:
