@@ -102,7 +102,7 @@ export function ClauseViewer({
   return (
     <section aria-label="Document text" className="flex flex-col gap-4">
       <h2 className="sr-only">Document text</h2>
-      <div role="search" className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card/95 px-3 py-2 backdrop-blur lg:sticky lg:top-14 lg:z-20">
+      <div role="search" className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card/95 px-3 py-2 backdrop-blur lg:sticky lg:top-0 lg:z-20">
         <input
           type="search"
           aria-label="Find in this document"
@@ -139,7 +139,7 @@ export function ClauseViewer({
       </div>
       {pages.map(({ pageNumber, clauses: pageClauses }, pageIndex) => (
         <div key={pageNumber} className="rounded-2xl border border-border bg-card">
-          <h3 className="rounded-t-2xl border-b border-border bg-card/95 px-5 py-2.5 text-xs font-medium tracking-wide text-muted-foreground uppercase backdrop-blur lg:sticky lg:top-[6.75rem] lg:z-10">
+          <h3 className="rounded-t-2xl border-b border-border bg-card/95 px-5 py-2.5 text-xs font-medium tracking-wide text-muted-foreground uppercase backdrop-blur lg:sticky lg:top-[3.75rem] lg:z-10">
             Page {pageNumber}
           </h3>
           <ol className="divide-y divide-border">
