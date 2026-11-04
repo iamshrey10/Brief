@@ -63,7 +63,7 @@ test("someone looking at a shared dashboard sees the owner's name, with the addr
     status: "active",
     dashboard: { owner_email: "mum@example.com", owner_name: "Maya Rao", documents: [], insights: [], key_dates: [] },
   });
-  await page.goto("/dashboard/profile");
+  await page.goto("/dashboard");
   await expect(page.getByRole("link", { name: "View dashboard" }).locator("xpath=..")).toContainText("Maya Rao");
 
   await page.getByRole("link", { name: "View dashboard" }).click();
