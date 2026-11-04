@@ -18,9 +18,11 @@ export type Share = {
 
 export type Invitation = { id: string; token: string; code: string; expires_at: string };
 export type SharedWithMe = { id: string; owner_email: string; status: "requested" | "active" };
+export type SharedTerm = { label: string; value: string };
+export type SharedDocument = DocumentSummary & { key_terms: SharedTerm[] };
 export type SharedDashboard = {
   owner_email: string;
-  documents: DocumentSummary[];
+  documents: SharedDocument[];
   insights: InsightFromApi[];
   key_dates: { document_id: string; field: string; label: string; value: string }[];
 };
@@ -64,9 +66,24 @@ export function asSharedDashboard(body: unknown): SharedDashboard | null {
   const shared = body as { owner_email?: unknown; documents?: unknown; insights?: unknown; key_dates?: unknown } | null;
   if (!shared || !isText(shared.owner_email)) return null;
   const dates = Array.isArray(shared.key_dates) ? shared.key_dates : [];
+  const termsById = new Map<string, SharedTerm[]>();
+  if (Array.isArray(shared.documents)) {
+    for (const entry of shared.documents) {
+      if (isText(entry?.id)) {
+        const terms: unknown[] = Array.isArray(entry.key_terms) ? entry.key_terms : [];
+        termsById.set(
+          entry.id,
+          terms.flatMap((term) => {
+            const t = term as { label?: unknown; value?: unknown };
+            return isText(t?.label) && isText(t?.value) ? [{ label: t.label, value: t.value }] : [];
+          }),
+        );
+      }
+    }
+  }
   return {
     owner_email: shared.owner_email,
-    documents: asDocuments(shared.documents),
+    documents: asDocuments(shared.documents).map((document) => ({ ...document, key_terms: termsById.get(document.id) ?? [] })),
     insights: asInsights(shared.insights),
     key_dates: dates.flatMap((entry) =>
       isText(entry?.document_id) && isText(entry?.field) && isText(entry?.label) && isText(entry?.value)

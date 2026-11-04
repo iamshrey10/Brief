@@ -15,7 +15,8 @@ const SHARED = {
   dashboard: {
     owner_email: "mum@example.com",
     documents: [
-      { id: "m1", filename: "mums-lease.pdf", doc_type: "lease", status: "ready", ocr_confidence: null, created_at: "2026-10-01T12:00:00Z", status_changed_at: "2026-10-01T12:01:00Z" },
+      { id: "m1", filename: "mums-lease.pdf", doc_type: "lease", status: "ready", ocr_confidence: null, created_at: "2026-10-01T12:00:00Z", status_changed_at: "2026-10-01T12:01:00Z", key_terms: [{ label: "Monthly rent", value: "$1,800 a month" }, { label: "Security deposit", value: "One month's rent" }] },
+      { id: "m2", filename: "mums-loan.pdf", doc_type: "loan", status: "failed", ocr_confidence: null, created_at: "2026-10-02T12:00:00Z", status_changed_at: "2026-10-02T12:01:00Z", key_terms: [] },
     ],
     insights: [{ document_id: "m1", terms_found: 5, terms_total: 6, questions_answered: 4, open_count: 1, open_questions: ["Is the deposit returned within 30 days?"] }],
     key_dates: [{ document_id: "m1", field: "lease_end", label: "Lease ends", value: "December 31, 2099" }],
@@ -93,6 +94,10 @@ test("a dashboard shared with the reader is listed in Profile and can be looked 
   await expect(page.getByRole("region", { name: "Lease remaining" })).toContainText("days left");
   await expect(page.getByRole("list", { name: "Shared documents" })).toContainText("mums-lease.pdf");
   await expect(page.getByText("Is the deposit returned within 30 days?")).toBeAttached();
+  await expect(page.getByRole("region", { name: "What is here" })).toContainText("Education loan");
+  await expect(page.getByRole("region", { name: "Important dates" })).toContainText("December 31, 2099");
+  await expect(page.getByRole("region", { name: "Needs attention" })).toContainText("mums-loan.pdf");
+  await expect(page.getByRole("list", { name: "Shared documents" }).getByText("Monthly rent")).toBeVisible();
   await expect(page.getByRole("button", { name: /delete|restore|approve|remove|upload|add documents|ask|edit|cancel/i })).toHaveCount(0);
   await expect(page.getByRole("link", { name: /mums-lease/ })).toHaveCount(0);
 });
