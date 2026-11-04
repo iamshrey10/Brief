@@ -84,4 +84,34 @@ describe("the upload panel", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("isn't supported");
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it("files an upload in the folder for its kind unless one is chosen, and says so when it is unsure", async () => {
+    render(<UploadPanel onUploaded={() => {}} />);
+
+    expect(screen.getByLabelText("Folder")).toHaveValue("");
+    expect(screen.queryByText(/Not sure where this belongs/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText(/Other/));
+    expect(screen.getByText(/Not sure where this belongs, so it goes in Other/)).toBeInTheDocument();
+
+    choose();
+    fireEvent.click(screen.getByRole("button", { name: /upload|add|send/i }));
+    await tick();
+
+    const body = JSON.parse(fetchMock.mock.calls.find(([url, init]) => url === "/api/backend/documents" && init?.method === "POST")![1].body);
+    expect(body).not.toHaveProperty("folder");
+  });
+
+  it("sends the folder that was chosen, and stops saying it is unsure", async () => {
+    render(<UploadPanel onUploaded={() => {}} />);
+    fireEvent.click(screen.getByLabelText(/Other/));
+    fireEvent.change(screen.getByLabelText("Folder"), { target: { value: "Personal_Documents" } });
+    expect(screen.queryByText(/Not sure where this belongs/)).not.toBeInTheDocument();
+
+    choose();
+    fireEvent.click(screen.getByRole("button", { name: /upload|add|send/i }));
+    await tick();
+
+    const body = JSON.parse(fetchMock.mock.calls.find(([url, init]) => url === "/api/backend/documents" && init?.method === "POST")![1].body);
+    expect(body).toMatchObject({ doc_type: "other", folder: "Personal_Documents" });
+  });
 });

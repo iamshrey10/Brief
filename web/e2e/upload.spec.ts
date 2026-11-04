@@ -17,7 +17,7 @@ async function choose(page: Page, file: { name: string; mimeType: string; buffer
 test("uploading a PDF sends it to storage, and the document goes from Processing to Ready by itself", async ({ page }) => {
   await choose(page, PDF);
   await expect(page.getByText("new-lease.pdf")).toBeVisible();
-  await page.getByText("Lease", { exact: true }).click();
+  await page.locator("fieldset").getByText("Lease", { exact: true }).click();
   await page.getByRole("button", { name: "Upload", exact: true }).click();
 
   const documents = page.getByRole("region", { name: "Your documents" });
@@ -95,4 +95,16 @@ test("Try a sample lease sends the made up lease that ships with the site to sto
   await expect
     .poll(async () => (await uploadsReceived(page)).map((upload) => `${upload.contentType} ${upload.bytes}`))
     .toEqual([`application/pdf ${bytes}`]);
+});
+
+test("an upload can be filed in a folder of its own choosing, and the list says where it is", async ({ page }) => {
+  await choose(page, PDF);
+  await page.locator("fieldset").getByText("Other", { exact: true }).click();
+  await expect(page.getByText(/Not sure where this belongs/)).toBeVisible();
+  await page.getByLabel("Folder").selectOption("Personal_Documents");
+  await expect(page.getByText(/Not sure where this belongs/)).toHaveCount(0);
+  await page.getByRole("button", { name: "Upload", exact: true }).click();
+
+  const row = page.getByRole("region", { name: "Your documents" }).getByRole("listitem").filter({ hasText: "new-lease.pdf" });
+  await expect(row).toContainText("In Personal documents");
 });

@@ -91,7 +91,7 @@ test("a person can add a document right from the Dashboard, and the numbers upda
   await expect(page.getByText("Drop a contract here")).toBeVisible();
 
   await page.getByLabel("Choose a file to upload").setInputFiles({ name: "new-lease.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.4 a tiny made up file") });
-  await card.getByText("Lease", { exact: true }).click();
+  await card.locator("fieldset").getByText("Lease", { exact: true }).click();
   await page.getByRole("button", { name: "Upload", exact: true }).click();
 
   await expect(card.getByRole("status")).toContainText("new-lease.pdf was added.");

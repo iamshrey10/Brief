@@ -2,6 +2,7 @@
 
 import { useState, type DragEvent, type FormEvent } from "react";
 import { CloudUpload, FileText } from "lucide-react";
+import { FOLDERS } from "@/lib/folders";
 import { DocTypeIcon } from "@/components/doc-type-icon";
 import { Button } from "@/components/ui/button";
 import {
@@ -40,6 +41,8 @@ export const SAMPLE_LEASE_URL = "/samples/sample-lease.pdf";
 export function UploadPanel({ onUploaded }: { onUploaded: (document: DocumentSummary) => void }) {
   const [file, setFile] = useState<File | null>(null);
   const [docType, setDocType] = useState("loan");
+  // Empty means automatic: the folder for the kind.
+  const [folder, setFolder] = useState("");
   const [status, setStatus] = useState<Status>("idle");
   const [stage, setStage] = useState<UploadStage>("preparing");
   const [errorMessage, setErrorMessage] = useState("");
@@ -117,6 +120,7 @@ export function UploadPanel({ onUploaded }: { onUploaded: (document: DocumentSum
           doc_type: kind,
           content_type: contentType,
           file_size_bytes: target.size,
+          ...(folder ? { folder } : {}),
         }),
       });
       if (!createRes.ok) throw new Error(await startFailureMessage(createRes));
@@ -226,6 +230,29 @@ export function UploadPanel({ onUploaded }: { onUploaded: (document: DocumentSum
           ))}
         </div>
       </fieldset>
+
+      <div className="flex flex-col gap-1">
+        <label htmlFor="upload-folder" className="text-sm font-medium text-foreground">
+          Folder
+        </label>
+        <select
+          id="upload-folder"
+          value={folder}
+          disabled={uploading}
+          onChange={(event) => setFolder(event.target.value)}
+          className="rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+        >
+          <option value="">Automatic, by kind</option>
+          {FOLDERS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        {docType === "other" && !folder && (
+          <p className="text-xs text-muted-foreground">Not sure where this belongs, so it goes in Other. Choose a folder to file it somewhere else.</p>
+        )}
+      </div>
 
       {status === "error" && (
         <p role="alert" className="text-sm text-destructive">

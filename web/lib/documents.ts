@@ -9,6 +9,8 @@ export type DocumentSummary = {
   // When its status last changed. What "stuck" is measured from, so a document that was just
   // retried is not stuck because it was uploaded long ago. Absent on older rows.
   status_changed_at?: string | null;
+  // Which storage folder the file is in. Absent on older responses, when it is the folder for its kind.
+  folder?: string | null;
   // Why a read failed, a short code from the API. Only present while the status is failed.
   failure_reason?: string | null;
   // How far a read has got while it is processing: parts done out of the total. Otherwise empty.

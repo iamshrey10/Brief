@@ -17,7 +17,8 @@ import {
 import { DocTypeIcon } from "@/components/doc-type-icon";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { deleteDocument, MAX_FILENAME_LENGTH, updateDocument } from "@/lib/document-actions";
+import { deleteDocument, MAX_FILENAME_LENGTH, moveDocument, updateDocument } from "@/lib/document-actions";
+import { FOLDERS, folderOf, isFiledElsewhere, folderLabel } from "@/lib/folders";
 import { retryDocument } from "@/lib/retry";
 import { rereadDocument } from "@/lib/reread";
 import {
@@ -94,6 +95,7 @@ function EditForm({
 }) {
   const [name, setName] = useState(doc.filename);
   const [kind, setKind] = useState(doc.doc_type);
+  const [folder, setFolder] = useState(folderOf(doc));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const nameInput = useRef<HTMLInputElement>(null);
@@ -109,7 +111,8 @@ function EditForm({
   const nameChanged = trimmed !== doc.filename;
   const kindChanged = kind !== doc.doc_type;
   const nameOk = trimmed.length > 0 && trimmed.length <= MAX_FILENAME_LENGTH;
-  const canSave = nameOk && (nameChanged || kindChanged) && !saving;
+  const folderChanged = folder !== folderOf(doc);
+  const canSave = nameOk && (nameChanged || kindChanged || folderChanged) && !saving;
 
   // The kinds Brief knows, plus the document's own if it is one that is no longer offered.
   const kinds = Object.entries(DOC_TYPE_LABELS);
@@ -125,10 +128,25 @@ function EditForm({
     if (nameChanged) changes.filename = trimmed;
     if (kindChanged) changes.doc_type = kind;
 
-    const outcome = await updateDocument(doc.id, changes);
+    let saved: DocumentSummary = doc;
+    if (nameChanged || kindChanged) {
+      const outcome = await updateDocument(doc.id, changes);
+      if (!outcome.ok) {
+        setSaving(false);
+        return setError(outcome.message);
+      }
+      saved = outcome.result;
+    }
+    if (folderChanged) {
+      const moved = await moveDocument(doc.id, folder);
+      if (!moved.ok) {
+        setSaving(false);
+        return setError(nameChanged || kindChanged ? `Your changes were saved, but the file was not moved. ${moved.message}` : moved.message);
+      }
+      saved = { ...saved, folder: moved.result.folder ?? folder };
+    }
     setSaving(false);
-    if (outcome.ok) onSaved(outcome.result);
-    else setError(outcome.message);
+    onSaved(saved);
   }
 
   return (
@@ -166,6 +184,22 @@ function EditForm({
           </select>
         </label>
       </div>
+
+      <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+        Folder
+        <select
+          value={folder}
+          onChange={(event) => setFolder(event.target.value)}
+          disabled={saving}
+          className="rounded-md border border-border bg-background px-3 py-2 text-sm font-normal text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+        >
+          {FOLDERS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </label>
 
       {trimmed.length === 0 && (
         <p className="text-xs text-muted-foreground">A name can&apos;t be empty.</p>
@@ -424,6 +458,7 @@ function DocumentRow({
         <span className="block truncate text-xs text-muted-foreground">
           {typeLabel}
           {uploaded && ` · Uploaded ${uploaded}`}
+          {isFiledElsewhere(doc) && ` · In ${folderLabel(folderOf(doc))}`}
         </span>
         {progress && <span className="mt-0.5 block text-xs text-muted-foreground">{progress}</span>}
         {failure && <span className="mt-0.5 block text-xs text-muted-foreground">{failure}</span>}
