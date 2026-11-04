@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 export const APP_SECTIONS = [
   { id: "dashboard", href: "/dashboard", label: "Dashboard" },
   { id: "documents", href: "/dashboard/documents", label: "Documents" },
+  { id: "shared", href: "/dashboard/shared", label: "Shared" },
   { id: "profile", href: "/dashboard/profile", label: "Profile" },
 ] as const;
 
@@ -30,7 +31,7 @@ export function AppHeader({
   return (
     <header className="sticky top-0 z-40 border-b border-border/70 bg-background/85 backdrop-blur print:hidden">
       <div className={`mx-auto flex w-full flex-wrap items-center justify-between gap-x-4 px-6 ${widthClass}`}>
-        <div className="flex h-14 items-center gap-8">
+        <div className="flex h-14 items-center gap-6">
           <Link href="/dashboard" className="font-heading text-xl font-semibold tracking-tight text-foreground">
             Brief<span className="text-primary">.</span>
           </Link>
@@ -39,7 +40,7 @@ export function AppHeader({
           </nav>
         </div>
         <div className="flex h-14 min-w-0 items-center gap-3">
-          <p className="hidden max-w-[14rem] truncate text-xs text-muted-foreground md:block" title={email}>
+          <p className="hidden max-w-[12rem] truncate text-xs text-muted-foreground md:block" title={email}>
             {email}
           </p>
           <ThemeToggle />

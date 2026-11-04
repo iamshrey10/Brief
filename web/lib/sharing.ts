@@ -97,6 +97,12 @@ export function asSharedDashboard(body: unknown): SharedDashboard | null {
   };
 }
 
+/** The secret part of a share link, from the whole link or from the secret on its own. Null when it is neither. */
+export function inviteTokenFrom(text: string): string | null {
+  const last = text.trim().replace(/[?#].*$/, "").replace(/\/+$/, "").split("/").pop() ?? "";
+  return /^[A-Za-z0-9_-]{16,200}$/.test(last) ? last : null;
+}
+
 /** The link to send: it opens the page that asks for the code. */
 export function joinLink(origin: string, token: string): string {
   return `${origin}/shared/join/${token}`;
