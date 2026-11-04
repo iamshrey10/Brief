@@ -2,10 +2,13 @@ import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
 import { AppHeader } from "@/components/app-header";
+import { BinList } from "@/components/bin-list";
 import { DeleteAccount } from "@/components/delete-account";
 import { ThemeChoice } from "@/components/theme-choice";
 import { UsageCard } from "@/components/usage-card";
+import { backendGet } from "@/lib/backend";
 import { initialOf } from "@/lib/profile";
+import { asTrash } from "@/lib/trash";
 import { mintServiceToken } from "@/lib/service-token";
 import { parseUsage, type Usage } from "@/lib/usage";
 
@@ -29,7 +32,8 @@ export default async function ProfilePage() {
   const email = (await auth())?.user?.email;
   // The proxy already turns visitors away, and this makes the page safe on its own too.
   if (!email) redirect("/");
-  const usage = await fetchUsageToday(email);
+  const [usage, trashBody] = await Promise.all([fetchUsageToday(email), backendGet(email, "/trash")]);
+  const trash = asTrash(trashBody);
 
   return (
     <div className="flex flex-1 flex-col">
@@ -37,7 +41,7 @@ export default async function ProfilePage() {
       <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-8 px-6 py-10">
         <div>
           <h1 className="font-heading text-3xl font-semibold tracking-tight text-foreground md:text-4xl">Profile</h1>
-          <p className="mt-2 max-w-xl text-muted-foreground">Your account, and what you have used today.</p>
+          <p className="mt-2 max-w-xl text-muted-foreground">Your account, what you have used today, and the Bin.</p>
         </div>
 
         <section aria-labelledby="account-heading" className="rounded-2xl border border-border bg-card p-6">
@@ -59,6 +63,16 @@ export default async function ProfilePage() {
         </section>
 
         <UsageCard usage={usage} />
+
+        <section id="bin" aria-labelledby="bin-heading" className="scroll-mt-6 rounded-2xl border border-border bg-card p-6">
+          <h2 id="bin-heading" className="text-lg font-semibold tracking-tight text-foreground">
+            Bin
+          </h2>
+          <p className="mt-1 mb-4 text-sm text-muted-foreground">
+            Documents you delete stay here for 7 days. Restore one, or delete it for good.
+          </p>
+          <BinList initial={trash} />
+        </section>
 
         <section aria-labelledby="appearance-heading" className="rounded-2xl border border-border bg-card p-6">
           <h2 id="appearance-heading" className="text-lg font-semibold tracking-tight text-foreground">

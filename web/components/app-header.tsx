@@ -9,7 +9,6 @@ import { cn } from "@/lib/utils";
 export const APP_SECTIONS = [
   { id: "dashboard", href: "/dashboard", label: "Dashboard" },
   { id: "documents", href: "/dashboard/documents", label: "Documents" },
-  { id: "bin", href: "/dashboard/bin", label: "Bin" },
   { id: "profile", href: "/dashboard/profile", label: "Profile" },
 ] as const;
 

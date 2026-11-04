@@ -35,7 +35,7 @@ test("the Dashboard home fits a phone, every section inside the screen and no si
   }
 });
 
-test("the Profile page fits a phone, with the four sections on a row of their own and no sideways scrolling", async ({ page }) => {
+test("the Profile page fits a phone, with the three sections on a row of their own and no sideways scrolling", async ({ page }) => {
   await page.goto("/dashboard/profile");
   await expect(page.getByRole("region", { name: "Today's limits" })).toBeVisible();
 
@@ -43,11 +43,11 @@ test("the Profile page fits a phone, with the four sections on a row of their ow
   const sections = page.getByRole("navigation", { name: "Sections" }).filter({ visible: true });
   await expect(sections).toHaveCount(1);
   const links = await sections.getByRole("link").all();
-  expect(links).toHaveLength(4);
+  expect(links).toHaveLength(3);
   const boxes = await Promise.all(links.map((link) => link.boundingBox()));
-  // All four on one row, and the last one inside the screen.
+  // All three on one row, and the last one inside the screen.
   expect(new Set(boxes.map((box) => box!.y)).size).toBe(1);
-  const last = boxes[3]!;
+  const last = boxes[2]!;
   expect(last.x + last.width).toBeLessThanOrEqual(390);
 });
 

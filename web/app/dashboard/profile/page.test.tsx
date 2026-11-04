@@ -24,7 +24,7 @@ const USAGE = {
 beforeEach(() => {
   authMock.mockReset();
   fetchMock.mockReset();
-  fetchMock.mockResolvedValue({ ok: true, json: async () => USAGE });
+  fetchMock.mockImplementation(async (url: string) => ({ ok: true, json: async () => (/\/trash$/.test(url) ? [] : USAGE) }));
   vi.stubGlobal("fetch", fetchMock);
 });
 
@@ -79,9 +79,9 @@ describe("the profile page", () => {
 
     await page();
 
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock.mock.calls[0][0]).toMatch(/\/me\/usage$/);
-    expect(fetchMock.mock.calls[0][1]).toMatchObject({ headers: { Authorization: "Bearer signed-token" }, cache: "no-store" });
+    const call = fetchMock.mock.calls.find(([url]) => /\/me\/usage$/.test(url))!;
+    expect(call).toBeDefined();
+    expect(call[1]).toMatchObject({ headers: { Authorization: "Bearer signed-token" }, cache: "no-store" });
   });
 
   it("shows today's limits from the answer", async () => {
@@ -111,6 +111,31 @@ describe("the profile page", () => {
     fetchMock.mockRejectedValue(new TypeError("fetch failed"));
 
     expect(await page()).toContain("Your usage is not available right now");
+  });
+
+  it("has the Bin as a section of its own, with what is in it", async () => {
+    authMock.mockResolvedValue({ user: { email: "reader@example.com" } });
+    fetchMock.mockImplementation(async (url: string) => ({
+      ok: true,
+      json: async () =>
+        /\/trash$/.test(url)
+          ? [{ id: "d1", filename: "maple-lease.pdf", doc_type: "lease", deleted_at: new Date().toISOString(), days_left: 6 }]
+          : USAGE,
+    }));
+
+    const html = await page();
+
+    expect(html).toContain('id="bin"');
+    expect(html).toMatch(/<h2[^>]*>Bin<\/h2>/);
+    expect(html).toContain("maple-lease.pdf");
+    expect(html).toContain("6 days left");
+  });
+
+  it("shows the empty Bin, and still the page, when the Bin cannot be read", async () => {
+    authMock.mockResolvedValue({ user: { email: "reader@example.com" } });
+    fetchMock.mockImplementation(async (url: string) => (/\/trash$/.test(url) ? { ok: false, json: async () => ({}) } : { ok: true, json: async () => USAGE }));
+
+    expect(await page()).toContain("The bin is empty");
   });
 
   it("asks the API for nothing when nobody is signed in", async () => {
