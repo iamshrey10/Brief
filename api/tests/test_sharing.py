@@ -370,3 +370,46 @@ async def test_deleting_an_account_removes_the_shares_it_was_part_of(client, db_
     db_session.expire_all()
     assert (await db_session.execute(select(DashboardShare))).scalars().all() == []
     assert (await db_session.execute(select(Document).where(Document.user_id == owner_id))).scalars().all() == []
+
+
+async def test_the_viewer_sees_what_was_found_in_each_document_but_not_the_quotes(client, db_session, test_user):
+    from app.key_term_fields import fields_for
+    from app.models import Clause, Extraction
+
+    friend = await make_user(db_session)
+    document = await _ready_document(db_session, test_user)
+    clause = Clause(document_id=document.id, clause_index=0, page_number=1, char_start=0, char_end=9, text="Rent is $1,800 a month.")
+    db_session.add(clause)
+    await db_session.flush()
+    fields = fields_for("lease")
+    for index, field in enumerate(fields):
+        found = index == 0
+        db_session.add(
+            Extraction(
+                document_id=document.id,
+                clause_id=clause.id if found else None,
+                field_name=field.name,
+                value="$1,800 a month" if found else None,
+                quote="Rent is $1,800 a month." if found else None,
+            )
+        )
+    await db_session.commit()
+    invitation = await share_with(client, db_session, test_user, friend)
+
+    act_as(friend)
+    response = await client.get(f"/shared/{invitation['id']}/dashboard")
+
+    assert response.json()["documents"][0]["key_terms"] == [{"label": fields[0].label, "value": "$1,800 a month"}]
+    assert "Rent is $1,800 a month." not in response.text
+    assert str(clause.id) not in response.text
+
+
+async def test_a_document_whose_terms_are_not_read_yet_has_none_to_show(client, db_session, test_user):
+    friend = await make_user(db_session)
+    await _ready_document(db_session, test_user)
+    invitation = await share_with(client, db_session, test_user, friend)
+
+    act_as(friend)
+    shown = (await client.get(f"/shared/{invitation['id']}/dashboard")).json()
+
+    assert shown["documents"][0]["key_terms"] == []

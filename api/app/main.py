@@ -1285,9 +1285,19 @@ async def list_shared_with_me(
     ]
 
 
+class SharedTerm(BaseModel):
+    label: str
+    value: str
+
+
+class SharedDocument(DocumentSummary):
+    # What was found in the document, in plain words. Only the label and the value: the quotes and where they came from stay with the owner.
+    key_terms: list[SharedTerm] = []
+
+
 class SharedDashboard(BaseModel):
     owner_email: str
-    documents: list[DocumentSummary]
+    documents: list[SharedDocument]
     insights: list[DocumentInsight]
     key_dates: list[KeyDate]
 
@@ -1316,9 +1326,14 @@ async def view_shared_dashboard(
         .where(Document.user_id == owner_id, Document.deleted_at.is_(None))
         .order_by(Document.created_at.desc())
     )
+    documents: list[SharedDocument] = []
+    for document in result.scalars().all():
+        saved = await load_key_terms(session, document.id, document.doc_type)
+        terms = [SharedTerm(label=t.label, value=t.value) for t in saved.terms if t.found and t.value] if saved else []
+        documents.append(SharedDocument(**DocumentSummary.from_document(document).model_dump(), key_terms=terms))
     return SharedDashboard(
         owner_email=owner_email,
-        documents=[DocumentSummary.from_document(d) for d in result.scalars().all()],
+        documents=documents,
         insights=await saved_insights(session, owner_id),
         key_dates=await saved_key_dates(session, owner_id),
     )
