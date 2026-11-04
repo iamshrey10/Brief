@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
@@ -9,6 +10,7 @@ import { LeaseCountdown } from "@/components/lease-countdown";
 import { KindBreakdown } from "@/components/kind-breakdown";
 import { OpenQuestions } from "@/components/open-questions";
 import { RecentActivity } from "@/components/recent-activity";
+import { buttonVariants } from "@/components/ui/button";
 import { Rise } from "@/components/rise";
 import { backendGet } from "@/lib/backend";
 import { asKeyDates, nextLeaseEnd } from "@/lib/lease-end";
@@ -36,9 +38,14 @@ export default async function DashboardHome() {
     <div className="flex flex-1 flex-col">
       <AppHeader email={email} current="dashboard" />
       <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-8 px-6 py-10">
-        <div>
-          <h1 className="font-heading text-3xl font-semibold tracking-tight text-foreground md:text-4xl">Dashboard</h1>
-          <p className="mt-2 max-w-xl text-muted-foreground">Where your documents stand, and what needs doing next.</p>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="font-heading text-3xl font-semibold tracking-tight text-foreground md:text-4xl">Dashboard</h1>
+            <p className="mt-2 max-w-xl text-muted-foreground">Where your documents stand, and what needs doing next.</p>
+          </div>
+          <Link href="/dashboard/profile#sharing" className={buttonVariants({ variant: "outline", size: "lg" })}>
+            Share dashboard
+          </Link>
         </div>
 
         <Rise order={1}>
