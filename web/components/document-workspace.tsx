@@ -118,7 +118,7 @@ export function DocumentWorkspace({
           id="panel-ask"
           aria-labelledby="tab-ask"
           hidden={tab !== "ask"}
-          className="flex min-h-0 flex-1 flex-col"
+          className="flex min-h-0 flex-1 flex-col lg:h-[32rem] lg:flex-none"
         >
           <ChatPanel
             documentId={documentId}
@@ -129,7 +129,8 @@ export function DocumentWorkspace({
           />
         </div>
       </div>
-      <div className="print:hidden">
+      {/* The document scrolls inside its own pane, so the tools on the left never move with it. */}
+      <div className="lg:sticky lg:top-20 lg:h-[calc(100vh-6.5rem)] lg:overflow-y-auto lg:overscroll-contain lg:pr-1 print:hidden">
         <ClauseViewer clauses={clauses} activeCitation={activeCitation} />
       </div>
     </div>
