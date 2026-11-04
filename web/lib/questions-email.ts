@@ -2,8 +2,8 @@ import type { ChecklistAnswer } from "@/lib/overview";
 
 const SUBJECTS: Record<string, { subject: string; about: string }> = {
   lease: { subject: "Questions about the lease before I sign", about: "the lease" },
-  loan: { subject: "Questions about the loan before I sign", about: "the loan" },
-  offer: { subject: "Questions about the job offer", about: "the offer" },
+  loan: { subject: "Questions about the loan before I sign", about: "the loan agreement" },
+  offer: { subject: "Questions about the job offer", about: "the offer letter" },
   other: { subject: "Questions about the agreement before I sign", about: "the agreement" },
 };
 
@@ -21,7 +21,13 @@ export type QuestionsEmail = {
 
 function bodyFor(about: string, questions: string[]): string {
   const list = questions.map((question, index) => `${index + 1}. ${question}`).join("\n");
-  return `Hello,\n\nBefore I sign, I have a few questions about ${about}:\n\n${list}\n\nThank you,\n`;
+  const count = questions.length === 1 ? "one question" : "a few questions";
+  const ask = questions.length === 1 ? "Could you please clarify this for me?" : "Could you please clarify each of these for me?";
+  return (
+    `Hi,\n\nThank you for sending over ${about}. I have read it carefully, and before I sign I have ${count} I would like to understand better.\n\n` +
+    `${ask}\n\n${list}\n\n` +
+    `If it is easier, please reply in writing so I have it for my records. I am also happy to talk it through by phone.\n\nThank you for your time,\n`
+  );
 }
 
 function linkFor(subject: string, body: string): string {
