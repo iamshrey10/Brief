@@ -108,3 +108,34 @@ export async function deleteForGood(documentId: string): Promise<ActionOutcome<n
     return { ok: false, message: messageForDeleteFailure(0) };
   }
 }
+
+/** Plain-language messages for each way moving a document to another folder can fail. */
+export function messageForMoveFailure(status: number): string {
+  switch (status) {
+    case 401:
+      return "Your session expired. Sign in again to move this.";
+    case 404:
+      return "That document is no longer here.";
+    case 409:
+      return "That document is still uploading. Move it once it has finished.";
+    case 429:
+      return "Too many requests at once. Wait a few seconds and try again.";
+    default:
+      return "Couldn't move that just now. It is still in its folder, so try again in a moment.";
+  }
+}
+
+/** Moves a document's file to another folder. A failure leaves it where it was. */
+export async function moveDocument(documentId: string, folder: string): Promise<ActionOutcome<DocumentSummary>> {
+  try {
+    const res = await fetch(`/api/backend/documents/${encodeURIComponent(documentId)}/move`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ folder }),
+    });
+    if (res.ok) return { ok: true, result: await res.json() };
+    return { ok: false, message: withReference(messageForMoveFailure(res.status), referenceFrom(res)) };
+  } catch {
+    return { ok: false, message: messageForMoveFailure(0) };
+  }
+}

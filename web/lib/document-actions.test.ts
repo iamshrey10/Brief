@@ -3,6 +3,8 @@ import {
   deleteDocument,
   deleteForGood,
   messageForDeleteFailure,
+  messageForMoveFailure,
+  moveDocument,
   messageForRestoreFailure,
   messageForUpdateFailure,
   restoreDocument,
@@ -244,4 +246,36 @@ describe("deleteForGood", () => {
 
     expect(await deleteForGood("d1")).toEqual({ ok: false, message: messageForDeleteFailure(0) });
   });
+});
+
+describe("moveDocument", () => {
+  it("asks for the move, naming the document safely, and returns the document", async () => {
+    fetchMock.mockResolvedValue(response({ id: "a", folder: "Other" }));
+
+    expect(await moveDocument("a/b c", "Other")).toEqual({ ok: true, result: { id: "a", folder: "Other" } });
+    expect(fetchMock).toHaveBeenCalledWith("/api/backend/documents/a%2Fb%20c/move", expect.objectContaining({ method: "POST", body: JSON.stringify({ folder: "Other" }) }));
+  });
+
+  it("explains a refusal with the reference", async () => {
+    fetchMock.mockResolvedValue(response({}, 409, { "X-Request-ID": "abcdef12-3456" }));
+
+    const outcome = await moveDocument("a", "Other");
+
+    expect(!outcome.ok && outcome.message).toContain("still uploading");
+    expect(!outcome.ok && outcome.message).toContain("Reference: abcdef12");
+  });
+
+  it("says it could not move rather than throwing when the server cannot be reached", async () => {
+    fetchMock.mockRejectedValue(new TypeError("fetch failed"));
+
+    expect(await moveDocument("a", "Other")).toEqual({ ok: false, message: messageForMoveFailure(0) });
+  });
+
+  it.each([
+    [401, "session expired"],
+    [404, "no longer here"],
+    [409, "still uploading"],
+    [429, "Too many requests"],
+    [502, "still in its folder"],
+  ])("a %i says %s", (status, text) => expect(messageForMoveFailure(status)).toContain(text));
 });

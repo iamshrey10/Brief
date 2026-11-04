@@ -4,14 +4,14 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { DocumentSummary } from "@/lib/documents";
-import { deleteDocument, updateDocument } from "@/lib/document-actions";
+import { deleteDocument, moveDocument, updateDocument } from "@/lib/document-actions";
 import { retryDocument } from "@/lib/retry";
 import { rereadDocument } from "@/lib/reread";
 import { EMPTY_STATE_PROMISES, DocumentList } from "./document-list";
 
 vi.mock("@/lib/document-actions", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/document-actions")>();
-  return { ...actual, deleteDocument: vi.fn(), updateDocument: vi.fn() };
+  return { ...actual, deleteDocument: vi.fn(), updateDocument: vi.fn(), moveDocument: vi.fn() };
 });
 
 vi.mock("@/lib/retry", async (importOriginal) => {
@@ -28,6 +28,7 @@ const retryMock = vi.mocked(retryDocument);
 const rereadMock = vi.mocked(rereadDocument);
 const deleteMock = vi.mocked(deleteDocument);
 const updateMock = vi.mocked(updateDocument);
+const moveMock = vi.mocked(moveDocument);
 
 function doc(
   status: string,
@@ -465,6 +466,113 @@ describe("DocumentList", () => {
       render(<DocumentList documents={[doc("pending", "a", "one.pdf")]} />);
 
       expect(screen.queryByRole("button", { name: "View original one.pdf" })).not.toBeInTheDocument();
+    });
+  });
+
+  describe("folders", () => {
+    it("says nothing about the folder when a document is in the one for its kind", () => {
+      render(<DocumentList documents={[doc("ready", "a", "Lease.pdf", { doc_type: "lease", folder: "Lease" })]} />);
+
+      expect(screen.getByRole("link")).not.toHaveTextContent("In ");
+    });
+
+    it("says which folder a document is in when it is filed somewhere else", () => {
+      render(<DocumentList documents={[doc("ready", "a", "Lease.pdf", { doc_type: "lease", folder: "Personal_Documents" })]} />);
+
+      expect(screen.getByRole("link")).toHaveTextContent("In Personal documents");
+    });
+
+    it("offers the five folders when editing, starting on the one it is in", async () => {
+      const user = userEvent.setup();
+      render(<DocumentList documents={[doc("ready", "a", "Lease.pdf", { doc_type: "lease", folder: "Lease" })]} />);
+      await user.click(screen.getByRole("button", { name: "Edit Lease.pdf" }));
+
+      const select = screen.getByLabelText("Folder");
+      expect(select).toHaveValue("Lease");
+      expect(within(select).getAllByRole("option").map((option) => option.textContent)).toEqual([
+        "Lease",
+        "Education loan",
+        "Job offers",
+        "Personal documents",
+        "Other",
+      ]);
+    });
+
+    it("moves the file when only the folder is changed, and does not touch the name or kind", async () => {
+      moveMock.mockResolvedValue({ ok: true, result: doc("ready", "a", "Lease.pdf", { doc_type: "lease", folder: "Personal_Documents" }) });
+      const user = userEvent.setup();
+      const onUpdated = vi.fn();
+      render(<DocumentList documents={[doc("ready", "a", "Lease.pdf", { doc_type: "lease", folder: "Lease" })]} onUpdated={onUpdated} />);
+      await user.click(screen.getByRole("button", { name: "Edit Lease.pdf" }));
+      await user.selectOptions(screen.getByLabelText("Folder"), "Personal_Documents");
+
+      await user.click(screen.getByRole("button", { name: "Save" }));
+
+      expect(moveMock).toHaveBeenCalledExactlyOnceWith("a", "Personal_Documents");
+      expect(updateMock).not.toHaveBeenCalled();
+      expect(onUpdated).toHaveBeenCalledWith(expect.objectContaining({ id: "a", folder: "Personal_Documents" }));
+    });
+
+    it("saves the name and then moves the file when both are changed", async () => {
+      updateMock.mockResolvedValue({ ok: true, result: doc("ready", "a", "New.pdf", { doc_type: "lease", folder: "Lease" }) });
+      moveMock.mockResolvedValue({ ok: true, result: doc("ready", "a", "New.pdf", { doc_type: "lease", folder: "Other" }) });
+      const user = userEvent.setup();
+      const onUpdated = vi.fn();
+      render(<DocumentList documents={[doc("ready", "a", "Lease.pdf", { doc_type: "lease", folder: "Lease" })]} onUpdated={onUpdated} />);
+      await user.click(screen.getByRole("button", { name: "Edit Lease.pdf" }));
+      await user.clear(screen.getByLabelText("Name"));
+      await user.type(screen.getByLabelText("Name"), "New.pdf");
+      await user.selectOptions(screen.getByLabelText("Folder"), "Other");
+
+      await user.click(screen.getByRole("button", { name: "Save" }));
+
+      expect(updateMock).toHaveBeenCalledWith("a", { filename: "New.pdf" });
+      expect(moveMock).toHaveBeenCalledWith("a", "Other");
+      expect(onUpdated).toHaveBeenCalledWith(expect.objectContaining({ filename: "New.pdf", folder: "Other" }));
+    });
+
+    it("keeps the form open and says why when the move fails, and says the other changes were saved", async () => {
+      updateMock.mockResolvedValue({ ok: true, result: doc("ready", "a", "New.pdf", { doc_type: "lease" }) });
+      moveMock.mockResolvedValue({ ok: false, message: "Couldn't move that just now." });
+      const user = userEvent.setup();
+      const onUpdated = vi.fn();
+      render(<DocumentList documents={[doc("ready", "a", "Lease.pdf", { doc_type: "lease", folder: "Lease" })]} onUpdated={onUpdated} />);
+      await user.click(screen.getByRole("button", { name: "Edit Lease.pdf" }));
+      await user.clear(screen.getByLabelText("Name"));
+      await user.type(screen.getByLabelText("Name"), "New.pdf");
+      await user.selectOptions(screen.getByLabelText("Folder"), "Other");
+
+      await user.click(screen.getByRole("button", { name: "Save" }));
+
+      expect(await screen.findByRole("alert")).toHaveTextContent("Your changes were saved, but the file was not moved. Couldn't move that just now.");
+      expect(onUpdated).not.toHaveBeenCalled();
+    });
+
+    it("shows only the reason when only the move was asked for and it fails", async () => {
+      moveMock.mockResolvedValue({ ok: false, message: "That document is still uploading." });
+      const user = userEvent.setup();
+      render(<DocumentList documents={[doc("ready", "a", "Lease.pdf", { doc_type: "lease", folder: "Lease" })]} />);
+      await user.click(screen.getByRole("button", { name: "Edit Lease.pdf" }));
+      await user.selectOptions(screen.getByLabelText("Folder"), "Other");
+
+      await user.click(screen.getByRole("button", { name: "Save" }));
+
+      expect(await screen.findByRole("alert")).toHaveTextContent("still uploading");
+      expect(screen.getByRole("alert")).not.toHaveTextContent("changes were saved");
+    });
+
+    it("does not move anything when the folder is left alone", async () => {
+      updateMock.mockResolvedValue({ ok: true, result: doc("ready", "a", "New.pdf", { doc_type: "lease" }) });
+      const user = userEvent.setup();
+      render(<DocumentList documents={[doc("ready", "a", "Lease.pdf", { doc_type: "lease", folder: "Lease" })]} />);
+      await user.click(screen.getByRole("button", { name: "Edit Lease.pdf" }));
+      await user.clear(screen.getByLabelText("Name"));
+      await user.type(screen.getByLabelText("Name"), "New.pdf");
+
+      await user.click(screen.getByRole("button", { name: "Save" }));
+
+      await waitFor(() => expect(updateMock).toHaveBeenCalled());
+      expect(moveMock).not.toHaveBeenCalled();
     });
   });
 

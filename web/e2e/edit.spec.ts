@@ -68,3 +68,15 @@ test("a save that fails says so with a reference code, and keeps the form open w
   await expect(page.getByLabel("Name")).toHaveValue("boom-lease.pdf");
   await expect(page.getByRole("button", { name: "Save" })).toBeEnabled();
 });
+
+test("a document can be moved to another folder, which the list then shows", async ({ page }) => {
+  // The form was opened by beforeEach.
+  const form = page.getByRole("form", { name: "Edit sample-lease.pdf" });
+  await form.getByLabel("Folder").selectOption("Personal_Documents");
+  await form.getByRole("button", { name: "Save", exact: true }).click();
+
+  const row = page.getByRole("region", { name: "Your documents" }).getByRole("listitem").filter({ hasText: "sample-lease.pdf" });
+  await expect(row).toContainText("In Personal documents");
+  await page.reload();
+  await expect(row).toContainText("In Personal documents");
+});

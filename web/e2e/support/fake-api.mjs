@@ -127,6 +127,8 @@ function visible(document) {
 }
 
 const DOC_TYPES = new Set(["loan", "lease", "offer", "other"]);
+const FOLDERS = new Set(["Lease", "Education_Loan", "Job_Offers", "Personal_Documents", "Other"]);
+const FOLDER_FOR_KIND = { lease: "Lease", loan: "Education_Loan", offer: "Job_Offers", other: "Other" };
 
 function send(response, status, body) {
   response.writeHead(status, { "Content-Type": "application/json" });
@@ -219,13 +221,14 @@ const server = createServer(async (request, response) => {
     return send(response, 200, state.documents.map(visible));
   }
   if (method === "POST" && path === "/documents") {
-    const { filename = "", doc_type: kind = "", content_type: contentType = "", file_size_bytes: size = 0 } = await readJson(request);
+    const { filename = "", doc_type: kind = "", content_type: contentType = "", file_size_bytes: size = 0, folder } = await readJson(request);
+    if (folder !== undefined && !FOLDERS.has(folder)) return send(response, 400, { detail: "unknown folder" });
     if (!DOC_TYPES.has(kind) || !contentType || size <= 0) return send(response, 400, { detail: "unsupported file type" });
     if (/limit/i.test(filename)) return send(response, 409, { detail: "You can keep up to 25 documents. Delete one you no longer need to upload another." });
     if (/daily/i.test(filename)) return send(response, 429, { detail: "You have reached today's limit of 30 document reads. Try again tomorrow." });
     state.created += 1;
     const id = `doc-new-${state.created}`;
-    state.documents.unshift({ id, filename, doc_type: kind, status: "pending", ocr_confidence: null, created_at: new Date().toISOString(), status_changed_at: new Date().toISOString() });
+    state.documents.unshift({ id, filename, doc_type: kind, folder: folder ?? FOLDER_FOR_KIND[kind], status: "pending", ocr_confidence: null, created_at: new Date().toISOString(), status_changed_at: new Date().toISOString() });
     const target = /storagefail/i.test(filename) ? "broken" : id;
     return send(response, 200, { document_id: id, upload_url: `http://localhost:${PORT}/__upload/${target}` });
   }
@@ -365,6 +368,13 @@ const server = createServer(async (request, response) => {
       state.documents = state.documents.filter((candidate) => candidate.id !== id);
       state.trash.unshift(document);
       return send(response, 204);
+    }
+    if (method === "POST" && part === "move") {
+      const { folder } = await readJson(request);
+      if (!FOLDERS.has(folder)) return send(response, 400, { detail: "unknown folder" });
+      if (/nomove/i.test(document.filename)) return send(response, 502, { detail: "could not move the file, it is still where it was" });
+      document.folder = folder;
+      return send(response, 200, visible(document));
     }
     if (method === "POST" && part === "ask") {
       if (usageFor(reader).ask.left === 0) return send(response, 429, { detail: "You have reached today's limit of 100 questions. Try again tomorrow." });
