@@ -66,8 +66,8 @@ export function DocumentWorkspace({
   }
 
   return (
-    <div className="grid items-start gap-6 lg:grid-cols-2 print:block">
-      <div className="flex max-h-[80vh] min-h-[28rem] flex-col gap-3 lg:sticky lg:top-20 lg:h-[calc(100vh-6.5rem)] lg:max-h-none print:static print:h-auto print:max-h-none">
+    <div className="grid items-start gap-6 lg:min-h-0 lg:flex-1 lg:grid-cols-2 lg:grid-rows-1 lg:items-stretch print:block">
+      <div className="flex max-h-[80vh] min-h-[28rem] flex-col gap-3 lg:h-full lg:max-h-none lg:min-h-0 print:static print:h-auto print:max-h-none">
         <div
           role="tablist"
           aria-label="Document tools"
@@ -129,8 +129,8 @@ export function DocumentWorkspace({
           />
         </div>
       </div>
-      {/* The document scrolls inside its own pane, so the tools on the left never move with it. */}
-      <div className="lg:sticky lg:top-20 lg:h-[calc(100vh-6.5rem)] lg:overflow-y-auto lg:overscroll-contain lg:pr-1 print:hidden">
+      {/* Each side scrolls on its own, so scrolling one never moves the other. */}
+      <div className="lg:h-full lg:min-h-0 lg:overflow-y-auto lg:pr-1 print:hidden">
         <ClauseViewer clauses={clauses} activeCitation={activeCitation} />
       </div>
     </div>
