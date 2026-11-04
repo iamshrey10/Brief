@@ -42,6 +42,18 @@ describe("the join form", () => {
     expect(screen.queryByLabelText("Six digit code")).not.toBeInTheDocument();
   });
 
+  it("names the owner by their name when they gave one", async () => {
+    joinMock.mockResolvedValue({ ok: true, result: { owner_email: "owner@example.com", owner_name: "Maya Rao", status: "requested" } });
+    render(<JoinForm token="t" />);
+    type("482913");
+
+    fireEvent.click(screen.getByRole("button", { name: "Ask for access" }));
+
+    const status = await screen.findByRole("status");
+    expect(status).toHaveTextContent("Maya Rao");
+    expect(status).not.toHaveTextContent("owner@example.com");
+  });
+
   it("shows why it failed, keeps the code typed, and can be tried again", async () => {
     joinMock.mockResolvedValue({ ok: false, message: "That code isn't right." });
     render(<JoinForm token="t" />);

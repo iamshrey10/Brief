@@ -24,34 +24,36 @@ const reply = (status: number, body?: unknown, headers: Record<string, string> =
 
 describe("reading what the backend sends", () => {
   it("keeps well-formed shares and drops the rest", () => {
-    const good = { id: "a", label: "Mum", status: "active", viewer_email: "m@x.com", created_at: "2026-11-01", expires_at: null, last_viewed_at: null };
+    const good = { id: "a", label: "Mum", status: "active", viewer_email: "m@x.com", viewer_name: "Maya Rao", created_at: "2026-11-01", expires_at: null, last_viewed_at: null };
     expect(asShares([good, { id: "b", status: "weird", created_at: "x" }, null, { status: "active" }])).toEqual([good]);
     expect(asShares({ detail: "x" })).toEqual([]);
   });
 
   it("fills in what is missing with nothing", () => {
-    expect(asShares([{ id: "a", status: "invited", created_at: "2026-11-01" }])[0]).toMatchObject({ label: null, viewer_email: null, expires_at: null, last_viewed_at: null });
+    expect(asShares([{ id: "a", status: "invited", created_at: "2026-11-01" }])[0]).toMatchObject({ label: null, viewer_email: null, viewer_name: null, expires_at: null, last_viewed_at: null });
   });
 
   it("keeps only dashboards that are waiting or active", () => {
     expect(
       asSharedWithMe([
-        { id: "a", owner_email: "o@x.com", status: "active" },
+        { id: "a", owner_email: "o@x.com", owner_name: "Olu Ade", status: "active" },
         { id: "b", owner_email: "o@x.com", status: "revoked" },
         { id: "c", status: "active" },
       ]),
-    ).toEqual([{ id: "a", owner_email: "o@x.com", status: "active" }]);
+    ).toEqual([{ id: "a", owner_email: "o@x.com", owner_name: "Olu Ade", status: "active" }]);
     expect(asSharedWithMe(null)).toEqual([]);
   });
 
   it("reads a shared dashboard, and gives nothing for an answer that is not one", () => {
     const shown = asSharedDashboard({
       owner_email: "o@x.com",
+      owner_name: "Olu Ade",
       documents: [{ id: "d1", filename: "a.pdf", doc_type: "lease", status: "ready" }],
       insights: [{ document_id: "d1", terms_found: 4, terms_total: 6 }],
       key_dates: [{ document_id: "d1", field: "lease_end", label: "Lease ends", value: "March 9, 2027" }, { field: "x" }],
     });
     expect(shown?.owner_email).toBe("o@x.com");
+    expect(shown?.owner_name).toBe("Olu Ade");
     expect(shown?.documents).toHaveLength(1);
     expect(shown?.insights[0].terms_found).toBe(4);
     expect(shown?.key_dates).toEqual([{ document_id: "d1", field: "lease_end", label: "Lease ends", value: "March 9, 2027" }]);

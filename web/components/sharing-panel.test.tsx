@@ -20,6 +20,7 @@ const share = (over: Partial<Share>): Share => ({
   label: "Mum",
   status: "invited",
   viewer_email: null,
+  viewer_name: null,
   created_at: "2026-11-01T10:00:00Z",
   expires_at: "2026-11-08T10:00:00Z",
   last_viewed_at: null,
@@ -62,6 +63,17 @@ describe("the sharing panel", () => {
     expect(within(list).getByText("sam@example.com").parentElement).toHaveTextContent("Waiting for your approval");
     expect(within(list).getByText("kim@example.com").parentElement).toHaveTextContent("Can view · Looked yesterday");
     expect(screen.getByText("3 of 5 places used")).toBeInTheDocument();
+  });
+});
+
+describe("people with a name", () => {
+  it("shows the name, with the address beneath it, in place of the address alone", () => {
+    render(<SharingPanel initial={[share({ status: "active", viewer_email: "sam@example.com", viewer_name: "Sam Lee" })]} />);
+
+    const item = screen.getByRole("list", { name: "People with access" }).querySelector("li")!;
+    expect(item).toHaveTextContent("Sam Lee");
+    expect(item).toHaveTextContent("sam@example.com");
+    expect(screen.getByRole("button", { name: "Remove access for Sam Lee" })).toBeInTheDocument();
   });
 });
 
