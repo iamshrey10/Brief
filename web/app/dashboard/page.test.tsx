@@ -86,7 +86,7 @@ describe("the dashboard home", () => {
   it("asks for the documents and what is worked out about each, each once", async () => {
     await page();
 
-    expect(getMock.mock.calls.map(([, path]) => path).sort()).toEqual(["/documents", "/me", "/me/insights", "/me/key-dates"]);
+    expect(getMock.mock.calls.map(([, path]) => path).sort()).toEqual(["/documents", "/me", "/me/insights", "/me/key-dates", "/shared"]);
   });
 
   it("shows how long the lease has left when a clear end date was found, and no card when none was", async () => {
@@ -195,5 +195,20 @@ describe("the dashboard home", () => {
 
     expect(order.every((position) => position > 0)).toBe(true);
     expect(order).toEqual([...order].sort((a, b) => a - b));
+  });
+
+  it("shows what was shared with the reader, above the upload card, and nothing when no one shared", async () => {
+    getMock.mockImplementation(async (_email: string, path: string) =>
+      path === "/shared" ? [{ id: "s1", owner_email: "mum@example.com", owner_name: "Asha Rao", status: "active" }] : [],
+    );
+
+    const html = await page();
+
+    expect(html).toContain("Shared with you");
+    expect(html).toContain("Asha Rao");
+    expect(html.indexOf("Shared with you")).toBeLessThan(html.indexOf("Add documents"));
+
+    getMock.mockResolvedValue([]);
+    expect(await page()).not.toContain("Shared with you");
   });
 });
