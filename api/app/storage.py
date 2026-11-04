@@ -6,6 +6,7 @@ from botocore.config import Config
 from botocore.exceptions import ClientError
 
 from app.config import settings
+from app.folders import FOLDERS
 
 MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024  # 50 MB
 ALLOWED_CONTENT_TYPES = {
@@ -33,9 +34,32 @@ def get_client():
     return _client
 
 
-def build_storage_key(user_id: str, filename: str) -> str:
-    safe_name = filename.replace("/", "_")
-    return f"{user_id}/{uuid.uuid4()}-{safe_name}"
+def build_storage_key(user_id: str, filename: str, folder: str = "Other") -> str:
+    """Where a file is kept: this person's part of storage, then the folder, then a name no other file can share."""
+    if folder not in FOLDERS:
+        raise ValueError(f"unknown folder: {folder!r}")
+    safe_name = filename.replace("/", "_").replace("\\", "_")
+    return f"{user_id}/{folder}/{uuid.uuid4()}-{safe_name}"
+
+
+def key_in_folder(storage_key: str, user_id: str, folder: str) -> str:
+    """The key the same file has once it is in another folder: the person's part and the file's own name stay, the folder changes.
+    A key that is not inside this person's own part is refused, so nothing of anyone else's can ever be moved."""
+    if folder not in FOLDERS:
+        raise ValueError(f"unknown folder: {folder!r}")
+    prefix = f"{user_id}/"
+    if not storage_key.startswith(prefix):
+        raise ValueError("that file is not in this person's part of storage")
+    return f"{prefix}{folder}/{storage_key.rsplit('/', 1)[-1]}"
+
+
+def copy_file(source_key: str, target_key: str) -> None:
+    """Makes a second copy of a file under another key, leaving the first where it is."""
+    get_client().copy_object(
+        Bucket=settings.r2_bucket_name,
+        Key=target_key,
+        CopySource={"Bucket": settings.r2_bucket_name, "Key": source_key},
+    )
 
 
 def create_presigned_upload_url(storage_key: str, content_type: str) -> str:

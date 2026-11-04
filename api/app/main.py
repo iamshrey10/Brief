@@ -32,6 +32,8 @@ from app.insights import DocumentInsight, saved_insights
 from app.key_dates import KeyDate, saved_key_dates
 from app.key_terms import KeyTermsGenerationError, KeyTermsResult, get_key_terms, load_key_terms
 from app import sharing
+from app.filing import FilingError, file_document
+from app.folders import FOLDERS, folder_for
 from app.models import ChecklistAnswerRow, Clause, Document, Extraction, User
 from app.qa import AnswerGenerationError, AnswerResult, answer_with_path
 from app.retrieval import hybrid_search, reranked_search
@@ -387,6 +389,8 @@ class CreateUploadRequest(BaseModel):
     doc_type: str
     content_type: str
     file_size_bytes: int
+    # One of the five storage folders. Left out, the file goes in the folder for its kind.
+    folder: str | None = None
 
 
 class CreateUploadResponse(BaseModel):
@@ -414,6 +418,8 @@ async def create_upload(
         raise HTTPException(status_code=400, detail=str(error)) from None
     if body.doc_type not in DOC_TYPES:
         raise HTTPException(status_code=400, detail="unknown document type")
+    if body.folder is not None and body.folder not in FOLDERS:
+        raise HTTPException(status_code=400, detail="unknown folder")
     if body.content_type not in ALLOWED_CONTENT_TYPES:
         raise HTTPException(status_code=400, detail="unsupported file type")
     if body.file_size_bytes <= 0 or body.file_size_bytes > MAX_FILE_SIZE_BYTES:
@@ -438,7 +444,8 @@ async def create_upload(
     # and before any record or upload link exists, so a refusal leaves nothing behind.
     await _spend_or_refuse(session, user, "read")
 
-    storage_key = build_storage_key(str(user.id), filename)
+    folder = folder_for(body.doc_type, body.folder)
+    storage_key = build_storage_key(str(user.id), filename, folder)
 
     document = Document(
         user_id=user.id,
@@ -446,6 +453,7 @@ async def create_upload(
         doc_type=body.doc_type,
         status="pending",
         storage_key=storage_key,
+        folder=folder,
         file_size_bytes=body.file_size_bytes,
         content_type=body.content_type,
     )
@@ -468,6 +476,8 @@ class DocumentSummary(BaseModel):
     created_at: datetime | None = None
     # When its status last changed, which is what decides whether a read has stalled.
     status_changed_at: datetime | None = None
+    # Which storage folder the file is in.
+    folder: str = "Other"
     # Why a read failed, a short code the page turns into plain words. Only set while failed.
     failure_reason: str | None = None
     # How far a read has got while processing: pieces done out of the total, otherwise empty.
@@ -484,6 +494,7 @@ class DocumentSummary(BaseModel):
             ocr_confidence=document.ocr_confidence,
             created_at=document.created_at,
             status_changed_at=document.status_changed_at,
+            folder=document.folder,
             failure_reason=document.failure_reason,
             progress_done=document.progress_done,
             progress_total=document.progress_total,
@@ -754,6 +765,39 @@ class TrashedDocument(BaseModel):
     deleted_at: datetime
     # Whole days left to restore it, counting a part of a day as a day.
     days_left: int
+
+
+class MoveRequest(BaseModel):
+    folder: str
+
+
+@app.post(
+    "/documents/{document_id}/move",
+    tags=["documents"],
+    summary="Move a document to another folder",
+    description=(
+        "Moves the stored file to one of the five folders: Lease, Education_Loan, Job_Offers, Personal_Documents or Other. The file is copied and checked before the old one is removed, so a failure leaves it where it was. A document still uploading or in the bin cannot be moved."
+    ),
+    responses=_errors(400, 401, 404, 409, 502),
+)
+async def move_document(
+    document_id: str,
+    body: MoveRequest,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> DocumentSummary:
+    if body.folder not in FOLDERS:
+        raise HTTPException(status_code=400, detail="unknown folder")
+    document = await _get_owned_document(document_id, user, session)
+    if document.status == "pending":
+        raise HTTPException(status_code=409, detail="the file is still uploading")
+    try:
+        await file_document(session, document, body.folder)
+    except FilingError as error:
+        logger.warning("could not move a document to another folder")
+        raise HTTPException(status_code=502, detail="could not move the file, it is still where it was") from error
+    await session.refresh(document)
+    return DocumentSummary.from_document(document)
 
 
 class DocumentFileLink(BaseModel):

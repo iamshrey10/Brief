@@ -354,6 +354,7 @@ async def test_a_viewer_cannot_use_any_other_route_on_the_owners_documents(clien
     assert (await client.get(f"/documents/{document.id}")).status_code == 404
     assert (await client.get(f"/documents/{document.id}/file")).status_code == 404
     assert (await client.delete(f"/documents/{document.id}")).status_code == 404
+    assert (await client.post(f"/documents/{document.id}/move", json={"folder": "Other"})).status_code == 404
     assert (await client.patch(f"/documents/{document.id}", json={"filename": "x.pdf"})).status_code == 404
     assert (await client.post(f"/documents/{document.id}/ask", json={"question": "hi"})).status_code == 404
 
