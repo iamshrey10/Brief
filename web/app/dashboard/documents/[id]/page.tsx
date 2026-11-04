@@ -111,21 +111,16 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
 
   return (
     <PageShell email={email} fill={isReadable(document.status) && clauses.length > 0}>
-      <div className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <Link href="/dashboard/documents" className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline print:hidden">
-            ← Back to your documents
-          </Link>
-          {isReadable(document.status) && clauses.length > 0 && <PrintButton />}
-        </div>
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-          <h1 className="font-heading text-xl font-semibold tracking-tight break-all text-foreground md:text-2xl">
-            {document.filename}
-          </h1>
-          <span className="rounded-full border border-border bg-accent px-2.5 py-0.5 text-xs font-medium text-accent-foreground">
-            {DOC_TYPE_LABELS[document.doc_type] ?? document.doc_type}
-          </span>
-        </div>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <Link href="/dashboard/documents" className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline print:hidden">
+          ← Back to your documents
+        </Link>
+        <h1 className="font-heading text-xl font-semibold tracking-tight break-all text-foreground md:text-2xl">
+          {document.filename}
+        </h1>
+        <span className="rounded-full border border-border bg-accent px-2.5 py-0.5 text-xs font-medium text-accent-foreground">
+          {DOC_TYPE_LABELS[document.doc_type] ?? document.doc_type}
+        </span>
         {documentFacts(clauses, document.created_at).length > 0 && (
           <dl aria-label="About this document" className="flex flex-wrap gap-x-5 gap-y-1 text-sm text-muted-foreground">
             {documentFacts(clauses, document.created_at).map((fact) => (
@@ -143,6 +138,11 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
               </div>
             ))}
           </dl>
+        )}
+        {isReadable(document.status) && clauses.length > 0 && (
+          <div className="ml-auto">
+            <PrintButton />
+          </div>
         )}
       </div>
 
