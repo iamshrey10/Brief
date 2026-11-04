@@ -128,10 +128,10 @@ async def test_a_right_code_asks_the_owner_for_approval_and_gives_nothing_yet(cl
     joined = await join(client, friend, invitation)
 
     assert joined.status_code == 200
-    assert joined.json() == {"owner_email": test_user.email, "status": "requested"}
+    assert joined.json() == {"owner_email": test_user.email, "owner_name": None, "status": "requested"}
     act_as(friend)
     assert (await client.get(f"/shared/{invitation['id']}/dashboard")).status_code == 404
-    assert (await client.get("/shared")).json() == [{"id": invitation["id"], "owner_email": test_user.email, "status": "requested"}]
+    assert (await client.get("/shared")).json() == [{"id": invitation["id"], "owner_email": test_user.email, "owner_name": None, "status": "requested"}]
 
 
 async def test_a_wrong_code_is_refused_and_five_of_them_end_the_invitation_even_for_the_right_code(client, db_session, test_user):
@@ -294,7 +294,7 @@ async def test_an_approved_person_sees_the_dashboard_and_the_owner_sees_when(cli
     act_as(test_user)
     assert (await client.get("/shares")).json()[0]["last_viewed_at"] is not None
     act_as(friend)
-    assert (await client.get("/shared")).json() == [{"id": invitation["id"], "owner_email": test_user.email, "status": "active"}]
+    assert (await client.get("/shared")).json() == [{"id": invitation["id"], "owner_email": test_user.email, "owner_name": None, "status": "active"}]
 
 
 async def test_what_the_viewer_gets_has_no_file_link_and_no_storage_detail(client, db_session, test_user):
@@ -413,3 +413,63 @@ async def test_a_document_whose_terms_are_not_read_yet_has_none_to_show(client, 
     shown = (await client.get(f"/shared/{invitation['id']}/dashboard")).json()
 
     assert shown["documents"][0]["key_terms"] == []
+
+
+# --- names ---
+
+
+async def set_name(client, user, first, last):
+    act_as(user)
+    return await client.patch("/me", json={"first_name": first, "last_name": last})
+
+
+async def test_a_person_gives_their_name_once_and_it_comes_back_from_me(client, db_session, test_user):
+    saved = await set_name(client, test_user, "  Sam ", "O'Neil-Smith Jr.")
+
+    assert saved.status_code == 200
+    assert (saved.json()["first_name"], saved.json()["last_name"]) == ("Sam", "O'Neil-Smith Jr.")
+    await db_session.refresh(test_user)
+    assert (await client.get("/me")).json()["first_name"] == "Sam"
+
+
+@pytest.mark.parametrize(
+    "first,last",
+    [("", "Smith"), ("Sam", ""), ("   ", "Smith"), ("x" * 51, "Smith"), ("Sam1", "Smith"), ("<b>Sam</b>", "Smith"), ("Sam\u0000", "Smith")],
+)
+async def test_a_name_with_nothing_in_it_or_odd_characters_is_refused(client, test_user, first, last):
+    assert (await set_name(client, test_user, first, last)).status_code == 422
+    assert (await client.get("/me")).json()["first_name"] is None
+
+
+async def test_names_may_use_letters_from_any_language_and_extra_spaces_are_squeezed(client, test_user):
+    saved = await set_name(client, test_user, "José   María", "Müller")
+
+    assert saved.json()["first_name"] == "José María"
+
+
+async def test_the_owner_and_the_viewer_each_see_the_others_name_beside_the_email(client, db_session, test_user):
+    friend = await make_user(db_session)
+    await set_name(client, test_user, "Maya", "Rao")
+    await set_name(client, friend, "Sam", "Lee")
+    invitation = await invite(client, test_user)
+    joined = await join(client, friend, invitation)
+    assert joined.json()["owner_name"] == "Maya Rao"
+
+    act_as(test_user)
+    waiting = (await client.get("/shares")).json()[0]
+    assert (waiting["viewer_name"], waiting["viewer_email"]) == ("Sam Lee", friend.email)
+    await client.post(f"/shares/{invitation['id']}/approve")
+
+    act_as(friend)
+    assert (await client.get("/shared")).json()[0]["owner_name"] == "Maya Rao"
+    assert (await client.get(f"/shared/{invitation['id']}/dashboard")).json()["owner_name"] == "Maya Rao"
+
+
+async def test_a_person_with_no_name_yet_has_none_to_show(client, db_session, test_user):
+    friend = await make_user(db_session)
+    invitation = await share_with(client, db_session, test_user, friend)
+
+    act_as(friend)
+    assert (await client.get(f"/shared/{invitation['id']}/dashboard")).json()["owner_name"] is None
+    act_as(test_user)
+    assert (await client.get("/shares")).json()[0]["viewer_name"] is None
