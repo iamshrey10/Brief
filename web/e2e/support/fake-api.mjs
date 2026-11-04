@@ -46,6 +46,8 @@ const LONG_CLAUSES = Array.from({ length: 40 }, (_, index) => ({
 
 const fresh = () => ({
   trash: [],
+  shares: [],
+  sharedWithMe: [],
   documents: [
     { id: "doc-lease", filename: "sample-lease.pdf", doc_type: "lease", status: "ready", ocr_confidence: null, created_at: "2026-10-01T12:00:00Z", status_changed_at: "2026-10-01T12:01:00Z" },
     { id: "doc-loan", filename: "sample-loan.pdf", doc_type: "loan", status: "ready", ocr_confidence: null, created_at: "2026-10-02T12:00:00Z", status_changed_at: "2026-10-02T12:01:00Z" },
@@ -160,6 +162,11 @@ const server = createServer(async (request, response) => {
     state.documents.push({ ocr_confidence: null, created_at: "2026-10-04T12:00:00Z", status_changed_at: "2026-10-04T12:01:00Z", ...seeded });
     return send(response, 204);
   }
+  // A dashboard someone else shared with the reader, ready to be looked at.
+  if (path === "/__seed-shared" && method === "POST") {
+    state.sharedWithMe.push(await readJson(request));
+    return send(response, 204);
+  }
   // What the short-lived link from storage would show: the original file.
   if (path.startsWith("/__original/")) return send(response, 200, { original: path.slice(12) });
   if (path === "/__account-deleted") return send(response, 200, { deleted: state.accountDeleted });
@@ -242,6 +249,49 @@ const server = createServer(async (request, response) => {
   if (method === "DELETE" && path === "/me") {
     state.accountDeleted = true;
     return send(response, 204);
+  }
+
+  // Sharing. The fake has one reader, so it lets that reader use their own invitation to show the viewer's side.
+  const MAX_SHARES = 5;
+  if (path === "/shares" && method === "GET") return send(response, 200, state.shares.map(({ token, code, ...rest }) => rest));
+  if (path === "/shares" && method === "POST") {
+    const { label } = await readJson(request);
+    if (state.shares.length >= MAX_SHARES) return send(response, 409, { detail: "You can share your dashboard with up to 5 people. Remove someone to invite another." });
+    const id = `share-${state.shares.length + 1}-${Date.now()}`;
+    const made = { id, label: label || null, status: "invited", viewer_email: null, created_at: new Date().toISOString(), expires_at: new Date(Date.now() + 7 * 86_400_000).toISOString(), last_viewed_at: null, token: `E2E${"x".repeat(40)}`, code: "482913" };
+    state.shares.push(made);
+    return send(response, 201, { id, token: made.token, code: made.code, expires_at: made.expires_at });
+  }
+  if (path === "/shares/join" && method === "POST") {
+    const { token, code } = await readJson(request);
+    const share = state.shares.find((candidate) => candidate.token === token && candidate.status === "invited");
+    if (!share) return send(response, 404, { detail: "that invitation is not valid any more" });
+    if (share.code !== code) return send(response, 400, { detail: "that code is not right" });
+    share.status = "requested";
+    share.viewer_email = "friend@example.com";
+    return send(response, 200, { owner_email: "e2e-reader@example.invalid", status: "requested" });
+  }
+  const shareAction = /^\/shares\/([^/]+)(?:\/(approve))?$/.exec(path);
+  if (shareAction) {
+    const [, id, action] = shareAction;
+    const share = state.shares.find((candidate) => candidate.id === id);
+    if (!share) return send(response, 404, { detail: "share not found" });
+    if (action === "approve" && method === "POST") {
+      if (share.status !== "requested") return send(response, 409, { detail: "there is no request waiting to approve" });
+      share.status = "active";
+      share.expires_at = null;
+      return send(response, 200, { status: "active" });
+    }
+    if (!action && method === "DELETE") {
+      state.shares = state.shares.filter((candidate) => candidate.id !== id);
+      return send(response, 204);
+    }
+  }
+  if (path === "/shared" && method === "GET") return send(response, 200, state.sharedWithMe.map(({ id, owner_email, status }) => ({ id, owner_email, status })));
+  const shared = /^\/shared\/([^/]+)\/dashboard$/.exec(path);
+  if (shared && method === "GET") {
+    const found = state.sharedWithMe.find((candidate) => candidate.id === shared[1] && candidate.status === "active");
+    return found ? send(response, 200, found.dashboard) : send(response, 404, { detail: "shared dashboard not found" });
   }
 
   // The bin: deleted documents wait here for 7 days. Restoring puts one back; deleting for good removes it.

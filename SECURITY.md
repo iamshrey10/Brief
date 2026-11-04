@@ -17,6 +17,11 @@ signed tokens that expire after 60 seconds between the website and the API, owne
 uploads checked against what the file really is, per minute and daily limits, deletion that removes the stored
 files, logs that never carry document text, and secret scanning with push protection on this repository.
 
+Sharing a dashboard is read only and enforced by the API, not the page. An invitation is a link secret and a six digit
+code, both stored only as keyed hashes. Five wrong codes end the invitation, an unapproved one stops working after
+seven days, at most five people can have access, the owner approves each person and can remove access at once, and a
+viewer is given the dashboard's summary and never the files or any route that changes or asks about a document.
+
 ## Known gaps
 
 These are not done yet, and are listed so nobody has to find them:
