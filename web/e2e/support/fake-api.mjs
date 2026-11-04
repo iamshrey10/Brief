@@ -46,6 +46,7 @@ const LONG_CLAUSES = Array.from({ length: 40 }, (_, index) => ({
 
 const fresh = () => ({
   trash: [],
+  name: { first_name: "Test", last_name: "Reader" },
   shares: [],
   sharedWithMe: [],
   documents: [
@@ -162,6 +163,11 @@ const server = createServer(async (request, response) => {
     state.documents.push({ ocr_confidence: null, created_at: "2026-10-04T12:00:00Z", status_changed_at: "2026-10-04T12:01:00Z", ...seeded });
     return send(response, 204);
   }
+  // A reader who has not given their name yet, as on a first visit.
+  if (path === "/__seed-no-name" && method === "POST") {
+    state.name = { first_name: null, last_name: null };
+    return send(response, 204);
+  }
   // A dashboard someone else shared with the reader, ready to be looked at.
   if (path === "/__seed-shared" && method === "POST") {
     state.sharedWithMe.push(await readJson(request));
@@ -245,7 +251,13 @@ const server = createServer(async (request, response) => {
       { document_id: "doc-loan", field: "repayment_start", label: "Repayments start", value: "six months after graduation" },
     ]);
   }
-  if (method === "GET" && path === "/me") return send(response, 200, { id: "e2e-reader", email: "e2e-reader@example.invalid" });
+  if (method === "GET" && path === "/me") return send(response, 200, { id: "e2e-reader", email: "e2e-reader@example.invalid", ...state.name });
+  if (method === "PATCH" && path === "/me") {
+    const { first_name: first, last_name: last } = await readJson(request);
+    if (!/^[\p{L} '.-]{1,50}$/u.test(first ?? "") || !/^[\p{L} '.-]{1,50}$/u.test(last ?? "")) return send(response, 422, { detail: "a name has letters only" });
+    state.name = { first_name: first, last_name: last };
+    return send(response, 200, { id: "e2e-reader", email: "e2e-reader@example.invalid", ...state.name });
+  }
   if (method === "DELETE" && path === "/me") {
     state.accountDeleted = true;
     return send(response, 204);
@@ -287,7 +299,7 @@ const server = createServer(async (request, response) => {
       return send(response, 204);
     }
   }
-  if (path === "/shared" && method === "GET") return send(response, 200, state.sharedWithMe.map(({ id, owner_email, status }) => ({ id, owner_email, status })));
+  if (path === "/shared" && method === "GET") return send(response, 200, state.sharedWithMe.map(({ id, owner_email, owner_name = null, status }) => ({ id, owner_email, owner_name, status })));
   const shared = /^\/shared\/([^/]+)\/dashboard$/.exec(path);
   if (shared && method === "GET") {
     const found = state.sharedWithMe.find((candidate) => candidate.id === shared[1] && candidate.status === "active");

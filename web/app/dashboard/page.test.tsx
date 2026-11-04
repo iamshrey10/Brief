@@ -86,7 +86,7 @@ describe("the dashboard home", () => {
   it("asks for the documents and what is worked out about each, each once", async () => {
     await page();
 
-    expect(getMock.mock.calls.map(([, path]) => path).sort()).toEqual(["/documents", "/me/insights", "/me/key-dates"]);
+    expect(getMock.mock.calls.map(([, path]) => path).sort()).toEqual(["/documents", "/me", "/me/insights", "/me/key-dates"]);
   });
 
   it("shows how long the lease has left when a clear end date was found, and no card when none was", async () => {
@@ -105,6 +105,18 @@ describe("the dashboard home", () => {
 
     getMock.mockResolvedValue([]);
     expect(await page()).not.toContain("Lease remaining");
+  });
+
+  it("asks someone who has not given their name for it first, and only when the backend clearly says so", async () => {
+    getMock.mockImplementation(async (_email: string, path: string) => (path === "/me" ? { id: "u1", email: "a@x.com", first_name: null } : []));
+    await expect(DashboardHome()).rejects.toThrow("NEXT_REDIRECT:/dashboard/welcome");
+
+    getMock.mockImplementation(async (_email: string, path: string) => (path === "/me" ? { id: "u1", email: "a@x.com", first_name: "Sam" } : []));
+    await expect(DashboardHome()).resolves.toBeDefined();
+
+    // The backend being unreachable is not a reason to send anyone to a form.
+    getMock.mockResolvedValue(null);
+    await expect(DashboardHome()).resolves.toBeDefined();
   });
 
   it("shows the recent activity and the mix of kinds when there are documents, and neither when there are none", async () => {

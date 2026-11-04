@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
+import { personLabel } from "@/lib/profile";
 import { joinShare } from "@/lib/sharing";
 
 /** Where someone who was sent an invitation link enters the six digit code, and then waits for the owner to approve. */
@@ -20,7 +21,7 @@ export function JoinForm({ token }: { token: string }) {
     const outcome = await joinShare(token, code);
     setBusy(false);
     if (!outcome.ok) return setError(outcome.message);
-    setSentTo(outcome.result.owner_email);
+    setSentTo(personLabel(outcome.result.owner_name, outcome.result.owner_email));
   }
 
   if (sentTo) {

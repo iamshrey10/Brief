@@ -30,7 +30,7 @@ function CopyButton({ text, label }: { text: string; label: string }) {
   );
 }
 
-const nameOf = (share: Share) => share.viewer_email ?? share.label ?? "Unnamed invitation";
+const nameOf = (share: Share) => share.viewer_name ?? share.viewer_email ?? share.label ?? "Unnamed invitation";
 
 /**
  * Where a person lets family or friends look at their dashboard, and only look. An invitation is a link and a code shown
@@ -58,7 +58,7 @@ export function SharingPanel({ initial }: { initial: Share[] }) {
     setFresh({ invitation, link: joinLink(window.location.origin, invitation.token) });
     setShares((current) => [
       ...current,
-      { id: invitation.id, label: label.trim() || null, status: "invited", viewer_email: null, created_at: new Date().toISOString(), expires_at: invitation.expires_at, last_viewed_at: null },
+      { id: invitation.id, label: label.trim() || null, status: "invited", viewer_email: null, viewer_name: null, created_at: new Date().toISOString(), expires_at: invitation.expires_at, last_viewed_at: null },
     ]);
     setLabel("");
   }
@@ -151,6 +151,7 @@ export function SharingPanel({ initial }: { initial: Share[] }) {
                   <div className="flex flex-wrap items-center gap-3">
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium text-foreground">{nameOf(share)}</p>
+                      {share.viewer_name && share.viewer_email && <p className="truncate text-xs text-muted-foreground">{share.viewer_email}</p>}
                       <p className="text-xs text-muted-foreground">
                         {shareStatusText(share.status)}
                         {share.status === "active" && ` · ${lastViewedText(share.last_viewed_at)}`}
