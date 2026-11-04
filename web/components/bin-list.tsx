@@ -71,9 +71,9 @@ export function BinList({ initial }: { initial: TrashedDocument[] }) {
       )}
 
       {items.length === 0 ? (
-        <section aria-label="The bin is empty" className="rounded-2xl border border-dashed border-border bg-card/60 px-6 py-12 text-center">
-          <p className="font-heading text-xl font-semibold text-foreground">The bin is empty</p>
-          <p className="mt-1 text-sm text-muted-foreground">A document you delete stays here for 7 days, so you can bring it back.</p>
+        <section aria-label="The bin is empty" className="rounded-lg border border-dashed border-border px-4 py-4 text-center">
+          <p className="text-sm font-medium text-foreground">The bin is empty</p>
+          <p className="text-xs text-muted-foreground">A document you delete stays here for 7 days, so you can bring it back.</p>
         </section>
       ) : (
         <ul aria-label="Documents in the bin" className="flex flex-col gap-2">
