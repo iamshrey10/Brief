@@ -196,3 +196,8 @@ async def viewable_share(
     await session.refresh(share)
     await session.refresh(owner)
     return share, owner
+
+
+def display_name(first_name: str | None, last_name: str | None) -> str | None:
+    """"First Last" from what the person told us, or None if they have not yet."""
+    return " ".join(part for part in (first_name, last_name) if part) or None
