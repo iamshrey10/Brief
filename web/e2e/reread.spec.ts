@@ -24,7 +24,7 @@ test("Read again asks first, and after confirming the document is read again and
   await expect(row.getByText("Ready")).toBeVisible({ timeout: 15_000 });
 
   const calls = await callsMade(page);
-  expect(calls.filter((call) => call.method === "POST").map((call) => call.path)).toEqual([
+  expect(calls.filter((call) => call.method === "POST" && !call.path.startsWith("/me/2fa")).map((call) => call.path)).toEqual([
     "/documents/doc-lease/reread",
   ]);
 });
@@ -66,7 +66,7 @@ test("a document that could not be read says why in plain words, and Try again r
   await expect(row.getByRole("button", { name: "Try again to read broken-scan.pdf" })).toHaveCount(0);
 
   const calls = await callsMade(page);
-  expect(calls.filter((call) => call.method === "POST").map((call) => call.path)).toEqual([
+  expect(calls.filter((call) => call.method === "POST" && !call.path.startsWith("/me/2fa")).map((call) => call.path)).toEqual([
     "/documents/doc-broken/retry",
   ]);
 });

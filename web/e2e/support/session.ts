@@ -56,3 +56,14 @@ export async function seedSharedDashboard(page: Page, shared: Record<string, unk
 export async function seedNoName(page: Page): Promise<void> {
   expect((await page.request.post(`${FAKE_API}/__seed-no-name`)).status()).toBe(204);
 }
+
+/** The code an authenticator app shows for this secret right now, or one step earlier or later. */
+export { totp } from "./totp.mjs";
+
+/** Makes the reader someone who already has two step verification on, with the secret `TWO_FACTOR_SECRET`. */
+export const TWO_FACTOR_SECRET = "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP";
+export async function seedTwoFactor(page: Page): Promise<void> {
+  expect((await page.request.post(`${FAKE_API}/__seed-two-factor`)).status()).toBe(204);
+  // Signing in already went through the check once, before this was on, and left a cookie saying nothing was needed.
+  await page.context().clearCookies({ name: "brief_2fa" });
+}
