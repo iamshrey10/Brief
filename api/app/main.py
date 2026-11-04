@@ -196,17 +196,63 @@ async def health_ready(
     return {"ready": ready, **status}
 
 
+class Me(BaseModel):
+    id: str
+    email: str
+    # What the person told us after their first sign in. None until they have.
+    first_name: str | None = None
+    last_name: str | None = None
+
+
 @app.get(
     "/me",
     tags=["account"],
     summary="Show who is signed in",
     description=(
-        "Returns the id and email of the signed-in person."
+        "Returns the id, email and name of the signed-in person. The name is empty until they have given it."
     ),
     responses=_errors(401),
 )
-async def me(user: User = Depends(get_current_user)) -> dict[str, str]:
-    return {"id": str(user.id), "email": user.email}
+async def me(user: User = Depends(get_current_user)) -> Me:
+    return Me(id=str(user.id), email=user.email, first_name=user.first_name, last_name=user.last_name)
+
+
+class NameRequest(BaseModel):
+    first_name: str
+    last_name: str
+
+    @field_validator("first_name", "last_name")
+    @classmethod
+    def _a_plain_name(cls, value: str) -> str:
+        value = " ".join(value.split())
+        if not 1 <= len(value) <= 50:
+            raise ValueError("a name is between 1 and 50 characters")
+        if any(not (ch.isalpha() or ch in " '-.") for ch in value):
+            raise ValueError("a name has letters, spaces, hyphens, apostrophes and full stops only")
+        return value
+
+
+@app.patch(
+    "/me",
+    tags=["account"],
+    summary="Set your first and last name",
+    description=(
+        "Saves the signed-in person's first and last name, which other people see in place of an email address when a dashboard is shared. Each is 1 to 50 letters, with spaces, hyphens, apostrophes and full stops allowed."
+    ),
+    responses=_errors(401),
+)
+async def set_my_name(
+    body: NameRequest,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> Me:
+    # Read again in this request's own session, so the change is saved whichever session found the person.
+    person = await session.get(User, user.id)
+    person.first_name = body.first_name
+    person.last_name = body.last_name
+    await session.commit()
+    await session.refresh(person)
+    return Me(id=str(person.id), email=person.email, first_name=person.first_name, last_name=person.last_name)
 
 
 @app.get(
@@ -1117,6 +1163,7 @@ class ShareInfo(BaseModel):
     # invited (nobody has used it yet), requested (waiting for you to approve), or active
     status: str
     viewer_email: str | None
+    viewer_name: str | None = None
     created_at: datetime
     expires_at: datetime | None
     last_viewed_at: datetime | None
@@ -1161,17 +1208,18 @@ async def list_shares(
     session: AsyncSession = Depends(get_session),
 ) -> list[ShareInfo]:
     shares = await sharing.owner_shares(session, user.id)
-    emails: dict[uuid.UUID, str] = {}
+    people: dict[uuid.UUID, tuple[str, str | None]] = {}
     viewer_ids = [share.viewer_id for share in shares if share.viewer_id]
     if viewer_ids:
-        found = await session.execute(select(User.id, User.email).where(User.id.in_(viewer_ids)))
-        emails = {row.id: row.email for row in found.all()}
+        found = await session.execute(select(User).where(User.id.in_(viewer_ids)))
+        people = {u.id: (u.email, sharing.display_name(u.first_name, u.last_name)) for u in found.scalars().all()}
     return [
         ShareInfo(
             id=str(share.id),
             label=share.label,
             status=share.status,
-            viewer_email=emails.get(share.viewer_id),
+            viewer_email=people.get(share.viewer_id, (None, None))[0],
+            viewer_name=people.get(share.viewer_id, (None, None))[1],
             created_at=share.created_at,
             expires_at=None if share.status == "active" else share.expires_at,
             last_viewed_at=share.last_viewed_at,
@@ -1229,6 +1277,7 @@ class JoinRequest(BaseModel):
 
 class JoinedShare(BaseModel):
     owner_email: str
+    owner_name: str | None = None
     status: str
 
 
@@ -1256,12 +1305,13 @@ async def join_share(
     if outcome is sharing.Joined.ALREADY:
         raise HTTPException(status_code=409, detail="you already have access to that dashboard")
     owner = await session.get(User, share.owner_id)
-    return JoinedShare(owner_email=owner.email, status="requested")
+    return JoinedShare(owner_email=owner.email, owner_name=sharing.display_name(owner.first_name, owner.last_name), status="requested")
 
 
 class SharedWithMe(BaseModel):
     id: str
     owner_email: str
+    owner_name: str | None = None
     # requested (waiting for the owner) or active
     status: str
 
@@ -1280,7 +1330,12 @@ async def list_shared_with_me(
     session: AsyncSession = Depends(get_session),
 ) -> list[SharedWithMe]:
     return [
-        SharedWithMe(id=str(share.id), owner_email=owner.email, status=share.status)
+        SharedWithMe(
+            id=str(share.id),
+            owner_email=owner.email,
+            owner_name=sharing.display_name(owner.first_name, owner.last_name),
+            status=share.status,
+        )
         for share, owner in await sharing.shared_with(session, user.id)
     ]
 
@@ -1297,6 +1352,7 @@ class SharedDocument(DocumentSummary):
 
 class SharedDashboard(BaseModel):
     owner_email: str
+    owner_name: str | None = None
     documents: list[SharedDocument]
     insights: list[DocumentInsight]
     key_dates: list[KeyDate]
@@ -1321,6 +1377,7 @@ async def view_shared_dashboard(
         raise HTTPException(status_code=404, detail="shared dashboard not found")
     _, owner = found
     owner_id, owner_email = owner.id, owner.email
+    owner_name = sharing.display_name(owner.first_name, owner.last_name)
     result = await session.execute(
         select(Document)
         .where(Document.user_id == owner_id, Document.deleted_at.is_(None))
@@ -1333,6 +1390,7 @@ async def view_shared_dashboard(
         documents.append(SharedDocument(**DocumentSummary.from_document(document).model_dump(), key_terms=terms))
     return SharedDashboard(
         owner_email=owner_email,
+        owner_name=owner_name,
         documents=documents,
         insights=await saved_insights(session, owner_id),
         key_dates=await saved_key_dates(session, owner_id),
