@@ -212,3 +212,29 @@ class AnswerTrace(Base):
     cited: Mapped[list[str]] = mapped_column(JSONB, default=list)
     elapsed_ms: Mapped[int] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class DashboardShare(Base):
+    """One person letting another look at their dashboard, and nothing more. It starts as an invitation (a link
+    and a six digit code, both kept only as keyed hashes), becomes a request when the other person enters the
+    code, and active once the owner approves. Both people's rows going removes it with them."""
+
+    __tablename__ = "dashboard_shares"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    owner_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    viewer_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=True
+    )
+    # Who the owner meant it for, in their own words, so a list of invitations can be told apart.
+    label: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    code_hash: Mapped[str] = mapped_column(String(64))
+    # invited, requested, active, or revoked
+    status: Mapped[str] = mapped_column(String(20), default="invited")
+    failed_codes: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # An invitation nobody has been approved on stops working at this time. Once approved it never expires, but can be revoked.
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_viewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
