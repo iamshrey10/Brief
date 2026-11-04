@@ -80,9 +80,11 @@ describe("the summary buttons", () => {
     };
     render(<SummaryActions documentId="d1" docType="lease" filename="a.pdf" keyTerms={withDate} checklist={CHECKLIST} />);
 
-    const names = [...screen.getAllByRole("button"), ...screen.getAllByRole("link")].map((el) => el.textContent);
-    expect(names).toEqual(["Copy summary", "Download summary (PDF)", "Add this date to your calendar", "Email these questions"]);
-    expect(screen.getByRole("link", { name: "Email these questions" })).toHaveAttribute("href", expect.stringMatching(/^mailto:\?subject=/));
+    const names = screen.getAllByRole("button").map((el) => el.textContent);
+    expect(names).toEqual(["Copy summary", "Download summary (PDF)", "Add to calendar", "Draft an email with 1 question"]);
+    fireEvent.click(screen.getByRole("button", { name: "Draft an email with 1 question" }));
+    expect(screen.getByRole("link", { name: "Open in my email app" })).toHaveAttribute("href", expect.stringMatching(/^mailto:\?subject=/));
+    expect(screen.getByText(/Thank you for sending over the lease/)).toBeInTheDocument();
     expect(screen.getByText(/Nothing is sent by Brief/)).toBeInTheDocument();
     expect(screen.getByText(/only when the document states them clearly/)).toBeInTheDocument();
   });
@@ -91,7 +93,19 @@ describe("the summary buttons", () => {
     render(<SummaryActions documentId="d1" docType="lease" filename="a.pdf" keyTerms={KEY_TERMS} checklist={null} />);
 
     expect(screen.queryByRole("button", { name: /calendar/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Email these questions" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Draft an email/ })).not.toBeInTheDocument();
     expect(screen.queryByText(/Nothing is sent by Brief/)).not.toBeInTheDocument();
+  });
+
+  it("copies the drafted email, subject first, and says so", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    render(<SummaryActions documentId="d1" docType="lease" filename="a.pdf" keyTerms={KEY_TERMS} checklist={CHECKLIST} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Draft an email with 1 question" }));
+    fireEvent.click(screen.getByRole("button", { name: "Copy email" }));
+
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Copied"));
+    expect(writeText).toHaveBeenCalledWith(expect.stringMatching(/^Subject: Questions about the lease before I sign\n\nHi,/));
   });
 });

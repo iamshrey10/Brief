@@ -101,7 +101,7 @@ test("printed, the document page is the Overview alone, without the top bar, the
 
 test("Add the date to your calendar saves a calendar file with the lease end date and a week's reminder", async ({ page }) => {
   await page.goto("/dashboard/documents/doc-lease");
-  const button = page.getByRole("button", { name: /Add this date to your calendar/ });
+  const button = page.getByRole("button", { name: /Add to calendar/ });
   await expect(button).toBeVisible();
 
   const [download] = await Promise.all([page.waitForEvent("download"), button.click()]);
@@ -115,10 +115,12 @@ test("Add the date to your calendar saves a calendar file with the lease end dat
   expect(file).toContain("\r\n");
 });
 
-test("Email these questions is a link that opens a message with the lease's open questions in it", async ({ page }) => {
+test("Draft an email shows the questions first, then opens a message with the lease's open questions in it", async ({ page }) => {
   await page.goto("/dashboard/documents/doc-lease");
 
-  const link = page.getByRole("link", { name: "Email these questions" });
+  await page.getByRole("button", { name: /Draft an email with \d+ questions?/ }).click();
+  await expect(page.getByText("Thank you for sending over the lease.")).toBeVisible();
+  const link = page.getByRole("link", { name: "Open in my email app" });
   await expect(link).toBeVisible();
   const href = (await link.getAttribute("href")) ?? "";
 

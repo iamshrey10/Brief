@@ -32,6 +32,7 @@ export function SummaryActions({
   checklist: ChecklistResult | null;
 }) {
   const [status, setStatus] = useState<"idle" | "copied" | "failed">("idle");
+  const [showEmail, setShowEmail] = useState(false);
   const email = buildQuestionsEmail(docType, checklist?.answers ?? []);
   const hasDates = clearDates(keyTerms.terms).length > 0;
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -49,6 +50,18 @@ export function SummaryActions({
       setStatus("copied");
     } catch {
       // Clipboard access can be blocked, so say so instead of looking like nothing happened.
+      setStatus("failed");
+    }
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => setStatus("idle"), 2500);
+  }
+
+  async function copyEmail() {
+    if (!email) return;
+    try {
+      await navigator.clipboard.writeText(`Subject: ${email.subject}\n\n${email.body}`);
+      setStatus("copied");
+    } catch {
       setStatus("failed");
     }
     if (timer.current) clearTimeout(timer.current);
@@ -78,15 +91,35 @@ export function SummaryActions({
         </Button>
         <CalendarButton documentId={documentId} filename={filename} terms={keyTerms.terms} />
         {email && (
-          <a href={email.href} className={buttonVariants({ variant: "outline", size: "lg" })}>
+          <Button type="button" variant="outline" size="lg" aria-expanded={showEmail} aria-controls="questions-email" onClick={() => setShowEmail((open) => !open)}>
             <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
               <rect x="3" y="5" width="18" height="14" rx="2" />
               <path d="m3 7 9 6 9-6" />
             </svg>
-            Email these questions
-          </a>
+            Draft an email with {email.total === 1 ? "1 question" : `${email.total} questions`}
+          </Button>
         )}
       </div>
+      {email && showEmail && (
+        <div id="questions-email" className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4">
+          <p className="text-sm text-muted-foreground">
+            A ready-to-send note to the other side. It holds only the questions this document leaves open, with no quotes from it.
+          </p>
+          <p className="text-sm">
+            <span className="font-medium text-foreground">Subject: </span>
+            {email.subject}
+          </p>
+          <p className="rounded-md border border-border bg-background p-3 text-sm leading-relaxed whitespace-pre-line text-foreground">{email.body}</p>
+          <div className="flex flex-wrap gap-2">
+            <a href={email.href} className={buttonVariants({ size: "lg" })}>
+              Open in my email app
+            </a>
+            <Button type="button" variant="outline" size="lg" onClick={copyEmail}>
+              Copy email
+            </Button>
+          </div>
+        </div>
+      )}
       <p className="text-xs text-muted-foreground">
         {hasDates && "Dates are added only when the document states them clearly, so check them. "}
         {email &&

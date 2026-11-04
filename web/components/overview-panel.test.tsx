@@ -449,14 +449,14 @@ describe("OverviewPanel calendar button", () => {
     checklistMock.mockResolvedValue({ ok: true, result: CHECKLIST });
     render(<OverviewPanel filename="lease.pdf" documentId="doc-1" onCitationSelect={vi.fn()} />);
 
-    expect(await screen.findByRole("button", { name: /Add these 2 dates to your calendar/ })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /Add to calendar/ })).toBeInTheDocument();
   });
 
   it("offers nothing when the document has no clear date, as in the loan with only an interest rate and a late fee", async () => {
     setup();
 
     await screen.findByRole("region", { name: "Key terms" });
-    expect(screen.queryByRole("button", { name: /to your calendar/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Add to calendar/ })).not.toBeInTheDocument();
   });
 });
 
@@ -464,7 +464,8 @@ describe("OverviewPanel email of questions", () => {
   it("offers to email the questions the document leaves open, to a mail program, with the wording in it", async () => {
     setup();
 
-    const link = await screen.findByRole("link", { name: "Email these questions" });
+    await userEvent.click(await screen.findByRole("button", { name: /Draft an email with \d+ questions?/ }));
+    const link = screen.getByRole("link", { name: "Open in my email app" });
 
     expect(link).toHaveAttribute("href", expect.stringMatching(/^mailto:\?subject=/));
     expect(decodeURIComponent(link.getAttribute("href") ?? "")).toContain("Is there any fee if I pay the loan off early?");
@@ -476,7 +477,8 @@ describe("OverviewPanel email of questions", () => {
     checklistMock.mockResolvedValue({ ok: true, result: CHECKLIST });
     render(<OverviewPanel filename="lease.pdf" docType="lease" documentId="doc-1" onCitationSelect={vi.fn()} />);
 
-    const link = await screen.findByRole("link", { name: "Email these questions" });
+    await userEvent.click(await screen.findByRole("button", { name: /Draft an email with \d+ questions?/ }));
+    const link = screen.getByRole("link", { name: "Open in my email app" });
 
     expect(decodeURIComponent(link.getAttribute("href") ?? "")).toContain("Questions about the lease before I sign");
   });
@@ -487,7 +489,7 @@ describe("OverviewPanel email of questions", () => {
     render(<OverviewPanel filename="lease.pdf" documentId="doc-1" onCitationSelect={vi.fn()} />);
 
     await screen.findByRole("region", { name: "Before you sign" });
-    expect(screen.queryByRole("link", { name: "Email these questions" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Draft an email with \d+ questions?/ })).not.toBeInTheDocument();
   });
 });
 

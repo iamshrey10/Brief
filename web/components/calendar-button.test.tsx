@@ -27,11 +27,11 @@ describe("the calendar button", () => {
 
   it("says how many dates it will add, in the singular and the plural", () => {
     const one = render(<CalendarButton documentId="d1" filename="lease.pdf" terms={[term("lease_end", "December 31, 2027")]} />);
-    expect(screen.getByRole("button", { name: /Add this date to your calendar/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Add to calendar/ })).toBeInTheDocument();
     one.unmount();
 
     render(<CalendarButton documentId="d1" filename="lease.pdf" terms={[term("lease_start", "January 1, 2027"), term("lease_end", "December 31, 2027")]} />);
-    expect(screen.getByRole("button", { name: /Add these 2 dates to your calendar/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Add to calendar/ })).toBeInTheDocument();
   });
 
   it("saves a calendar file named after the document, with an event for each clear date and a week's warning before the end", () => {

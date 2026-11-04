@@ -22,7 +22,7 @@ describe("buildQuestionsEmail", () => {
   it("has a subject for the kind of document, and a numbered list of the wording", () => {
     expect(email.subject).toBe("Questions about the lease before I sign");
     expect(email.body).toBe(
-      "Hello,\n\nBefore I sign, I have a few questions about the lease:\n\n1. Wording for renewal?\n2. Wording for pets?\n\nThank you,\n",
+      "Hi,\n\nThank you for sending over the lease. I have read it carefully, and before I sign I have a few questions I would like to understand better.\n\nCould you please clarify each of these for me?\n\n1. Wording for renewal?\n2. Wording for pets?\n\nIf it is easier, please reply in writing so I have it for my records. I am also happy to talk it through by phone.\n\nThank you for your time,\n",
     );
     expect([email.included, email.total]).toEqual([2, 2]);
   });
