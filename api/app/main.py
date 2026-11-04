@@ -31,6 +31,7 @@ from app import request_id
 from app.insights import DocumentInsight, saved_insights
 from app.key_dates import KeyDate, saved_key_dates
 from app.key_terms import KeyTermsGenerationError, KeyTermsResult, get_key_terms, load_key_terms
+from app import sharing
 from app.models import ChecklistAnswerRow, Clause, Document, Extraction, User
 from app.qa import AnswerGenerationError, AnswerResult, answer_with_path
 from app.retrieval import hybrid_search, reranked_search
@@ -110,6 +111,7 @@ app = FastAPI(
         {"name": "account", "description": "The signed-in person: who they are, their daily limits, deleting the account."},
         {"name": "documents", "description": "Uploading, reading, renaming and deleting documents."},
         {"name": "answers", "description": "Questions, search, key terms and the questions to ask before signing."},
+        {"name": "sharing", "description": "Letting someone else look at your dashboard, read only, and looking at one shared with you."},
     ],
     **docs_urls(settings.environment),
 )
@@ -120,7 +122,7 @@ app = FastAPI(
 _ERROR_MEANINGS = {
     400: "The request is not valid: the message says what is wrong.",
     401: "Not signed in, or the token has expired.",
-    404: "There is no such document, or it belongs to someone else.",
+    404: "There is no such document, invitation or shared dashboard, or it belongs to someone else.",
     409: "Not allowed in the document's current state, or a limit on how much a person can keep was reached.",
     429: "A daily limit was reached: the message says which one.",
     502: "A service the server relies on had a problem: try again in a moment.",
@@ -1089,3 +1091,234 @@ async def document_checklist(
         raise HTTPException(
             status_code=502, detail="the reading service is unavailable, try again"
         ) from exc
+
+
+class CreateShareRequest(BaseModel):
+    # Who it is for, in the owner's words, so the list of invitations can be told apart.
+    label: str | None = Field(default=None, max_length=100)
+
+    @field_validator("label")
+    @classmethod
+    def _trim_label(cls, value: str | None) -> str | None:
+        return (value or "").strip() or None
+
+
+class ShareCreated(BaseModel):
+    id: str
+    # The secret part of the link and the six digit code. They are shown this once and kept only as hashes.
+    token: str
+    code: str
+    expires_at: datetime
+
+
+class ShareInfo(BaseModel):
+    id: str
+    label: str | None
+    # invited (nobody has used it yet), requested (waiting for you to approve), or active
+    status: str
+    viewer_email: str | None
+    created_at: datetime
+    expires_at: datetime | None
+    last_viewed_at: datetime | None
+
+
+@app.post(
+    "/shares",
+    status_code=201,
+    tags=["sharing"],
+    summary="Invite someone to view your dashboard",
+    description=(
+        "Makes an invitation: a link and a six digit code, shown once. The other person signs in, opens the link and enters the code, and then you approve them. At most five people can have access, counting invitations still waiting. An invitation not approved within seven days stops working."
+    ),
+    responses=_errors(401, 409),
+)
+async def create_share(
+    body: CreateShareRequest,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> ShareCreated:
+    made = await sharing.create_share(session, user, body.label)
+    if made is None:
+        raise HTTPException(
+            status_code=409,
+            detail=f"You can share your dashboard with up to {sharing.MAX_SHARES} people. Remove someone to invite another.",
+        )
+    share, token, code = made
+    return ShareCreated(id=str(share.id), token=token, code=code, expires_at=share.expires_at)
+
+
+@app.get(
+    "/shares",
+    tags=["sharing"],
+    summary="List who can view your dashboard",
+    description=(
+        "Returns the invitations you made that are still usable, the people waiting for your approval, and the people who can view your dashboard, with when each last looked. Codes and links are never included."
+    ),
+    responses=_errors(401),
+)
+async def list_shares(
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> list[ShareInfo]:
+    shares = await sharing.owner_shares(session, user.id)
+    emails: dict[uuid.UUID, str] = {}
+    viewer_ids = [share.viewer_id for share in shares if share.viewer_id]
+    if viewer_ids:
+        found = await session.execute(select(User.id, User.email).where(User.id.in_(viewer_ids)))
+        emails = {row.id: row.email for row in found.all()}
+    return [
+        ShareInfo(
+            id=str(share.id),
+            label=share.label,
+            status=share.status,
+            viewer_email=emails.get(share.viewer_id),
+            created_at=share.created_at,
+            expires_at=None if share.status == "active" else share.expires_at,
+            last_viewed_at=share.last_viewed_at,
+        )
+        for share in shares
+    ]
+
+
+@app.post(
+    "/shares/{share_id}/approve",
+    tags=["sharing"],
+    summary="Approve someone who entered the code",
+    description=(
+        "Lets the person who entered the code from your invitation view your dashboard, read only. Only works on a request that is waiting for you."
+    ),
+    responses=_errors(401, 404, 409),
+)
+async def approve_share(
+    share_id: str,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, str]:
+    outcome = await sharing.approve_share(session, user, share_id)
+    if outcome is sharing.Decision.MISSING:
+        raise HTTPException(status_code=404, detail="share not found")
+    if outcome is sharing.Decision.NOT_NOW:
+        raise HTTPException(status_code=409, detail="there is no request waiting to approve")
+    return {"status": "active"}
+
+
+@app.delete(
+    "/shares/{share_id}",
+    status_code=204,
+    tags=["sharing"],
+    summary="Stop sharing, or turn down a request",
+    description=(
+        "Ends an invitation, declines a request or removes someone's access at once. Whoever had the link or access can no longer open anything."
+    ),
+    responses=_errors(401, 404),
+)
+async def revoke_share(
+    share_id: str,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> Response:
+    if not await sharing.revoke_share(session, user, share_id):
+        raise HTTPException(status_code=404, detail="share not found")
+    return Response(status_code=204)
+
+
+class JoinRequest(BaseModel):
+    token: str = Field(min_length=20, max_length=200)
+    code: str = Field(pattern=r"^\d{6}$")
+
+
+class JoinedShare(BaseModel):
+    owner_email: str
+    status: str
+
+
+@app.post(
+    "/shares/join",
+    tags=["sharing"],
+    summary="Use an invitation to ask for access",
+    description=(
+        "The signed-in person enters the code from an invitation link. A right code sends the owner a request to approve. Five wrong codes end the invitation, and an unknown, used or expired one is answered the same way as a missing one."
+    ),
+    responses=_errors(400, 401, 404, 409),
+)
+async def join_share(
+    body: JoinRequest,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> JoinedShare:
+    outcome, share = await sharing.join_share(session, user, body.token, body.code)
+    if outcome is sharing.Joined.INVALID:
+        raise HTTPException(status_code=404, detail="that invitation is not valid any more")
+    if outcome is sharing.Joined.WRONG_CODE:
+        raise HTTPException(status_code=400, detail="that code is not right")
+    if outcome is sharing.Joined.OWN:
+        raise HTTPException(status_code=400, detail="that is your own invitation")
+    if outcome is sharing.Joined.ALREADY:
+        raise HTTPException(status_code=409, detail="you already have access to that dashboard")
+    owner = await session.get(User, share.owner_id)
+    return JoinedShare(owner_email=owner.email, status="requested")
+
+
+class SharedWithMe(BaseModel):
+    id: str
+    owner_email: str
+    # requested (waiting for the owner) or active
+    status: str
+
+
+@app.get(
+    "/shared",
+    tags=["sharing"],
+    summary="List dashboards shared with you",
+    description=(
+        "Returns the dashboards other people have approved you to view, and the requests still waiting for their answer."
+    ),
+    responses=_errors(401),
+)
+async def list_shared_with_me(
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> list[SharedWithMe]:
+    return [
+        SharedWithMe(id=str(share.id), owner_email=owner.email, status=share.status)
+        for share, owner in await sharing.shared_with(session, user.id)
+    ]
+
+
+class SharedDashboard(BaseModel):
+    owner_email: str
+    documents: list[DocumentSummary]
+    insights: list[DocumentInsight]
+    key_dates: list[KeyDate]
+
+
+@app.get(
+    "/shared/{share_id}/dashboard",
+    tags=["sharing"],
+    summary="View a dashboard shared with you",
+    description=(
+        "Returns what the owner's dashboard shows: their documents with their status, what was found in each, and the dates found. Read only, and it never includes the files themselves or lets anything be asked, changed or deleted. Answers 404 once the owner removes access."
+    ),
+    responses=_errors(401, 404),
+)
+async def view_shared_dashboard(
+    share_id: str,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> SharedDashboard:
+    found = await sharing.viewable_share(session, user, share_id)
+    if found is None:
+        raise HTTPException(status_code=404, detail="shared dashboard not found")
+    _, owner = found
+    owner_id, owner_email = owner.id, owner.email
+    result = await session.execute(
+        select(Document)
+        .where(Document.user_id == owner_id, Document.deleted_at.is_(None))
+        .order_by(Document.created_at.desc())
+    )
+    return SharedDashboard(
+        owner_email=owner_email,
+        documents=[DocumentSummary.from_document(d) for d in result.scalars().all()],
+        insights=await saved_insights(session, owner_id),
+        key_dates=await saved_key_dates(session, owner_id),
+    )
