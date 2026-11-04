@@ -2144,7 +2144,8 @@ async def test_an_upload_name_that_tries_to_climb_folders_stays_inside_the_users
 
     document = await db_session.get(Document, uuid.UUID(response.json()["document_id"]))
     assert document.storage_key.startswith(f"{test_user.id}/")
-    assert "/../" not in document.storage_key and document.storage_key.count("/") == 1
+    assert document.storage_key.startswith(f"{test_user.id}/Lease/")
+    assert "/../" not in document.storage_key and document.storage_key.count("/") == 2
 
 
 # --- the daily limits on model-backed actions ---

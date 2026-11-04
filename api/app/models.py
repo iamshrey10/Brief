@@ -53,6 +53,8 @@ class Document(Base):
     status: Mapped[str] = mapped_column(String(50), default="pending")
     # where this file lives in object storage, not a public URL
     storage_key: Mapped[str] = mapped_column(String(500))
+    # Which of the five storage folders the file is in: Lease, Education_Loan, Job_Offers, Personal_Documents or Other.
+    folder: Mapped[str] = mapped_column(String(50), default="Other", server_default="Other")
     file_size_bytes: Mapped[int] = mapped_column(Integer)
     content_type: Mapped[str] = mapped_column(String(100), default="application/pdf")
     # only set for image-sourced (OCR'd) documents, 0-100, null for born-digital PDFs
