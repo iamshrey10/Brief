@@ -1,8 +1,10 @@
 // A stand-in for the Brief API, only for the browser tests. It answers with realistic data, refuses a
 // call that carries no token, remembers deletes until it is reset, and records the request ids it was
 // sent so a test can check the website forwarded them. Run: node e2e/support/fake-api.mjs
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { createServer } from "node:http";
+
+import { totpMatches } from "./totp.mjs";
 
 const PORT = Number(process.env.FAKE_API_PORT ?? 3101);
 // The secret the website signs its tokens with, shared with it the way the real API shares one.
@@ -46,6 +48,7 @@ const LONG_CLAUSES = Array.from({ length: 40 }, (_, index) => ({
 
 const fresh = () => ({
   trash: [],
+  twoFactor: { enabled: false, pending: null, secret: null, recovery: [], devices: [], wrong: 0 },
   name: { first_name: "Test", last_name: "Reader" },
   shares: [],
   sharedWithMe: [],
@@ -130,8 +133,8 @@ const DOC_TYPES = new Set(["loan", "lease", "offer", "other"]);
 const FOLDERS = new Set(["Lease", "Education_Loan", "Job_Offers", "Personal_Documents", "Other"]);
 const FOLDER_FOR_KIND = { lease: "Lease", loan: "Education_Loan", offer: "Job_Offers", other: "Other" };
 
-function send(response, status, body) {
-  response.writeHead(status, { "Content-Type": "application/json" });
+function send(response, status, body, headers = {}) {
+  response.writeHead(status, { "Content-Type": "application/json", ...headers });
   response.end(body === undefined ? undefined : JSON.stringify(body));
 }
 
@@ -163,6 +166,11 @@ const server = createServer(async (request, response) => {
   if (path === "/__seed-document" && method === "POST") {
     const seeded = await readJson(request);
     state.documents.push({ ocr_confidence: null, created_at: "2026-10-04T12:00:00Z", status_changed_at: "2026-10-04T12:01:00Z", ...seeded });
+    return send(response, 204);
+  }
+  // A reader who has two step verification on already, with this secret.
+  if (path === "/__seed-two-factor" && method === "POST") {
+    state.twoFactor = { enabled: true, pending: null, secret: "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP", recovery: ["RCODE0-ABCD0", "RCODE1-ABCD1"], devices: [], wrong: 0 };
     return send(response, 204);
   }
   // A reader who has not given their name yet, as on a first visit.
@@ -266,9 +274,60 @@ const server = createServer(async (request, response) => {
     return send(response, 204);
   }
 
+  // Two step verification, with the real time based codes, so the browser tests give real ones.
+  const two = state.twoFactor;
+  if (path === "/me/2fa" && method === "GET") return send(response, 200, { enabled: two.enabled, recovery_codes_left: two.recovery.length });
+  if (path === "/me/2fa/setup" && method === "POST") {
+    if (two.enabled) return send(response, 409, { detail: "two step verification is already on" });
+    two.pending = Array.from(randomBytes(20), (byte) => "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"[byte % 32]).join("");
+    return send(response, 200, { secret: two.pending, otpauth_uri: `otpauth://totp/Brief%3Afake?secret=${two.pending}&issuer=Brief&algorithm=SHA1&digits=6&period=30` });
+  }
+  if (path === "/me/2fa/enable" && method === "POST") {
+    const { code } = await readJson(request);
+    if (!two.pending || two.enabled) return send(response, 409, { detail: "there is no setup waiting" });
+    if (two.wrong >= 5) return send(response, 429, { detail: "too many wrong codes, try again in 15 minutes" });
+    if (!totpMatches(two.pending, code)) {
+      two.wrong += 1;
+      return send(response, 400, { detail: "that code is not right" });
+    }
+    two.enabled = true;
+    two.secret = two.pending;
+    two.recovery = Array.from({ length: 10 }, (_, i) => `RCODE${i}-ABCD${i}`);
+    return send(response, 200, { recovery_codes: [...two.recovery] });
+  }
+  if (path === "/me/2fa/verify" && method === "POST") {
+    const { code, remember } = await readJson(request);
+    if (!two.enabled) return send(response, 409, { detail: "two step verification is not on" });
+    if (two.wrong >= 5) return send(response, 429, { detail: "too many wrong codes, try again in 15 minutes" }, { "Retry-After": "900" });
+    const recovery = two.recovery.indexOf(String(code).toUpperCase().replace(/\s/g, "-"));
+    if (!totpMatches(two.secret, String(code)) && recovery === -1) {
+      two.wrong += 1;
+      return send(response, 400, { detail: "that code is not right" });
+    }
+    if (recovery !== -1) two.recovery.splice(recovery, 1);
+    two.wrong = 0;
+    const device = remember ? `device-${two.devices.length + 1}-${"d".repeat(40)}` : null;
+    if (device) two.devices.push(device);
+    return send(response, 200, { device_token: device, used_recovery_code: recovery !== -1 });
+  }
+  if (path === "/me/2fa/check" && method === "POST") {
+    const { device_token: device } = await readJson(request);
+    return send(response, 200, { required: two.enabled, trusted: two.enabled && Boolean(device) && two.devices.includes(device) });
+  }
+  if (path === "/me/2fa/disable" && method === "POST") {
+    const { code } = await readJson(request);
+    if (!two.enabled) return send(response, 409, { detail: "two step verification is not on" });
+    if (!totpMatches(two.secret, String(code)) && !two.recovery.includes(String(code))) {
+      two.wrong += 1;
+      return send(response, 400, { detail: "that code is not right" });
+    }
+    state.twoFactor = { enabled: false, pending: null, secret: null, recovery: [], devices: [], wrong: 0 };
+    return send(response, 200, { enabled: false, recovery_codes_left: 0 });
+  }
+
   // Sharing. The fake has one reader, so it lets that reader use their own invitation to show the viewer's side.
   const MAX_SHARES = 5;
-  if (path === "/shares" && method === "GET") return send(response, 200, state.shares.map(({ token, code, ...rest }) => rest));
+  if (path === "/shares" && method === "GET") return send(response, 200, state.shares.map((share) => ({ id: share.id, label: share.label, status: share.status, viewer_email: share.viewer_email, viewer_name: share.viewer_name ?? null, created_at: share.created_at, expires_at: share.expires_at, last_viewed_at: share.last_viewed_at })));
   if (path === "/shares" && method === "POST") {
     const { label } = await readJson(request);
     if (state.shares.length >= MAX_SHARES) return send(response, 409, { detail: "You can share your dashboard with up to 5 people. Remove someone to invite another." });

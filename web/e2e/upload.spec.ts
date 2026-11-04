@@ -37,7 +37,7 @@ test("a file of the wrong kind is turned away on the spot, and nothing is sent a
 
   await expect(page.locator("form").getByRole("alert")).toHaveText("That kind of file isn't supported. Use a PDF, JPG, PNG, or HEIC.");
   await expect(page.getByRole("button", { name: "Upload", exact: true })).toBeDisabled();
-  expect((await callsMade(page)).filter((call) => call.method === "POST")).toEqual([]);
+  expect((await callsMade(page)).filter((call) => call.method === "POST" && !call.path.startsWith("/me/2fa"))).toEqual([]);
   expect(await uploadsReceived(page)).toEqual([]);
 });
 

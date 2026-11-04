@@ -27,6 +27,11 @@ Personal_Documents, Other). A folder is only ever one of those names, so nothing
 else's files, and moving a file copies it and checks the copy before the original goes. Files stored before folders
 existed are filed with `python -m app.filing`, which can be run again safely.
 
+Two step verification is optional and uses an authenticator app. The secret is stored encrypted, a code works once, five
+wrong codes lock it for fifteen minutes, ten single use recovery codes are kept only as keyed hashes, and a person can
+keep a browser remembered for thirty days (also kept only as a hash). Once it is on, the website asks the API on every
+new sign in and lets nobody through when the API cannot answer.
+
 ## Known gaps
 
 These are not done yet, and are listed so nobody has to find them:
