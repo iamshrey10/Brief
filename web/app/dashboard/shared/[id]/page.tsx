@@ -20,7 +20,7 @@ export default async function SharedDashboardPage({ params }: { params: Promise<
 
   return (
     <div className="flex flex-1 flex-col">
-      <AppHeader email={email} current={null} />
+      <AppHeader email={email} current="shared" />
       <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-8 px-6 py-10">
         <h1 className="font-heading text-3xl font-semibold tracking-tight text-foreground md:text-4xl">Shared dashboard</h1>
         <SharedDashboardView shared={shared} />

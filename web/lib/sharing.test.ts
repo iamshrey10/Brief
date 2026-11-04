@@ -168,3 +168,23 @@ describe("the calls", () => {
     expect(await joinShare("tok", "000000")).toEqual({ ok: false, message: expect.stringContaining("isn't right") });
   });
 });
+
+describe("inviteTokenFrom", () => {
+  const token = "Ab1-_".repeat(9);
+
+  it("takes the secret from a whole link, with or without a query, a slash or spaces", async () => {
+    const { inviteTokenFrom } = await import("./sharing");
+
+    expect(inviteTokenFrom(`https://brief.example/shared/join/${token}`)).toBe(token);
+    expect(inviteTokenFrom(`  https://brief.example/shared/join/${token}/?a=1#b `)).toBe(token);
+    expect(inviteTokenFrom(token)).toBe(token);
+  });
+
+  it("is null for anything that is not a secret", async () => {
+    const { inviteTokenFrom } = await import("./sharing");
+
+    expect(inviteTokenFrom("")).toBeNull();
+    expect(inviteTokenFrom("hello")).toBeNull();
+    expect(inviteTokenFrom("https://brief.example/shared/join/short")).toBeNull();
+  });
+});
