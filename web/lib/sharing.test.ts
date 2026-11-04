@@ -55,9 +55,24 @@ describe("reading what the backend sends", () => {
     expect(shown?.documents).toHaveLength(1);
     expect(shown?.insights[0].terms_found).toBe(4);
     expect(shown?.key_dates).toEqual([{ document_id: "d1", field: "lease_end", label: "Lease ends", value: "March 9, 2027" }]);
+    expect(shown?.documents[0].key_terms).toEqual([]);
     expect(asSharedDashboard(null)).toBeNull();
     expect(asSharedDashboard({ documents: [] })).toBeNull();
     expect(asSharedDashboard({ owner_email: "o@x.com" })?.key_dates).toEqual([]);
+  });
+});
+
+describe("key terms in a shared dashboard", () => {
+  it("keeps each document's terms and drops any that are not a label with a value", () => {
+    const shown = asSharedDashboard({
+      owner_email: "o@x.com",
+      documents: [
+        { id: "d1", filename: "a.pdf", doc_type: "lease", status: "ready", key_terms: [{ label: "Monthly rent", value: "$1,800" }, { label: "x" }, null, { label: "", value: "y" }] },
+        { id: "d2", filename: "b.pdf", doc_type: "loan", status: "ready", key_terms: "nope" },
+      ],
+    });
+
+    expect(shown?.documents.map((d) => d.key_terms)).toEqual([[{ label: "Monthly rent", value: "$1,800" }], []]);
   });
 });
 
