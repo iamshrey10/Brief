@@ -84,10 +84,11 @@ test("only five people can be invited at once", async ({ page }) => {
   await expect(page.getByText(/All 5 places are used/)).toBeVisible();
 });
 
-test("a dashboard shared with the reader is listed in Profile and can be looked at, read only", async ({ page }) => {
+test("a dashboard shared with the reader is listed on the Dashboard and can be looked at, read only", async ({ page }) => {
   await seedSharedDashboard(page, SHARED);
-  await page.goto("/dashboard/profile");
+  await page.goto("/dashboard");
 
+  await expect(page.getByRole("region", { name: "Shared with you" })).toContainText("mum@example.com");
   await page.getByRole("link", { name: "View dashboard" }).click();
 
   await expect(page.getByRole("note")).toContainText("mum@example.com");
@@ -120,3 +121,15 @@ for (const scheme of ["light", "dark"] as const) {
     }
   });
 }
+
+test("the Shared section is in the top bar, and a link with its code can be typed in there", async ({ page }) => {
+  await page.goto("/dashboard");
+  await page.getByRole("navigation", { name: "Sections" }).first().getByRole("link", { name: "Shared" }).click();
+
+  await expect(page).toHaveURL(/\/dashboard\/shared$/);
+  await page.getByLabel("Share link").fill(`http://localhost:3000/shared/join/${"z".repeat(43)}`);
+  await page.getByLabel("Six digit code").fill("482913");
+  await page.getByRole("button", { name: "Ask for access" }).click();
+
+  await expect(page.locator("p[role=alert]")).toContainText("isn't valid any more");
+});

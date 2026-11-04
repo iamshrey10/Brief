@@ -29,7 +29,7 @@ export function JoinForm({ token }: { token: string }) {
       <div role="status" className="flex flex-col gap-3 text-sm text-foreground">
         <p>
           Your request was sent to <strong className="font-semibold">{sentTo}</strong>. Once they approve it, their dashboard appears under
-          &ldquo;Shared with you&rdquo; in your Profile.
+          &ldquo;Shared with you&rdquo; on your Dashboard.
         </p>
         <Link href="/dashboard/profile#shared" className="font-medium underline underline-offset-2">
           Go to Profile

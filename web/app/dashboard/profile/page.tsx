@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
 import { AppHeader } from "@/components/app-header";
-import Link from "next/link";
 import { BinList } from "@/components/bin-list";
 import { TwoFactorPanel } from "@/components/two-factor-panel";
 import { SharingPanel } from "@/components/sharing-panel";
@@ -11,8 +10,7 @@ import { DeleteAccount } from "@/components/delete-account";
 import { ThemeChoice } from "@/components/theme-choice";
 import { UsageCard } from "@/components/usage-card";
 import { backendGet } from "@/lib/backend";
-import { personLabel } from "@/lib/profile";
-import { asSharedWithMe, asShares } from "@/lib/sharing";
+import { asShares } from "@/lib/sharing";
 import { asTrash } from "@/lib/trash";
 import { asTwoFactorStatus } from "@/lib/two-factor";
 import { mintServiceToken } from "@/lib/service-token";
@@ -38,19 +36,17 @@ export default async function ProfilePage() {
   const email = (await auth())?.user?.email;
   // The proxy already turns visitors away, and this makes the page safe on its own too.
   if (!email) redirect("/");
-  const [usage, meBody, trashBody, sharesBody, sharedBody, twoFactorBody] = await Promise.all([
+  const [usage, meBody, trashBody, sharesBody, twoFactorBody] = await Promise.all([
     fetchUsageToday(email),
     backendGet(email, "/me"),
     backendGet(email, "/trash"),
     backendGet(email, "/shares"),
-    backendGet(email, "/shared"),
     backendGet(email, "/me/2fa"),
   ]);
   const twoFactor = asTwoFactorStatus(twoFactorBody);
   const me = (meBody && typeof meBody === "object" ? meBody : null) as { first_name?: string | null; last_name?: string | null } | null;
   const trash = asTrash(trashBody);
   const shares = asShares(sharesBody);
-  const sharedWithMe = asSharedWithMe(sharedBody);
 
   return (
     <div className="flex flex-1 flex-col">
@@ -68,29 +64,6 @@ export default async function ProfilePage() {
         {twoFactor && <TwoFactorPanel initialEnabled={twoFactor.enabled} initialCodesLeft={twoFactor.recovery_codes_left} />}
 
         <SharingPanel initial={shares} />
-
-        {sharedWithMe.length > 0 && (
-          <section id="shared" aria-labelledby="shared-heading" className="scroll-mt-6 rounded-2xl border border-border bg-card p-6">
-            <h2 id="shared-heading" className="text-lg font-semibold tracking-tight text-foreground">
-              Shared with you
-            </h2>
-            <p className="mt-1 mb-4 text-sm text-muted-foreground">Dashboards other people let you look at. Read only.</p>
-            <ul className="flex flex-col gap-2">
-              {sharedWithMe.map((shared) => (
-                <li key={shared.id} className="flex items-center justify-between gap-3 rounded-lg border border-border px-4 py-3 text-sm">
-                  <span className="min-w-0 truncate font-medium text-foreground">{personLabel(shared.owner_name, shared.owner_email)}</span>
-                  {shared.status === "active" ? (
-                    <Link href={`/dashboard/shared/${shared.id}`} className="shrink-0 font-medium text-primary underline underline-offset-2">
-                      View dashboard
-                    </Link>
-                  ) : (
-                    <span className="shrink-0 text-muted-foreground">Waiting for their approval</span>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
 
         <section id="bin" aria-labelledby="bin-heading" className="scroll-mt-6 rounded-2xl border border-border bg-card p-6">
           <h2 id="bin-heading" className="text-lg font-semibold tracking-tight text-foreground">
