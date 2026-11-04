@@ -60,12 +60,12 @@ function StatusNotice({ document }: { document: DocumentSummary }) {
 function PageShell({ email, children, fill = false }: { email: string; children: React.ReactNode; fill?: boolean }) {
   return (
     <div className="flex flex-1 flex-col">
-      <AppHeader email={email} current="documents" widthClass="max-w-6xl" />
+      <AppHeader email={email} current="documents" widthClass="max-w-none" />
       <div
         className={
           fill
-            ? "mx-auto flex w-full max-w-6xl flex-1 flex-col gap-4 px-6 py-5 lg:h-[calc(100vh-3.5rem)] lg:flex-none lg:overflow-hidden print:h-auto print:overflow-visible"
-            : "mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-6 py-8"
+            ? "mx-auto flex w-full max-w-none flex-1 flex-col gap-3 px-6 py-3 lg:h-[calc(100vh-3.5rem)] lg:flex-none lg:overflow-hidden print:h-auto print:overflow-visible"
+            : "mx-auto flex w-full max-w-none flex-1 flex-col gap-6 px-6 py-8"
         }
       >
         {children}
@@ -111,15 +111,15 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
 
   return (
     <PageShell email={email} fill={isReadable(document.status) && clauses.length > 0}>
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-1.5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Link href="/dashboard/documents" className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline print:hidden">
             ← Back to your documents
           </Link>
           {isReadable(document.status) && clauses.length > 0 && <PrintButton />}
         </div>
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-          <h1 className="font-heading text-2xl font-semibold tracking-tight break-all text-foreground md:text-3xl">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <h1 className="font-heading text-lg font-semibold tracking-tight break-all text-foreground md:text-xl">
             {document.filename}
           </h1>
           <span className="rounded-full border border-border bg-accent px-2.5 py-0.5 text-xs font-medium text-accent-foreground">

@@ -21,14 +21,14 @@ export function DashboardUpload() {
   return (
     <section
       aria-label="Add documents"
-      className="rounded-3xl border-2 border-dashed border-primary/40 bg-gradient-to-br from-accent via-card to-accent/60 px-6 py-10 shadow-md shadow-primary/10"
+      className="rounded-3xl border-2 border-dashed border-primary/40 bg-gradient-to-br from-accent via-card to-accent/60 px-6 py-6 shadow-md shadow-primary/10"
     >
       {!open && (
-        <div className="flex flex-col items-center justify-center gap-6">
-          <span aria-hidden="true" className="flex size-20 shrink-0 items-center justify-center rounded-3xl bg-primary text-primary-foreground shadow-lg shadow-primary/30 ring-8 ring-primary/10">
-            <CloudUpload className="size-10" />
+        <div className="flex flex-col items-center justify-center gap-4">
+          <span aria-hidden="true" className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/30 ring-6 ring-primary/10">
+            <CloudUpload className="size-7" />
           </span>
-          <Button type="button" size="lg" className="h-14 px-10 text-lg font-semibold shadow-md shadow-primary/25" aria-expanded={false} aria-controls="dashboard-upload-form" onClick={() => setOpen(true)}>
+          <Button type="button" size="lg" className="h-12 px-9 text-base font-semibold shadow-md shadow-primary/25" aria-expanded={false} aria-controls="dashboard-upload-form" onClick={() => setOpen(true)}>
             Add documents
           </Button>
         </div>

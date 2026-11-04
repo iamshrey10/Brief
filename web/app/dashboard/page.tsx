@@ -45,14 +45,14 @@ export default async function DashboardHome() {
   return (
     <div className="flex flex-1 flex-col">
       <AppHeader email={email} current="dashboard" />
-      <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-8 px-6 py-10">
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary to-primary/80 px-7 py-8 text-primary-foreground shadow-lg shadow-primary/20 md:px-10 md:py-10">
+      <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-5 px-6 py-5">
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary to-primary/80 px-7 py-5 text-primary-foreground shadow-lg shadow-primary/20 md:px-8 md:py-6">
           <div aria-hidden="true" className="pointer-events-none absolute -top-16 -right-10 size-56 rounded-full bg-white/10" />
           <div aria-hidden="true" className="pointer-events-none absolute -bottom-20 right-24 size-44 rounded-full bg-white/5" />
           <div className="relative flex flex-wrap items-end justify-between gap-6">
             <div>
-              <h1 className="font-heading text-4xl font-semibold tracking-tight md:text-5xl">Dashboard</h1>
-              <p className="mt-3 max-w-xl text-base text-primary-foreground md:text-lg">Where your documents stand, and what needs doing next.</p>
+              <h1 className="font-heading text-3xl font-semibold tracking-tight md:text-4xl">Dashboard</h1>
+              <p className="mt-1.5 max-w-xl text-sm text-primary-foreground md:text-base">Where your documents stand, and what needs doing next.</p>
             </div>
             <Link href="/dashboard/profile#sharing" className={buttonVariants({ variant: "secondary", size: "lg" })}>
               Share dashboard
