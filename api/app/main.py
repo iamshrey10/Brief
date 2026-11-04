@@ -31,7 +31,7 @@ from app import request_id
 from app.insights import DocumentInsight, saved_insights
 from app.key_dates import KeyDate, saved_key_dates
 from app.key_terms import KeyTermsGenerationError, KeyTermsResult, get_key_terms, load_key_terms
-from app import sharing
+from app import sharing, two_factor
 from app.filing import FilingError, file_document
 from app.folders import FOLDERS, folder_for
 from app.models import ChecklistAnswerRow, Clause, Document, Extraction, User
@@ -126,7 +126,7 @@ _ERROR_MEANINGS = {
     401: "Not signed in, or the token has expired.",
     404: "There is no such document, invitation or shared dashboard, or it belongs to someone else.",
     409: "Not allowed in the document's current state, or a limit on how much a person can keep was reached.",
-    429: "A daily limit was reached: the message says which one.",
+    429: "A limit was reached: the message says which one, or when to try again.",
     502: "A service the server relies on had a problem: try again in a moment.",
 }
 
@@ -1439,3 +1439,174 @@ async def view_shared_dashboard(
         insights=await saved_insights(session, owner_id),
         key_dates=await saved_key_dates(session, owner_id),
     )
+
+
+class TwoFactorStatus(BaseModel):
+    enabled: bool
+    recovery_codes_left: int
+
+
+@app.get(
+    "/me/2fa",
+    tags=["account"],
+    summary="Show whether two step verification is on",
+    description=(
+        "Says whether the signed-in person has turned on two step verification with an authenticator app, and how many of their recovery codes are unused."
+    ),
+    responses=_errors(401),
+)
+async def two_factor_status(
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> TwoFactorStatus:
+    return TwoFactorStatus(
+        enabled=await two_factor.is_enabled(session, user.id),
+        recovery_codes_left=await two_factor.codes_left(session, user.id),
+    )
+
+
+class TwoFactorSetup(BaseModel):
+    secret: str
+    otpauth_uri: str
+
+
+@app.post(
+    "/me/2fa/setup",
+    tags=["account"],
+    summary="Start setting up two step verification",
+    description=(
+        "Makes a new secret for an authenticator app and returns it, with the address the app reads from a QR code. Nothing is switched on until a code from the app is proved. Answers 409 when it is already on."
+    ),
+    responses=_errors(401, 409),
+)
+async def two_factor_setup(
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> TwoFactorSetup:
+    email = user.email
+    secret = await two_factor.begin_setup(session, user)
+    if secret is None:
+        raise HTTPException(status_code=409, detail="two step verification is already on")
+    return TwoFactorSetup(secret=secret, otpauth_uri=two_factor.otpauth_uri(secret, email))
+
+
+class CodeRequest(BaseModel):
+    code: str = Field(min_length=1, max_length=32)
+
+
+class RecoveryCodes(BaseModel):
+    recovery_codes: list[str]
+
+
+@app.post(
+    "/me/2fa/enable",
+    tags=["account"],
+    summary="Turn on two step verification",
+    description=(
+        "Proves the person can read codes from their authenticator app, switches two step verification on and returns ten recovery codes, shown only this once. Answers 409 when no setup is waiting. Wrong codes are counted, and five lock the account for fifteen minutes."
+    ),
+    responses=_errors(400, 401, 409, 429),
+)
+async def two_factor_enable(
+    body: CodeRequest,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> RecoveryCodes:
+    tried, codes = await two_factor.confirm_setup(session, user, body.code)
+    if tried is None:
+        raise HTTPException(status_code=409, detail="there is no setup waiting")
+    if tried is two_factor.Tried.LOCKED:
+        raise HTTPException(status_code=429, detail="too many wrong codes, try again in 15 minutes", headers={"Retry-After": str(int(two_factor.LOCKED_FOR.total_seconds()))})
+    if tried is two_factor.Tried.WRONG:
+        raise HTTPException(status_code=400, detail="that code is not right")
+    return RecoveryCodes(recovery_codes=codes)
+
+
+class VerifyRequest(BaseModel):
+    code: str = Field(min_length=1, max_length=32)
+    # Keep this browser trusted for thirty days.
+    remember: bool = False
+
+
+class Verification(BaseModel):
+    # The secret for a remembered browser, shown only now. None unless it was asked for.
+    device_token: str | None = None
+    # Whether a recovery code was used, which the person should be told so they can make fresh ones.
+    used_recovery_code: bool = False
+
+
+@app.post(
+    "/me/2fa/verify",
+    tags=["account"],
+    summary="Give a code at sign in",
+    description=(
+        "Checks a six digit code from the authenticator app, or a recovery code, which works once. A right code can also keep this browser trusted for thirty days. Wrong codes are counted, and five lock the account for fifteen minutes."
+    ),
+    responses=_errors(400, 401, 409, 429),
+)
+async def two_factor_verify(
+    body: VerifyRequest,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> Verification:
+    outcome, device, how = await two_factor.verify(session, user, body.code, body.remember)
+    if outcome is two_factor.Verified.NOT_ON:
+        raise HTTPException(status_code=409, detail="two step verification is not on")
+    if outcome is two_factor.Verified.LOCKED:
+        raise HTTPException(status_code=429, detail="too many wrong codes, try again in 15 minutes", headers={"Retry-After": str(int(two_factor.LOCKED_FOR.total_seconds()))})
+    if outcome is two_factor.Verified.WRONG:
+        raise HTTPException(status_code=400, detail="that code is not right")
+    return Verification(device_token=device, used_recovery_code=how == "recovery")
+
+
+class CheckRequest(BaseModel):
+    device_token: str | None = Field(default=None, max_length=200)
+
+
+class TwoFactorCheck(BaseModel):
+    # Whether this person has to give a code to sign in.
+    required: bool
+    # Whether this browser is one they chose to remember, so they are not asked now.
+    trusted: bool
+
+
+@app.post(
+    "/me/2fa/check",
+    tags=["account"],
+    summary="Ask whether a code is needed at sign in",
+    description=(
+        "Says whether the signed-in person has to give a code, and whether the browser they are using, named by the secret it was given, is one they chose to remember."
+    ),
+    responses=_errors(401),
+)
+async def two_factor_check(
+    body: CheckRequest,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> TwoFactorCheck:
+    required, trusted = await two_factor.check(session, user, body.device_token)
+    return TwoFactorCheck(required=required, trusted=trusted)
+
+
+@app.post(
+    "/me/2fa/disable",
+    tags=["account"],
+    summary="Turn off two step verification",
+    description=(
+        "Turns two step verification off and forgets the secret, the recovery codes and every remembered browser. Needs a right code. Wrong codes are counted, and five lock the account for fifteen minutes."
+    ),
+    responses=_errors(400, 401, 409, 429),
+)
+async def two_factor_disable(
+    body: CodeRequest,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> TwoFactorStatus:
+    outcome = await two_factor.disable(session, user, body.code)
+    if outcome is two_factor.Verified.NOT_ON:
+        raise HTTPException(status_code=409, detail="two step verification is not on")
+    if outcome is two_factor.Verified.LOCKED:
+        raise HTTPException(status_code=429, detail="too many wrong codes, try again in 15 minutes", headers={"Retry-After": str(int(two_factor.LOCKED_FOR.total_seconds()))})
+    if outcome is two_factor.Verified.WRONG:
+        raise HTTPException(status_code=400, detail="that code is not right")
+    return TwoFactorStatus(enabled=False, recovery_codes_left=0)

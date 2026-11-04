@@ -7,9 +7,11 @@ from sqlalchemy import (
     Computed,
     Date,
     DateTime,
+    Boolean,
     Float,
     ForeignKey,
     Index,
+    BigInteger,
     Integer,
     String,
     Text,
@@ -243,3 +245,42 @@ class DashboardShare(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_viewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class TwoFactor(Base):
+    """A person's authenticator app. The secret is kept encrypted, and is only used once `enabled` is true, which happens
+    when they prove they can read codes from it. `last_used_step` stops a code being used twice."""
+
+    __tablename__ = "two_factor"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    secret_encrypted: Mapped[str] = mapped_column(Text)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    last_used_step: Mapped[int] = mapped_column(BigInteger, default=0, server_default="0")
+    failed_attempts: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class RecoveryCode(Base):
+    """One of the single use codes given when two step verification is turned on, kept only as a keyed hash."""
+
+    __tablename__ = "recovery_codes"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    code_hash: Mapped[str] = mapped_column(String(64))
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class TrustedDevice(Base):
+    """A browser the person chose to remember, so it is not asked for a code again until `expires_at`. Only a keyed hash of its secret is kept."""
+
+    __tablename__ = "trusted_devices"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
