@@ -13,7 +13,7 @@ export function leaseDaysText(days: number): string {
 }
 
 /** One small card: how long the lease that ends soonest has left. Shown only when a clear end date was found. */
-export function LeaseCountdown({ lease }: { lease: LeaseEnd | null }) {
+export function LeaseCountdown({ lease, linked = true }: { lease: LeaseEnd | null; linked?: boolean }) {
   if (!lease) return null;
   const soon = lease.days >= 0 && lease.days <= 60;
   return (
@@ -29,9 +29,13 @@ export function LeaseCountdown({ lease }: { lease: LeaseEnd | null }) {
         <p className="font-heading text-2xl font-semibold tracking-tight text-foreground">{leaseDaysText(lease.days)}</p>
         <p className="truncate text-sm text-muted-foreground">
           Ends {lease.value} ·{" "}
-          <Link href={`/dashboard/documents/${lease.documentId}`} className="underline underline-offset-2 hover:text-foreground">
-            {lease.filename}
-          </Link>
+          {linked ? (
+            <Link href={`/dashboard/documents/${lease.documentId}`} className="underline underline-offset-2 hover:text-foreground">
+              {lease.filename}
+            </Link>
+          ) : (
+            lease.filename
+          )}
         </p>
       </div>
     </section>
