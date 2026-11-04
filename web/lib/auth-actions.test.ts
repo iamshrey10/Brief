@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const deleted: string[] = [];
+vi.mock("next/headers", () => ({ cookies: async () => ({ delete: (name: string) => deleted.push(name) }) }));
 vi.mock("@/auth", () => ({ signIn: vi.fn(), signOut: vi.fn() }));
 vi.mock("next/navigation", () => ({
   redirect: vi.fn((to: string) => {
@@ -14,6 +16,7 @@ const signInMock = signIn as unknown as ReturnType<typeof vi.fn>;
 const signOutMock = signOut as unknown as ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
+  deleted.length = 0;
   signInMock.mockReset();
   signOutMock.mockReset();
 });
@@ -31,6 +34,12 @@ describe("the sign in and sign out actions", () => {
 
     expect(signOutMock).toHaveBeenCalledExactlyOnceWith({ redirectTo: "/" });
     expect(signInMock).not.toHaveBeenCalled();
+  });
+
+  it("sign out forgets that the second step was given, so the next sign in is asked again", async () => {
+    await signOutToHome();
+
+    expect(deleted).toEqual(["brief_2fa"]);
   });
 });
 

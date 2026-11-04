@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { AppHeader } from "@/components/app-header";
 import Link from "next/link";
 import { BinList } from "@/components/bin-list";
+import { TwoFactorPanel } from "@/components/two-factor-panel";
 import { SharingPanel } from "@/components/sharing-panel";
 import { ProfileAccount } from "@/components/profile-account";
 import { DeleteAccount } from "@/components/delete-account";
@@ -13,6 +14,7 @@ import { backendGet } from "@/lib/backend";
 import { personLabel } from "@/lib/profile";
 import { asSharedWithMe, asShares } from "@/lib/sharing";
 import { asTrash } from "@/lib/trash";
+import { asTwoFactorStatus } from "@/lib/two-factor";
 import { mintServiceToken } from "@/lib/service-token";
 import { parseUsage, type Usage } from "@/lib/usage";
 
@@ -36,13 +38,15 @@ export default async function ProfilePage() {
   const email = (await auth())?.user?.email;
   // The proxy already turns visitors away, and this makes the page safe on its own too.
   if (!email) redirect("/");
-  const [usage, meBody, trashBody, sharesBody, sharedBody] = await Promise.all([
+  const [usage, meBody, trashBody, sharesBody, sharedBody, twoFactorBody] = await Promise.all([
     fetchUsageToday(email),
     backendGet(email, "/me"),
     backendGet(email, "/trash"),
     backendGet(email, "/shares"),
     backendGet(email, "/shared"),
+    backendGet(email, "/me/2fa"),
   ]);
+  const twoFactor = asTwoFactorStatus(twoFactorBody);
   const me = (meBody && typeof meBody === "object" ? meBody : null) as { first_name?: string | null; last_name?: string | null } | null;
   const trash = asTrash(trashBody);
   const shares = asShares(sharesBody);
@@ -60,6 +64,8 @@ export default async function ProfilePage() {
         <ProfileAccount email={email} firstName={me?.first_name ?? null} lastName={me?.last_name ?? null} />
 
         <UsageCard usage={usage} />
+
+        {twoFactor && <TwoFactorPanel initialEnabled={twoFactor.enabled} initialCodesLeft={twoFactor.recovery_codes_left} />}
 
         <SharingPanel initial={shares} />
 
