@@ -51,3 +51,8 @@ export async function seedDocument(page: Page, document: Record<string, unknown>
 export async function seedSharedDashboard(page: Page, shared: Record<string, unknown>): Promise<void> {
   expect((await page.request.post(`${FAKE_API}/__seed-shared`, { data: shared })).status()).toBe(204);
 }
+
+/** Makes the reader someone who has not given their name yet, as on a first visit. */
+export async function seedNoName(page: Page): Promise<void> {
+  expect((await page.request.post(`${FAKE_API}/__seed-no-name`)).status()).toBe(204);
+}

@@ -5,11 +5,12 @@ import { AppHeader } from "@/components/app-header";
 import Link from "next/link";
 import { BinList } from "@/components/bin-list";
 import { SharingPanel } from "@/components/sharing-panel";
+import { ProfileAccount } from "@/components/profile-account";
 import { DeleteAccount } from "@/components/delete-account";
 import { ThemeChoice } from "@/components/theme-choice";
 import { UsageCard } from "@/components/usage-card";
 import { backendGet } from "@/lib/backend";
-import { initialOf } from "@/lib/profile";
+import { personLabel } from "@/lib/profile";
 import { asSharedWithMe, asShares } from "@/lib/sharing";
 import { asTrash } from "@/lib/trash";
 import { mintServiceToken } from "@/lib/service-token";
@@ -35,12 +36,14 @@ export default async function ProfilePage() {
   const email = (await auth())?.user?.email;
   // The proxy already turns visitors away, and this makes the page safe on its own too.
   if (!email) redirect("/");
-  const [usage, trashBody, sharesBody, sharedBody] = await Promise.all([
+  const [usage, meBody, trashBody, sharesBody, sharedBody] = await Promise.all([
     fetchUsageToday(email),
+    backendGet(email, "/me"),
     backendGet(email, "/trash"),
     backendGet(email, "/shares"),
     backendGet(email, "/shared"),
   ]);
+  const me = (meBody && typeof meBody === "object" ? meBody : null) as { first_name?: string | null; last_name?: string | null } | null;
   const trash = asTrash(trashBody);
   const shares = asShares(sharesBody);
   const sharedWithMe = asSharedWithMe(sharedBody);
@@ -54,23 +57,7 @@ export default async function ProfilePage() {
           <p className="mt-2 max-w-xl text-muted-foreground">Your account, what you have used today, and the Bin.</p>
         </div>
 
-        <section aria-labelledby="account-heading" className="rounded-2xl border border-border bg-card p-6">
-          <h2 id="account-heading" className="text-lg font-semibold tracking-tight text-foreground">
-            Account
-          </h2>
-          <div className="mt-4 flex items-center gap-4">
-            <span
-              aria-hidden="true"
-              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-accent font-heading text-xl font-semibold text-accent-foreground"
-            >
-              {initialOf(email)}
-            </span>
-            <div className="min-w-0">
-              <p className="truncate text-sm font-medium text-foreground">{email}</p>
-              <p className="text-sm text-muted-foreground">Signed in with Google</p>
-            </div>
-          </div>
-        </section>
+        <ProfileAccount email={email} firstName={me?.first_name ?? null} lastName={me?.last_name ?? null} />
 
         <UsageCard usage={usage} />
 
@@ -85,7 +72,7 @@ export default async function ProfilePage() {
             <ul className="flex flex-col gap-2">
               {sharedWithMe.map((shared) => (
                 <li key={shared.id} className="flex items-center justify-between gap-3 rounded-lg border border-border px-4 py-3 text-sm">
-                  <span className="min-w-0 truncate font-medium text-foreground">{shared.owner_email}</span>
+                  <span className="min-w-0 truncate font-medium text-foreground">{personLabel(shared.owner_name, shared.owner_email)}</span>
                   {shared.status === "active" ? (
                     <Link href={`/dashboard/shared/${shared.id}`} className="shrink-0 font-medium text-primary underline underline-offset-2">
                       View dashboard

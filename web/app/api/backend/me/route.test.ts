@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/lib/proxy", () => ({ proxyDelete: vi.fn(), proxyGet: vi.fn() }));
+vi.mock("@/lib/proxy", () => ({ proxyDelete: vi.fn(), proxyGet: vi.fn(), proxyPatch: vi.fn() }));
 vi.mock("@/lib/require-session", () => ({ requireSession: vi.fn() }));
 
-import { proxyDelete, proxyGet } from "@/lib/proxy";
-import { DELETE, GET } from "./route";
+import { proxyDelete, proxyGet, proxyPatch } from "@/lib/proxy";
+import { DELETE, GET, PATCH } from "./route";
 
 const proxyMock = vi.mocked(proxyDelete);
 const getMock = vi.mocked(proxyGet);
@@ -46,5 +46,28 @@ describe("GET /api/backend/me", () => {
     expect(getMock).toHaveBeenCalledTimes(1);
     expect(getMock).toHaveBeenCalledWith("/me");
     expect(await res.json()).toEqual({ id: "u1", email: "reader@example.com" });
+  });
+});
+
+describe("PATCH /api/backend/me", () => {
+  const patchMock = vi.mocked(proxyPatch);
+  const send = (body: string) => PATCH(new Request("http://localhost/x", { method: "PATCH", headers: { "Content-Type": "application/json" }, body }));
+
+  beforeEach(() => {
+    patchMock.mockReset();
+    patchMock.mockResolvedValue(Response.json({ first_name: "Maya" }));
+  });
+
+  it("passes the names on to the backend", async () => {
+    await send('{"first_name":"Maya","last_name":"Rao"}');
+
+    expect(patchMock).toHaveBeenCalledExactlyOnceWith("/me", { first_name: "Maya", last_name: "Rao" });
+  });
+
+  it("refuses a body that is not JSON, without asking the backend", async () => {
+    const res = await send("not json");
+
+    expect(res.status).toBe(400);
+    expect(patchMock).not.toHaveBeenCalled();
   });
 });

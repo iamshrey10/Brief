@@ -11,17 +11,19 @@ export type Share = {
   label: string | null;
   status: "invited" | "requested" | "active";
   viewer_email: string | null;
+  viewer_name: string | null;
   created_at: string;
   expires_at: string | null;
   last_viewed_at: string | null;
 };
 
 export type Invitation = { id: string; token: string; code: string; expires_at: string };
-export type SharedWithMe = { id: string; owner_email: string; status: "requested" | "active" };
+export type SharedWithMe = { id: string; owner_email: string; owner_name: string | null; status: "requested" | "active" };
 export type SharedTerm = { label: string; value: string };
 export type SharedDocument = DocumentSummary & { key_terms: SharedTerm[] };
 export type SharedDashboard = {
   owner_email: string;
+  owner_name: string | null;
   documents: SharedDocument[];
   insights: InsightFromApi[];
   key_dates: { document_id: string; field: string; label: string; value: string }[];
@@ -42,6 +44,7 @@ export function asShares(body: unknown): Share[] {
             label: textOrNull(entry.label),
             status: entry.status,
             viewer_email: textOrNull(entry.viewer_email),
+            viewer_name: textOrNull(entry.viewer_name),
             created_at: entry.created_at,
             expires_at: textOrNull(entry.expires_at),
             last_viewed_at: textOrNull(entry.last_viewed_at),
@@ -56,14 +59,14 @@ export function asSharedWithMe(body: unknown): SharedWithMe[] {
   if (!Array.isArray(body)) return [];
   return body.flatMap((entry) =>
     isText(entry?.id) && isText(entry?.owner_email) && (entry?.status === "requested" || entry?.status === "active")
-      ? [{ id: entry.id, owner_email: entry.owner_email, status: entry.status }]
+      ? [{ id: entry.id, owner_email: entry.owner_email, owner_name: textOrNull(entry.owner_name), status: entry.status }]
       : [],
   );
 }
 
 /** A shared dashboard, or null when the backend's answer is not one. */
 export function asSharedDashboard(body: unknown): SharedDashboard | null {
-  const shared = body as { owner_email?: unknown; documents?: unknown; insights?: unknown; key_dates?: unknown } | null;
+  const shared = body as { owner_email?: unknown; owner_name?: unknown; documents?: unknown; insights?: unknown; key_dates?: unknown } | null;
   if (!shared || !isText(shared.owner_email)) return null;
   const dates = Array.isArray(shared.key_dates) ? shared.key_dates : [];
   const termsById = new Map<string, SharedTerm[]>();
@@ -83,6 +86,7 @@ export function asSharedDashboard(body: unknown): SharedDashboard | null {
   }
   return {
     owner_email: shared.owner_email,
+    owner_name: textOrNull(shared.owner_name),
     documents: asDocuments(shared.documents).map((document) => ({ ...document, key_terms: termsById.get(document.id) ?? [] })),
     insights: asInsights(shared.insights),
     key_dates: dates.flatMap((entry) =>
@@ -175,4 +179,4 @@ export const removeShare = (id: string) =>
 
 /** Enters the code from an invitation link. */
 export const joinShare = (token: string, code: string) =>
-  call<{ owner_email: string; status: string }>("/api/backend/shares/join", json({ token, code }), messageForJoinFailure, (res) => res.json());
+  call<{ owner_email: string; owner_name?: string | null; status: string }>("/api/backend/shares/join", json({ token, code }), messageForJoinFailure, (res) => res.json());

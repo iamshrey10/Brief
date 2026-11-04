@@ -14,6 +14,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { Rise } from "@/components/rise";
 import { backendGet } from "@/lib/backend";
 import { asKeyDates, nextLeaseEnd } from "@/lib/lease-end";
+import { needsName } from "@/lib/profile";
 import { asDocuments, asInsights, documentStats, openQuestionGroups, recentActivity } from "@/lib/dashboard";
 
 export const metadata = { title: "Dashboard", robots: { index: false, follow: false } };
@@ -24,11 +25,14 @@ export default async function DashboardHome() {
   // The proxy already turns visitors away, and this makes the page safe on its own too.
   if (!email) redirect("/");
 
-  const [documentsBody, insightsBody, datesBody] = await Promise.all([
+  const [documentsBody, insightsBody, datesBody, meBody] = await Promise.all([
     backendGet(email, "/documents"),
     backendGet(email, "/me/insights"),
     backendGet(email, "/me/key-dates"),
+    backendGet(email, "/me"),
   ]);
+  // Someone's first visit: ask for their name before showing anything else.
+  if (needsName(meBody)) redirect("/dashboard/welcome");
   const documents = asDocuments(documentsBody);
   const insights = asInsights(insightsBody);
   const stats = documentStats(documents);

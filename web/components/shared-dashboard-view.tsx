@@ -7,6 +7,7 @@ import { documentStats } from "@/lib/dashboard";
 import { countByKind } from "@/lib/document-summary";
 import { DOC_TYPE_LABELS, formatUploaded, statusLabel } from "@/lib/documents";
 import { nextLeaseEnd } from "@/lib/lease-end";
+import { badgeLetter, personLabel } from "@/lib/profile";
 import { daysAwayText, importantDates, needsAttention } from "@/lib/shared-summary";
 import type { SharedDashboard } from "@/lib/sharing";
 import { cn } from "@/lib/utils";
@@ -42,10 +43,11 @@ export function SharedDashboardView({ shared, now = new Date() }: { shared: Shar
     <div className="flex flex-col gap-10">
       <div role="note" className="flex flex-wrap items-center gap-3 rounded-2xl border border-primary/25 bg-gradient-to-br from-accent/80 via-card to-card p-5">
         <span aria-hidden="true" className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary font-heading text-lg font-semibold text-primary-foreground">
-          {shared.owner_email.charAt(0).toUpperCase()}
+          {badgeLetter(shared.owner_name, shared.owner_email)}
         </span>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium text-foreground">{shared.owner_email}</p>
+          <p className="truncate text-base font-semibold text-foreground">{personLabel(shared.owner_name, shared.owner_email)}</p>
+          {shared.owner_name && <p className="truncate text-xs text-muted-foreground">{shared.owner_email}</p>}
           <p className="text-sm text-muted-foreground">shared their dashboard with you</p>
         </div>
         <span className="rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-muted-foreground">Read only</span>
