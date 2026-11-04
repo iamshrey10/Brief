@@ -24,7 +24,7 @@ export function AppHeader({
   widthClass = "max-w-4xl",
 }: {
   email: string;
-  current: AppSection;
+  current: AppSection | null;
   widthClass?: string;
 }) {
   return (
@@ -57,7 +57,7 @@ export function AppHeader({
   );
 }
 
-function SectionLinks({ current }: { current: AppSection }) {
+function SectionLinks({ current }: { current: AppSection | null }) {
   return APP_SECTIONS.map((section) => (
     <Link
       key={section.id}

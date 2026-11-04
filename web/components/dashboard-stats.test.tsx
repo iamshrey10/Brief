@@ -59,3 +59,13 @@ describe("the dashboard numbers", () => {
     expect(html).toContain("motion-reduce:hover:translate-y-0");
   });
 });
+
+describe("the numbers when someone else is only looking", () => {
+  it("does not send them to documents they cannot open", () => {
+    const html = renderToStaticMarkup(<DashboardStats stats={{ total: 3, ready: 1, reading: 0, needsAttention: 2 }} readOnly />);
+
+    expect(html).not.toContain("<a");
+    expect(html).toContain("Could not be read well<");
+    expect(html).not.toContain("open Documents");
+  });
+});

@@ -10,7 +10,7 @@ type Card = { label: string; value: number; hint: string; icon: LucideIcon; tone
  * The numbers at the top of the dashboard, each with an icon in its own color. A card that asks something of the person is
  * tinted so it is not missed, and the icon of a document being read turns while it is, unless the reader prefers less motion.
  */
-export function DashboardStats({ stats }: { stats: DocumentStats }) {
+export function DashboardStats({ stats, readOnly = false }: { stats: DocumentStats; readOnly?: boolean }) {
   const cards: Card[] = [
     { label: "Documents", value: stats.total, hint: stats.total === 0 ? "None yet" : "In your account", icon: FileText, tone: "bg-accent text-accent-foreground" },
     {
@@ -31,7 +31,7 @@ export function DashboardStats({ stats }: { stats: DocumentStats }) {
     {
       label: "Needs attention",
       value: stats.needsAttention,
-      hint: stats.needsAttention === 0 ? "Nothing to fix" : "Could not be read well, open Documents",
+      hint: stats.needsAttention === 0 ? "Nothing to fix" : readOnly ? "Could not be read well" : "Could not be read well, open Documents",
       icon: AlertTriangle,
       tone: "bg-destructive/10 text-destructive",
       attention: stats.needsAttention > 0,
@@ -63,7 +63,7 @@ export function DashboardStats({ stats }: { stats: DocumentStats }) {
           );
         })}
       </ul>
-      {stats.needsAttention > 0 && (
+      {!readOnly && stats.needsAttention > 0 && (
         <p className="mt-3 text-sm text-muted-foreground">
           <Link href="/dashboard/documents" className="font-medium text-primary underline-offset-4 hover:underline">
             Open your documents
