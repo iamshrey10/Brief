@@ -46,3 +46,8 @@ export async function seedFailedDocument(page: Page): Promise<void> {
 export async function seedDocument(page: Page, document: Record<string, unknown>): Promise<void> {
   expect((await page.request.post(`${FAKE_API}/__seed-document`, { data: document })).status()).toBe(204);
 }
+
+/** Puts a dashboard someone else shared with the reader in place, so the viewer's side can be seen. */
+export async function seedSharedDashboard(page: Page, shared: Record<string, unknown>): Promise<void> {
+  expect((await page.request.post(`${FAKE_API}/__seed-shared`, { data: shared })).status()).toBe(204);
+}
