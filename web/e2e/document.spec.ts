@@ -65,22 +65,19 @@ test("a document that is not there shows a not found page, not someone else's da
   expect(response?.status()).toBe(404);
 });
 
-test("on a long document the top bar stays in view, and the Overview panel, which sticks while the clauses scroll, sticks below it", async ({
-  page,
-}) => {
+test("on a long document the page itself does not scroll, so the top bar and both sides stay in view", async ({ page }) => {
   await seedDocument(page, { id: "doc-long", filename: "long.pdf", doc_type: "lease", status: "ready" });
   await page.setViewportSize({ width: 1280, height: 700 });
   await page.goto("/dashboard/documents/doc-long");
-  await page.evaluate(() => window.scrollTo(0, 1200));
 
   const bar = page.locator("header").first();
   const tabs = page.getByRole("tablist");
   await expect(bar).toBeInViewport();
   await expect(tabs).toBeInViewport();
   const barBox = (await bar.boundingBox())!;
-  const tabsTop = (await tabs.boundingBox())!.y;
 
-  expect(tabsTop).toBeGreaterThanOrEqual(barBox.y + barBox.height);
+  expect((await tabs.boundingBox())!.y).toBeGreaterThanOrEqual(barBox.y + barBox.height);
+  expect(await page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight)).toBeLessThanOrEqual(1);
 });
 
 test("printed, the document page is the Overview alone, without the top bar, the tabs or the clause text", async ({ page }) => {
@@ -169,7 +166,6 @@ test("Find in this document marks matches, steps through them, and stays reachab
   await expect(page.getByRole("status").filter({ hasText: /^7 of 11$/ })).toBeVisible();
   await expect(page.locator('mark[data-find-current="true"]')).toBeInViewport();
 
-  await page.evaluate(() => window.scrollTo(0, 1500));
   const bar = page.getByRole("search").filter({ has: box });
   const header = page.locator("header").first();
   await expect(bar).toBeInViewport();

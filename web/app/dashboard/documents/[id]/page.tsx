@@ -57,11 +57,19 @@ function StatusNotice({ document }: { document: DocumentSummary }) {
 }
 
 /** The signed in top bar, then the page's own content at the same width. */
-function PageShell({ email, children }: { email: string; children: React.ReactNode }) {
+function PageShell({ email, children, fill = false }: { email: string; children: React.ReactNode; fill?: boolean }) {
   return (
     <div className="flex flex-1 flex-col">
       <AppHeader email={email} current="documents" widthClass="max-w-6xl" />
-      <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-6 py-8">{children}</div>
+      <div
+        className={
+          fill
+            ? "mx-auto flex w-full max-w-6xl flex-1 flex-col gap-4 px-6 py-5 lg:h-[calc(100vh-3.5rem)] lg:flex-none lg:overflow-hidden print:h-auto print:overflow-visible"
+            : "mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-6 py-8"
+        }
+      >
+        {children}
+      </div>
     </div>
   );
 }
@@ -102,8 +110,8 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
   }
 
   return (
-    <PageShell email={email}>
-      <div className="flex flex-col gap-3">
+    <PageShell email={email} fill={isReadable(document.status) && clauses.length > 0}>
+      <div className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Link href="/dashboard/documents" className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline print:hidden">
             ← Back to your documents
