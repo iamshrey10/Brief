@@ -12,7 +12,8 @@ export function WelcomeName({ initialFirst, initialLast }: { initialFirst: strin
       initialFirst={initialFirst}
       initialLast={initialLast}
       onSaved={() => {
-        router.push("/dashboard");
+        // Next, the offer of a second lock on the account.
+        router.push("/dashboard/profile#two-step");
         router.refresh();
       }}
     />
