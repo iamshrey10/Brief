@@ -12,7 +12,7 @@ export function SharedWithYou({ items, headingLevel = 2 }: { items: SharedWithMe
   const Heading = headingLevel === 2 ? "h2" : "h3";
   const waiting = items.filter((item) => item.status === "requested").length;
   return (
-    <section id="shared" aria-labelledby="shared-heading" className="scroll-mt-20 rounded-2xl border border-border bg-card p-6 shadow-sm">
+    <section id="shared" aria-labelledby="shared-heading" className="scroll-mt-20 flex flex-col rounded-2xl border border-border bg-card p-6 shadow-sm">
       <div className="flex flex-wrap items-center gap-3">
         <Heading id="shared-heading" className="text-xl font-semibold tracking-tight text-foreground">
           Shared with you
@@ -21,7 +21,7 @@ export function SharedWithYou({ items, headingLevel = 2 }: { items: SharedWithMe
           <span className="rounded-full bg-primary px-2.5 py-0.5 text-xs font-semibold text-primary-foreground">{items.length}</span>
         )}
       </div>
-      <p className="mt-1 mb-4 text-sm text-muted-foreground">
+      <p className="mt-1 mb-5 text-sm text-muted-foreground">
         Dashboards other people let you look at. You can read them, not change them.
         {waiting > 0 && ` ${waiting} waiting for their approval.`}
       </p>
@@ -46,7 +46,7 @@ export function SharedWithYou({ items, headingLevel = 2 }: { items: SharedWithMe
           ))}
         </ul>
       )}
-      <details className="group rounded-xl border border-border bg-background px-4 py-3" open={items.length === 0}>
+      <details className="group mt-auto rounded-xl border border-border bg-background px-4 py-3" open={items.length === 0}>
         <summary className="cursor-pointer text-sm font-medium text-foreground">Got a share link and code? Enter them here</summary>
         <div className="mt-4">
           <JoinByLink />
