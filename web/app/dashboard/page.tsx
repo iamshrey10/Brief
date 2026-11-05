@@ -45,7 +45,7 @@ export default async function DashboardHome() {
   return (
     <div className="flex flex-1 flex-col">
       <AppHeader email={email} current="dashboard" />
-      <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-5 px-6 py-5">
+      <div className="mx-auto flex w-[min(100%-3rem,1400px)] flex-1 flex-col gap-5 py-5">
         <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary to-primary/80 px-7 py-5 text-primary-foreground shadow-lg shadow-primary/20 md:px-8 md:py-6">
           <div aria-hidden="true" className="pointer-events-none absolute -top-16 -right-10 size-56 rounded-full bg-white/10" />
           <div aria-hidden="true" className="pointer-events-none absolute -bottom-20 right-24 size-44 rounded-full bg-white/5" />
@@ -70,15 +70,12 @@ export default async function DashboardHome() {
           <DashboardStats stats={stats} />
         </Rise>
 
-        <Rise order={3}>
-          <DashboardUpload />
+        <Rise order={3} className="grid grid-cols-1 items-stretch gap-5 lg:grid-cols-3">
+          <div className={lease ? "lg:col-span-2" : "lg:col-span-3"}>
+            <DashboardUpload />
+          </div>
+          {lease && <LeaseCountdown lease={lease} />}
         </Rise>
-
-        {lease && (
-          <Rise order={3}>
-            <LeaseCountdown lease={lease} />
-          </Rise>
-        )}
 
         <Rise order={3}>
           <DocumentAnalysis insights={insights} documents={documents} />
