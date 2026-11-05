@@ -42,10 +42,10 @@ describe("the landing page hero", () => {
     }
   });
 
-  it("fills the screen below the top bar, with its content centered, so the first screen is complete and not cut off", () => {
+  it("has a See how it works button that jumps to the How it works section", () => {
     const html = renderToStaticMarkup(<LandingHero signedIn={false} />);
 
-    expect(html).toContain("min-h-[calc(100svh-4.0625rem)]");
-    expect(html).toContain("content-center");
+    expect(html).toMatch(/href="#how"[^>]*>See how it works</);
+    expect(html).not.toContain("min-h-[calc(100svh");
   });
 });

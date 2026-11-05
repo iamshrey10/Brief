@@ -12,29 +12,24 @@ test("the landing page says what Brief is and offers to sign in", async ({ page 
   await expect(page.locator('meta[property="og:site_name"]')).toHaveAttribute("content", "Brief");
 });
 
-test("the top bar's links take you to their sections, and the page has the attribute Next needs for smooth scrolling", async ({ page }) => {
+test("See how it works scrolls to How it works, which comes after What you get, and the page has the attribute Next needs for smooth scrolling", async ({ page }) => {
   await page.goto("/");
   await expect(page.locator("html")).toHaveAttribute("data-scroll-behavior", "smooth");
+  await expect(page.getByRole("navigation", { name: "Sections" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { level: 2, name: "What you get" })).toBeAttached();
+  const features = (await page.getByRole("heading", { level: 2, name: "What you get" }).boundingBox())!;
+  const how = (await page.getByRole("heading", { level: 2, name: "How it works" }).boundingBox())!;
+  expect(features.y).toBeLessThan(how.y);
 
-  await page.getByRole("navigation", { name: "Sections" }).getByRole("link", { name: "How it works" }).click();
+  await page.getByRole("link", { name: "See how it works" }).click();
   await expect(page).toHaveURL(/#how$/);
   await expect(page.getByRole("heading", { level: 2, name: "How it works" })).toBeInViewport();
-
-  await page.getByRole("navigation", { name: "Sections" }).getByRole("link", { name: "What you get" }).click();
-  await expect(page).toHaveURL(/#features$/);
-  await expect(page.getByRole("heading", { level: 2, name: "What you get" })).toBeInViewport();
 });
 
-test("the top bar stays in view after scrolling to the bottom, and the section links are hidden on a phone", async ({ page, browser }) => {
+test("the top bar stays in view after scrolling to the bottom", async ({ page }) => {
   await page.goto("/");
   await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
   await expect(page.getByRole("link", { name: "Brief." }).first()).toBeInViewport();
-
-  const phone = await browser.newContext({ viewport: { width: 390, height: 844 } });
-  const phonePage = await phone.newPage();
-  await phonePage.goto("/");
-  await expect(phonePage.getByRole("navigation", { name: "Sections" })).toBeHidden();
-  await phone.close();
 });
 
 test("a shared link shows Brief's own card image and the page has Brief's own icon", async ({ page, request }) => {
@@ -110,22 +105,20 @@ test("the three scenes in How it works play while it is on screen, and stand sti
 });
 
 for (const [name, width, height] of [["a laptop", 1440, 900], ["a wide monitor", 1920, 1080], ["a small laptop", 1280, 720], ["a tablet", 820, 1180], ["a phone", 390, 844]] as const)
-  test(`on ${name} the first screen of the landing page fits the window, and the next section is just below it`, async ({ browser }) => {
+  test(`on ${name} the landing page's first screen has the headline and the way in, and What you get starts just below`, async ({ browser }) => {
     const page = await (await browser.newContext({ viewport: { width, height }, reducedMotion: "reduce" })).newPage();
     await page.goto("/");
     const header = (await page.locator("header").first().boundingBox())!;
     const hero = (await page.locator("section").first().boundingBox())!;
     const next = (await page.locator("#features").boundingBox())!;
 
-    // The first section starts right under the top bar and is at least as tall as what is left of the window.
+    // The first section starts right under the top bar, and What you get follows straight on, with no gap.
     expect(Math.abs(hero.y - (header.y + header.height))).toBeLessThanOrEqual(2);
-    expect(hero.height).toBeGreaterThanOrEqual(height - (header.y + header.height) - 2);
-    // The next section follows straight on, with no gap.
     expect(Math.abs(next.y - (hero.y + hero.height))).toBeLessThanOrEqual(2);
-    // The headline and the way in are both inside that first screen, and nothing runs off the side.
+    // The headline and the way in are inside the first screen on anything but a phone, and nothing runs off the side.
     const heading = (await page.getByRole("heading", { level: 1 }).boundingBox())!;
     const signIn = (await page.getByRole("button", { name: "Sign in with Google" }).boundingBox())!;
     expect(heading.y + heading.height).toBeLessThanOrEqual(hero.y + hero.height);
-    if (height >= 720 && width >= 820) expect(signIn.y + signIn.height).toBeLessThanOrEqual(height);
+    if (width >= 820) expect(signIn.y + signIn.height).toBeLessThanOrEqual(height);
     expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
   });

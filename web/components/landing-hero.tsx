@@ -22,7 +22,7 @@ function Check() {
 /** The first screen of the landing page: what Brief is, one way in, and the proof underneath. */
 export function LandingHero({ signedIn }: { signedIn: boolean }) {
   return (
-    <section className="mx-auto grid min-h-[calc(100svh-4.0625rem)] w-full max-w-6xl content-center items-center gap-12 px-6 py-10 md:px-8 md:py-12 lg:grid-cols-[1.1fr_0.9fr]">
+    <section className="mx-auto grid w-[min(100%-3rem,1400px)] items-center gap-10 py-10 md:py-14 lg:grid-cols-[1.1fr_0.9fr]">
       <div className="flex flex-col items-start gap-6">
         <p className="rounded-full border border-border bg-accent px-3 py-1 text-xs font-medium text-accent-foreground">
           For loans, leases and job offers
@@ -35,17 +35,22 @@ export function LandingHero({ signedIn }: { signedIn: boolean }) {
           <span className="font-medium text-foreground">exactly where every answer comes from</span>, not a guess.
         </p>
 
-        {signedIn ? (
-          <Link href="/dashboard" className={buttonVariants({ size: "lg", className: "h-11 px-5 text-base" })}>
-            Go to dashboard
-          </Link>
-        ) : (
-          <form action={signInWithGoogle}>
-            <Button type="submit" size="lg" className="h-11 px-5 text-base">
-              Sign in with Google
-            </Button>
-          </form>
-        )}
+        <div className="flex flex-wrap items-center gap-3">
+          {signedIn ? (
+            <Link href="/dashboard" className={buttonVariants({ size: "lg", className: "h-11 px-5 text-base" })}>
+              Go to dashboard
+            </Link>
+          ) : (
+            <form action={signInWithGoogle}>
+              <Button type="submit" size="lg" className="h-11 px-5 text-base">
+                Sign in with Google
+              </Button>
+            </form>
+          )}
+          <a href="#how" className={buttonVariants({ variant: "outline", size: "lg", className: "h-11 px-5 text-base" })}>
+            See how it works
+          </a>
+        </div>
 
         <ul className="mt-2 flex flex-col gap-2.5 text-sm text-muted-foreground">
           {HERO_PROMISES.map((promise) => (

@@ -6,7 +6,7 @@ export const REPOSITORY_URL = "https://github.com/iamshrey10/Brief";
 export function SiteFooter() {
   return (
     <footer className="border-t border-border/70">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 py-10 md:flex-row md:items-start md:justify-between md:px-8">
+      <div className="mx-auto flex w-[min(100%-3rem,1400px)] flex-col gap-6 py-10 md:flex-row md:items-start md:justify-between">
         <div className="flex max-w-sm flex-col gap-2">
           <p className="font-heading text-xl font-semibold tracking-tight text-foreground">
             Brief<span className="text-primary">.</span>

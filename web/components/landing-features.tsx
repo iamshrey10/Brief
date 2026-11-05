@@ -55,7 +55,7 @@ export const FEATURES: Feature[] = [
 export function LandingFeatures() {
   return (
     <section id="features" aria-labelledby="features-heading" className="scroll-mt-16 border-t border-border/70 bg-secondary/40">
-      <div className="mx-auto w-full max-w-6xl px-6 py-16 md:px-8 md:py-20">
+      <div className="mx-auto w-[min(100%-3rem,1400px)] py-12 md:py-14">
         <div className="max-w-2xl">
           <h2 id="features-heading" className="text-3xl font-semibold tracking-tight text-foreground md:text-4xl">
             What you get
