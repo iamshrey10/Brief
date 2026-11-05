@@ -83,16 +83,16 @@ export function SharingPanel({ initial }: { initial: Share[] }) {
   }
 
   return (
-    <section id="sharing" aria-labelledby="sharing-heading" className="scroll-mt-6 rounded-2xl border border-border bg-card p-6">
-      <h2 id="sharing-heading" className="text-lg font-semibold tracking-tight text-foreground">
+    <section id="sharing" aria-labelledby="sharing-heading" className="scroll-mt-6 rounded-2xl border border-border bg-card p-6 shadow-sm">
+      <h2 id="sharing-heading" className="text-xl font-semibold tracking-tight text-foreground">
         Share your dashboard
       </h2>
-      <p className="mt-1 max-w-xl text-sm text-muted-foreground">
+      <p className="mt-1 mb-5 text-sm text-muted-foreground">
         Let family or friends look at your dashboard: your documents, what was found in them and how long your lease has left. They can only look. They
         cannot change anything or open your files. Up to {MAX_SHARES} people.
       </p>
 
-      <form onSubmit={create} className="mt-4 flex flex-wrap items-end gap-3">
+      <form onSubmit={create} className="flex flex-col gap-3 sm:flex-row sm:items-end">
         <label className="flex min-w-0 flex-1 flex-col gap-1 text-sm font-medium text-foreground">
           Who is it for? (optional)
           <input
@@ -100,7 +100,7 @@ export function SharingPanel({ initial }: { initial: Share[] }) {
             onChange={(event) => setLabel(event.target.value)}
             maxLength={100}
             placeholder="For example, Mum"
-            className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm font-normal outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+            className="h-11 w-full rounded-lg border border-input bg-background px-3 text-sm font-normal outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
           />
         </label>
         <Button type="submit" size="lg" disabled={creating || full}>
