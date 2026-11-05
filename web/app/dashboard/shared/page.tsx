@@ -3,8 +3,9 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { AppHeader } from "@/components/app-header";
 import { SharedWithYou } from "@/components/shared-with-you";
+import { SharingPanel } from "@/components/sharing-panel";
 import { backendGet } from "@/lib/backend";
-import { asSharedWithMe } from "@/lib/sharing";
+import { asShares, asSharedWithMe } from "@/lib/sharing";
 
 export const metadata = { title: "Shared with you", robots: { index: false, follow: false } };
 
@@ -13,7 +14,9 @@ export default async function SharedPage() {
   const email = (await auth())?.user?.email;
   // The proxy already turns visitors away, and this makes the page safe on its own too.
   if (!email) redirect("/");
-  const items = asSharedWithMe(await backendGet(email, "/shared"));
+  const [sharedBody, sharesBody] = await Promise.all([backendGet(email, "/shared"), backendGet(email, "/shares")]);
+  const items = asSharedWithMe(sharedBody);
+  const shares = asShares(sharesBody);
 
   return (
     <div className="flex flex-1 flex-col">
@@ -21,9 +24,12 @@ export default async function SharedPage() {
       <div className="mx-auto flex w-[min(100%-3rem,1400px)] flex-1 flex-col gap-5 py-6">
         <div>
           <h1 className="font-heading text-3xl font-semibold tracking-tight text-foreground md:text-4xl">Shared</h1>
-          <p className="mt-2 max-w-xl text-muted-foreground">Dashboards other people let you look at, read only.</p>
+          <p className="mt-2 max-w-xl text-muted-foreground">What other people shared with you, and who can see your dashboard.</p>
         </div>
-        <SharedWithYou items={items} headingLevel={2} />
+        <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-2">
+          <SharedWithYou items={items} headingLevel={2} />
+          <SharingPanel initial={shares} />
+        </div>
       </div>
     </div>
   );

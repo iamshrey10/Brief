@@ -28,12 +28,12 @@ test("the Dashboard has a Share button that goes to the sharing section", async 
 
   await page.getByRole("link", { name: "Share dashboard" }).click();
 
-  await expect(page).toHaveURL(/\/dashboard\/profile#sharing$/);
+  await expect(page).toHaveURL(/\/dashboard\/shared#sharing$/);
   await expect(page.getByRole("heading", { name: "Share your dashboard", level: 2 })).toBeVisible();
 });
 
 test("an invitation is made, used with the code, approved, and then removed", async ({ page }) => {
-  await page.goto("/dashboard/profile#sharing");
+  await page.goto("/dashboard/shared#sharing");
   await page.getByLabel(/Who is it for/).fill("Mum");
   await page.getByRole("button", { name: "Create invitation" }).click();
 
@@ -52,7 +52,7 @@ test("an invitation is made, used with the code, approved, and then removed", as
   await expect(page.getByRole("status")).toContainText("Your request was sent to");
 
   // The owner sees who asked and approves.
-  await page.goto("/dashboard/profile#sharing");
+  await page.goto("/dashboard/shared#sharing");
   const row = page.getByRole("list", { name: "People with access" }).getByRole("listitem");
   await expect(row).toContainText("friend@example.com");
   await expect(row).toContainText("Waiting for your approval");
@@ -74,7 +74,7 @@ test("an invitation link that is not valid says so", async ({ page }) => {
 });
 
 test("only five people can be invited at once", async ({ page }) => {
-  await page.goto("/dashboard/profile#sharing");
+  await page.goto("/dashboard/shared#sharing");
   for (let i = 0; i < 5; i += 1) {
     await page.getByRole("button", { name: "Create invitation" }).click();
     await expect(page.getByText(`${i + 1} of 5 places used`)).toBeVisible();
@@ -113,7 +113,7 @@ for (const scheme of ["light", "dark"] as const) {
   test(`the sharing pages have no accessibility violations in ${scheme} mode`, async ({ page }) => {
     await page.emulateMedia({ colorScheme: scheme });
     await seedSharedDashboard(page, SHARED);
-    for (const path of ["/dashboard/profile", "/dashboard/shared/shared-1", `/shared/join/${"z".repeat(43)}`]) {
+    for (const path of ["/dashboard/shared", "/dashboard/shared/shared-1", `/shared/join/${"z".repeat(43)}`]) {
       await page.goto(path);
       await page.waitForTimeout(800);
       const results = await new AxeBuilder({ page }).analyze();
