@@ -84,9 +84,8 @@ test("the Dashboard gathers the questions still to ask and shows what Brief foun
 test("a person can add a document right from the Dashboard, and the numbers update by themselves", async ({ page }) => {
   await page.goto("/dashboard");
   const card = page.getByRole("region", { name: "Add documents" });
-  // The card is one button, and it is the first thing on the page.
   await expect(card).toBeVisible();
-  await expect(card).toHaveText("Add documents");
+  await expect(card.getByRole("heading", { name: "Add your documents" })).toBeVisible();
   await card.getByRole("button", { name: "Add documents" }).click();
   await expect(page.getByText("Drop a contract here")).toBeVisible();
 
@@ -101,12 +100,12 @@ test("a person can add a document right from the Dashboard, and the numbers upda
   await expect(page.getByRole("region", { name: "Your documents" }).getByText("new-lease.pdf")).toBeVisible();
 });
 
-test("the way to add a document comes before the numbers on the Dashboard", async ({ page }) => {
+test("the numbers come first on the Dashboard, then the way to add a document", async ({ page }) => {
   await page.goto("/dashboard");
 
   const upload = await page.getByRole("region", { name: "Add documents" }).boundingBox();
   const numbers = await page.getByRole("region", { name: "Your documents at a glance" }).boundingBox();
-  expect(upload!.y).toBeLessThan(numbers!.y);
+  expect(numbers!.y).toBeLessThan(upload!.y);
 });
 
 test("the sections rise into place, and end fully visible, and do not move for a reader who prefers less motion", async ({ page }) => {

@@ -66,12 +66,12 @@ export default async function DashboardHome() {
           </Rise>
         )}
 
-        <Rise order={1}>
-          <DashboardUpload />
-        </Rise>
-
         <Rise order={2}>
           <DashboardStats stats={stats} />
+        </Rise>
+
+        <Rise order={3}>
+          <DashboardUpload />
         </Rise>
 
         {lease && (

@@ -19,23 +19,28 @@ beforeEach(() => refresh.mockReset());
 afterEach(cleanup);
 
 describe("the dashboard add documents card", () => {
-  it("shows an icon and one button and no other words: no heading and no description", () => {
+  it("shows a heading, one line about it, one button and what is accepted", () => {
     const { container } = render(<DashboardUpload />);
 
+    expect(screen.getByRole("heading", { name: "Add your documents" })).toBeInTheDocument();
+    expect(screen.getByText("Upload a loan, lease, or job offer to get started.")).toBeInTheDocument();
+    expect(screen.getAllByRole("button")).toHaveLength(1);
     expect(screen.getByRole("button", { name: "Add documents" })).toBeInTheDocument();
-    expect(container.textContent).toBe("Add documents");
-    expect(screen.queryByRole("heading")).not.toBeInTheDocument();
+    const list = screen.getByRole("list", { name: "About uploads" });
+    expect(list).toHaveTextContent("PDF, JPG, PNG, or HEIC");
+    expect(list).toHaveTextContent("Up to 50 MB per file");
+    expect(list).toHaveTextContent("Secure and private");
     expect(container.querySelector("svg")).not.toBeNull();
   });
 
-  it("has the polished look: a tinted gradient card with a dashed edge and a raised icon tile, hidden from a screen reader", () => {
+  it("has the polished look: a tinted gradient card, a dashed drop area and a raised icon tile, hidden from a screen reader", () => {
     const { container } = render(<DashboardUpload />);
 
     expect(container.querySelector("section")?.className).toContain("bg-gradient-to-br");
     const tile = container.querySelector('span[aria-hidden="true"]');
     expect(tile?.className).toContain("bg-primary");
-    expect(tile?.className).toContain("shadow-lg");
-    expect(container.querySelector("section")?.className).toContain("border-dashed");
+    expect(tile?.className).toContain("shadow-md");
+    expect(container.querySelector(".border-dashed")).not.toBeNull();
   });
 
   it("is a section named Add documents", () => {
