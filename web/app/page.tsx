@@ -1,4 +1,5 @@
 import { auth } from "@/auth";
+import { LandingBackdrop } from "@/components/landing-backdrop";
 import { LandingHero } from "@/components/landing-hero";
 import { LandingFeatures } from "@/components/landing-features";
 import { LandingSteps } from "@/components/landing-steps";
@@ -12,7 +13,8 @@ export default async function Home() {
   return (
     <div className="flex flex-1 flex-col bg-background">
       <SiteHeader signedIn={signedIn} />
-      <div className="flex min-h-[calc(100svh-4.0625rem)] items-center">
+      <div className="relative isolate flex min-h-[calc(100svh-4.0625rem)] items-center overflow-hidden">
+        <LandingBackdrop />
         <LandingHero signedIn={signedIn} />
       </div>
       <LandingFeatures />
