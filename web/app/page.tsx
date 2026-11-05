@@ -12,7 +12,9 @@ export default async function Home() {
   return (
     <div className="flex flex-1 flex-col bg-background">
       <SiteHeader signedIn={signedIn} />
-      <LandingHero signedIn={signedIn} />
+      <div className="flex min-h-[calc(100svh-4.0625rem)] items-center">
+        <LandingHero signedIn={signedIn} />
+      </div>
       <LandingFeatures />
       <LandingSteps />
       <SiteFooter />
