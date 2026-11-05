@@ -7,7 +7,7 @@ function Frame({ scene, children }: { scene: string; children: React.ReactNode }
   return (
     <div
       aria-hidden="true"
-      className={`hiw-art ${scene} relative h-32 overflow-hidden rounded-xl border border-border bg-gradient-to-b from-card to-secondary/60`}
+      className={`hiw-art ${scene} relative h-40 overflow-hidden rounded-xl border border-border bg-gradient-to-b from-card to-secondary/60`}
     >
       <div className="hiw-scene absolute inset-0">{children}</div>
     </div>
