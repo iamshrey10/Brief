@@ -1,6 +1,8 @@
 import { Play } from "lucide-react";
 import Link from "next/link";
 
+import { Rise } from "@/components/rise";
+
 import { DocumentPreview } from "@/components/document-preview";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { signInWithGoogle } from "@/lib/auth-actions";
@@ -39,49 +41,59 @@ export function LandingHero({ signedIn }: { signedIn: boolean }) {
   return (
     <section className="mx-auto grid w-[min(100%-3rem,1400px)] items-center gap-10 py-10 md:py-14 lg:grid-cols-[1.1fr_0.9fr]">
       <div className="flex flex-col items-start gap-6">
-        <p className="rounded-full border border-border bg-accent px-4 py-1.5 text-sm font-medium text-accent-foreground">
-          For loans, leases and job offers
-        </p>
-        <h1 className="text-6xl leading-[1.05] font-semibold tracking-tight text-foreground md:text-7xl">
-          Every clause, explained.
-        </h1>
-        <p className="max-w-2xl text-xl text-muted-foreground md:text-2xl">
-          An AI that reads your contract and shows you{" "}
-          <span className="font-medium text-foreground">exactly where every answer comes from</span>, not a guess.
-        </p>
+        <Rise order={0}>
+          <p className="rounded-full border border-border bg-accent px-4 py-1.5 text-sm font-medium text-accent-foreground">
+            For loans, leases and job offers
+          </p>
+        </Rise>
+        <Rise order={1}>
+          <h1 className="text-6xl leading-[1.05] font-semibold tracking-tight text-foreground md:text-7xl">
+            Every clause, explained.
+          </h1>
+        </Rise>
+        <Rise order={2}>
+          <p className="max-w-2xl text-xl text-muted-foreground md:text-2xl">
+            An AI that reads your contract and shows you{" "}
+            <span className="font-medium text-foreground">exactly where every answer comes from</span>, not a guess.
+          </p>
+        </Rise>
 
-        <div className="flex flex-wrap items-center gap-3">
-          {signedIn ? (
-            <Link href="/dashboard" className={buttonVariants({ size: "lg", className: "h-12 px-6 text-lg" })}>
-              Go to dashboard
-            </Link>
-          ) : (
-            <form action={signInWithGoogle}>
-              <Button type="submit" size="lg" className="h-12 gap-3 px-5 text-lg">
-                <GoogleG />
-                Sign in with Google
-              </Button>
-            </form>
-          )}
-          <a href="#how" className={buttonVariants({ variant: "outline", size: "lg", className: "h-12 px-6 text-lg" })}>
-            <Play aria-hidden="true" className="size-4" />
-            See how it works
-          </a>
-        </div>
+        <Rise order={3}>
+          <div className="flex flex-wrap items-center gap-3">
+            {signedIn ? (
+              <Link href="/dashboard" className={buttonVariants({ size: "lg", className: "h-12 px-6 text-lg" })}>
+                Go to dashboard
+              </Link>
+            ) : (
+              <form action={signInWithGoogle}>
+                <Button type="submit" size="lg" className="h-12 gap-3 px-5 text-lg">
+                  <GoogleG />
+                  Sign in with Google
+                </Button>
+              </form>
+            )}
+            <a href="#how" className={buttonVariants({ variant: "outline", size: "lg", className: "h-12 px-6 text-lg" })}>
+              <Play aria-hidden="true" className="size-4" />
+              See how it works
+            </a>
+          </div>
+        </Rise>
 
+        <Rise order={4}>
         <ul className="mt-2 flex flex-col gap-3 text-base text-muted-foreground">
-          {HERO_PROMISES.map((promise) => (
-            <li key={promise} className="flex items-start gap-2.5">
-              <Check />
-              {promise}
-            </li>
-          ))}
-        </ul>
+            {HERO_PROMISES.map((promise) => (
+              <li key={promise} className="flex items-start gap-2.5">
+                <Check />
+                {promise}
+              </li>
+            ))}
+          </ul>
+        </Rise>
       </div>
-      <div className="relative flex justify-center">
+      <Rise order={3} className="relative flex justify-center">
         <span aria-hidden="true" className="absolute inset-x-4 inset-y-6 rounded-[45%_55%_50%_50%/55%_45%_55%_45%] bg-accent/70" />
         <DocumentPreview />
-      </div>
+      </Rise>
     </section>
   );
 }

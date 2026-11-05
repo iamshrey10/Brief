@@ -16,6 +16,15 @@ for (const [name, path] of PAGES)
       const page = await context.newPage();
       await page.goto(path);
       await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+      // Check the page at rest: let the entrance animations that end finish first (loops that never end are left alone).
+      await page.evaluate(() =>
+        Promise.all(
+          document
+            .getAnimations()
+            .filter((animation) => animation.effect?.getComputedTiming().iterations !== Infinity)
+            .map((animation) => animation.finished),
+        ),
+      );
 
       const results = await new AxeBuilder({ page }).analyze();
 
