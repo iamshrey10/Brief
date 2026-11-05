@@ -1,5 +1,7 @@
 import { auth } from "@/auth";
 import { LandingHero } from "@/components/landing-hero";
+import { LandingFeatures } from "@/components/landing-features";
+import { LandingSteps } from "@/components/landing-steps";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 
@@ -10,9 +12,9 @@ export default async function Home() {
   return (
     <div className="flex flex-1 flex-col bg-background">
       <SiteHeader signedIn={signedIn} />
-      <div className="flex flex-1 items-center">
-        <LandingHero signedIn={signedIn} />
-      </div>
+      <LandingHero signedIn={signedIn} />
+      <LandingFeatures />
+      <LandingSteps />
       <SiteFooter />
     </div>
   );

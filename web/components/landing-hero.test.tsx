@@ -51,10 +51,10 @@ describe("the landing page hero", () => {
     expect(button).toContain("Sign in with Google");
   });
 
-  it("has no See how it works button, because the landing page is this one screen", () => {
+  it("has a See how it works button that jumps to the How it works section", () => {
     const html = renderToStaticMarkup(<LandingHero signedIn={false} />);
 
-    expect(html).not.toContain("See how it works");
-    expect(html).not.toContain('href="#how"');
+    expect(html).toMatch(/href="#how"[^>]*>.*See how it works</);
+    expect(html).not.toContain("min-h-[calc(100svh");
   });
 });

@@ -27,3 +27,23 @@ for (const [name, path] of PAGES)
       await context.close();
     });
   }
+
+for (const scheme of ["light", "dark"] as const)
+  test(`the landing page's How it works section, once it has come in with its scenes playing, has no problems in ${scheme} mode`, async ({
+    browser,
+  }) => {
+    const context = await browser.newContext({ colorScheme: scheme, reducedMotion: "no-preference", viewport: { width: 1280, height: 700 } });
+    const page = await context.newPage();
+    await page.goto("/");
+    await page.locator("#how").scrollIntoViewIfNeeded();
+    await expect(page.locator("#how [data-reveal]")).toHaveAttribute("data-reveal", "shown");
+    // The cards come in with transitions. The scenes loop for ever, so only the transitions are waited for.
+    await page.evaluate(() =>
+      Promise.all(document.getAnimations().filter((animation) => animation instanceof CSSTransition).map((animation) => animation.finished)),
+    );
+
+    const results = await new AxeBuilder({ page }).include("#how").analyze();
+
+    expect(results.violations.map((violation) => `${violation.id} (${violation.impact}): ${violation.nodes.length} element(s)`)).toEqual([]);
+    await context.close();
+  });
