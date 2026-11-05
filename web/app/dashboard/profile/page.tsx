@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
 import { AppHeader } from "@/components/app-header";
+import { Lock, Palette, Trash2, Users } from "lucide-react";
+import { ProfileRow } from "@/components/profile-row";
 import { BinList } from "@/components/bin-list";
 import { TwoFactorPanel } from "@/components/two-factor-panel";
 import { SharingPanel } from "@/components/sharing-panel";
@@ -51,37 +53,48 @@ export default async function ProfilePage() {
   return (
     <div className="flex flex-1 flex-col">
       <AppHeader email={email} current="profile" />
-      <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-8 px-6 py-10">
+      <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-5 px-6 py-6">
         <div>
           <h1 className="font-heading text-3xl font-semibold tracking-tight text-foreground md:text-4xl">Profile</h1>
           <p className="mt-2 max-w-xl text-muted-foreground">Your account, what you have used today, and the Bin.</p>
         </div>
 
-        <ProfileAccount email={email} firstName={me?.first_name ?? null} lastName={me?.last_name ?? null} />
-
-        <UsageCard usage={usage} />
-
-        {twoFactor && <TwoFactorPanel initialEnabled={twoFactor.enabled} initialCodesLeft={twoFactor.recovery_codes_left} />}
-
-        <SharingPanel initial={shares} />
-
-        <section id="bin" aria-labelledby="bin-heading" className="scroll-mt-6 rounded-2xl border border-border bg-card p-6">
-          <h2 id="bin-heading" className="text-lg font-semibold tracking-tight text-foreground">
-            Bin
-          </h2>
-          <p className="mt-1 mb-4 text-sm text-muted-foreground">
-            Documents you delete stay here for 7 days. Restore one, or delete it for good.
-          </p>
-          <BinList initial={trash} />
-        </section>
-
-        <section aria-labelledby="appearance-heading" className="rounded-2xl border border-border bg-card p-6">
-          <h2 id="appearance-heading" className="text-lg font-semibold tracking-tight text-foreground">
-            Appearance
-          </h2>
-          <p className="mt-1 mb-4 text-sm text-muted-foreground">Choose how Brief looks on this device.</p>
-          <ThemeChoice />
-        </section>
+        <div className="grid grid-cols-1 items-start gap-5 md:grid-cols-2">
+          <div className="flex min-w-0 flex-col gap-5">
+            <ProfileAccount email={email} firstName={me?.first_name ?? null} lastName={me?.last_name ?? null} />
+            <UsageCard usage={usage} />
+          </div>
+          <div className="flex min-w-0 flex-col gap-3">
+            {twoFactor && (
+              <ProfileRow anchor="two-step" icon={<Lock className="size-5" />} title="Two-step verification" description="Add a second lock to your account.">
+                <TwoFactorPanel initialEnabled={twoFactor.enabled} initialCodesLeft={twoFactor.recovery_codes_left} />
+              </ProfileRow>
+            )}
+            <ProfileRow anchor="sharing" icon={<Users className="size-5" />} title="Share your dashboard" description="Let family or friends view your documents.">
+              <SharingPanel initial={shares} />
+            </ProfileRow>
+            <ProfileRow anchor="bin" icon={<Trash2 className="size-5" />} title="Bin" description="Deleted documents stay for 7 days.">
+              <section id="bin" aria-labelledby="bin-heading">
+                <h2 id="bin-heading" className="text-lg font-semibold tracking-tight text-foreground">
+                  Bin
+                </h2>
+                <p className="mt-1 mb-4 text-sm text-muted-foreground">
+                  Documents you delete stay here for 7 days. Restore one, or delete it for good.
+                </p>
+                <BinList initial={trash} />
+              </section>
+            </ProfileRow>
+            <ProfileRow anchor="appearance" icon={<Palette className="size-5" />} title="Appearance" description="Choose how Brief looks on this device.">
+              <section id="appearance" aria-labelledby="appearance-heading">
+                <h2 id="appearance-heading" className="text-lg font-semibold tracking-tight text-foreground">
+                  Appearance
+                </h2>
+                <p className="mt-1 mb-4 text-sm text-muted-foreground">Choose how Brief looks on this device.</p>
+                <ThemeChoice />
+              </section>
+            </ProfileRow>
+          </div>
+        </div>
 
         <section
           aria-labelledby="danger-heading"

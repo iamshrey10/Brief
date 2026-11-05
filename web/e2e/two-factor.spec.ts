@@ -9,7 +9,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 async function turnOn(page: Page) {
-  await page.goto("/dashboard/profile");
+  await page.goto("/dashboard/profile#two-step");
   await page.getByRole("button", { name: "Turn on" }).click();
   await expect(page.getByAltText("QR code for your authenticator app")).toBeVisible();
   const text = await page.locator("li", { hasText: "type this key in by hand" }).textContent();
@@ -20,7 +20,7 @@ async function turnOn(page: Page) {
 }
 
 test("two step verification is turned on with a QR code and a first code, and shows ten recovery codes once", async ({ page }) => {
-  await page.goto("/dashboard/profile");
+  await page.goto("/dashboard/profile#two-step");
   await expect(page.getByRole("region", { name: "Two step verification" })).toContainText("Status: off");
 
   await turnOn(page);
@@ -37,7 +37,7 @@ test("two step verification is turned on with a QR code and a first code, and sh
 });
 
 test("a wrong first code turns nothing on, and says why", async ({ page }) => {
-  await page.goto("/dashboard/profile");
+  await page.goto("/dashboard/profile#two-step");
   await page.getByRole("button", { name: "Turn on" }).click();
   await page.getByLabel("6 digit code").fill("000000");
   await page.getByRole("button", { name: "Turn on" }).click();
@@ -142,7 +142,7 @@ test("it is turned off with a right code, and the next visit asks for nothing", 
   await page.getByLabel("Code from your authenticator app").fill(totp(TWO_FACTOR_SECRET));
   await page.getByRole("button", { name: "Verify" }).click();
   await expect(page).toHaveURL(/\/dashboard$/);
-  await page.goto("/dashboard/profile");
+  await page.goto("/dashboard/profile#two-step");
 
   await page.getByRole("button", { name: "Turn off" }).click();
   await page.getByLabel(/Code, or a recovery code/).fill("000000");
@@ -176,7 +176,7 @@ test("five wrong codes are answered as locked", async ({ page }) => {
 for (const scheme of ["light", "dark"] as const) {
   test(`the code page and the setup have no accessibility violations in ${scheme} mode`, async ({ page }) => {
     await page.emulateMedia({ colorScheme: scheme });
-    await page.goto("/dashboard/profile");
+    await page.goto("/dashboard/profile#two-step");
     await page.getByRole("button", { name: "Turn on" }).click();
     await expect(page.getByAltText("QR code for your authenticator app")).toBeVisible();
     await page.waitForTimeout(600);

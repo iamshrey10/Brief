@@ -33,7 +33,7 @@ test("the Dashboard has a Share button that goes to the sharing section", async 
 });
 
 test("an invitation is made, used with the code, approved, and then removed", async ({ page }) => {
-  await page.goto("/dashboard/profile");
+  await page.goto("/dashboard/profile#sharing");
   await page.getByLabel(/Who is it for/).fill("Mum");
   await page.getByRole("button", { name: "Create invitation" }).click();
 
@@ -52,7 +52,7 @@ test("an invitation is made, used with the code, approved, and then removed", as
   await expect(page.getByRole("status")).toContainText("Your request was sent to");
 
   // The owner sees who asked and approves.
-  await page.goto("/dashboard/profile");
+  await page.goto("/dashboard/profile#sharing");
   const row = page.getByRole("list", { name: "People with access" }).getByRole("listitem");
   await expect(row).toContainText("friend@example.com");
   await expect(row).toContainText("Waiting for your approval");
@@ -74,7 +74,7 @@ test("an invitation link that is not valid says so", async ({ page }) => {
 });
 
 test("only five people can be invited at once", async ({ page }) => {
-  await page.goto("/dashboard/profile");
+  await page.goto("/dashboard/profile#sharing");
   for (let i = 0; i < 5; i += 1) {
     await page.getByRole("button", { name: "Create invitation" }).click();
     await expect(page.getByText(`${i + 1} of 5 places used`)).toBeVisible();
