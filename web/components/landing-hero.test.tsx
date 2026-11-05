@@ -42,10 +42,19 @@ describe("the landing page hero", () => {
     }
   });
 
+  it("shows the Google G inside the Sign in with Google button, as a decoration", () => {
+    const html = renderToStaticMarkup(<LandingHero signedIn={false} />);
+    const button = html.slice(html.indexOf("<button"), html.indexOf("</button>"));
+
+    expect(button).toContain('fill="#4285F4"');
+    expect(button).toContain('aria-hidden="true"');
+    expect(button).toContain("Sign in with Google");
+  });
+
   it("has a See how it works button that jumps to the How it works section", () => {
     const html = renderToStaticMarkup(<LandingHero signedIn={false} />);
 
-    expect(html).toMatch(/href="#how"[^>]*>See how it works</);
+    expect(html).toMatch(/href="#how"[^>]*>.*See how it works</);
     expect(html).not.toContain("min-h-[calc(100svh");
   });
 });
