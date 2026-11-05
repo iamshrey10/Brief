@@ -40,8 +40,8 @@ export function SharedDashboardView({ shared, now = new Date() }: { shared: Shar
   const datesFor = (id: string) => dates.filter((item) => item.key.startsWith(`${id}-`));
 
   return (
-    <div className="flex flex-col gap-10">
-      <div role="note" className="flex flex-wrap items-center gap-3 rounded-2xl border border-primary/25 bg-gradient-to-br from-accent/80 via-card to-card p-5">
+    <div className="flex flex-col gap-5">
+      <div role="note" className="flex flex-wrap items-center gap-3 rounded-2xl border border-primary/25 bg-gradient-to-br from-accent/80 via-card to-card p-4">
         <span aria-hidden="true" className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary font-heading text-lg font-semibold text-primary-foreground">
           {badgeLetter(shared.owner_name, shared.owner_email)}
         </span>
@@ -72,7 +72,7 @@ export function SharedDashboardView({ shared, now = new Date() }: { shared: Shar
 
       <LeaseCountdown lease={lease} linked={false} />
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2">
         <section aria-labelledby="shared-dates-heading" className="rounded-2xl border border-border bg-card p-5">
           <div className="flex items-center gap-2">
             <CalendarDays aria-hidden className="size-4 text-primary" />
@@ -130,17 +130,17 @@ export function SharedDashboardView({ shared, now = new Date() }: { shared: Shar
         </section>
       </div>
 
-      <section aria-labelledby="shared-docs-heading" className="flex flex-col gap-4">
+      <section aria-labelledby="shared-docs-heading" className="flex flex-col gap-3">
         <Heading id="shared-docs-heading">Documents</Heading>
         {shared.documents.length === 0 ? (
           <p className="rounded-lg border border-dashed border-border px-4 py-4 text-center text-sm text-muted-foreground">No documents yet.</p>
         ) : (
-          <ul aria-label="Shared documents" className="flex flex-col gap-4">
+          <ul aria-label="Shared documents" className="flex flex-col gap-3">
             {shared.documents.map((document) => {
               const insight = insightFor(document.id);
               const own = datesFor(document.id);
               return (
-                <li key={document.id} className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+                <li key={document.id} className="rounded-2xl border border-border bg-card p-4 shadow-sm">
                   <div className="flex items-start gap-3">
                     <span aria-hidden="true" className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-accent text-accent-foreground">
                       <DocTypeIcon type={document.doc_type} className="size-5" />
