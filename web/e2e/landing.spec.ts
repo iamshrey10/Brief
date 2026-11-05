@@ -123,3 +123,14 @@ for (const [name, width, height] of [["a laptop", 1440, 900], ["a wide monitor",
     if (width >= 820) await expect(page.getByRole("button", { name: "Sign in with Google" })).toBeInViewport();
     expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
   });
+
+test("What you get waits for you to reach it, then brings its heading and three cards in one after another", async ({ page }) => {
+  await page.goto("/");
+  const wrapper = page.locator("#features [data-reveal]");
+  await expect(wrapper).toHaveAttribute("data-reveal", "armed");
+
+  await page.locator("#features").scrollIntoViewIfNeeded();
+  await expect(wrapper).toHaveAttribute("data-reveal", "shown");
+  await expect(page.getByRole("heading", { level: 3, name: "Answers you can check" })).toBeVisible();
+  expect(await page.locator("#features .hiw-card").count()).toBe(4);
+});

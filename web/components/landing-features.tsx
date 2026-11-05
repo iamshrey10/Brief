@@ -1,6 +1,9 @@
 import type { ReactNode } from "react";
 
+import type { CSSProperties } from "react";
+
 import { FEATURES_WORDS, LandingBackdrop } from "@/components/landing-backdrop";
+import { RevealOnView } from "@/components/reveal-on-view";
 
 type Feature = { title: string; body: string; icon: ReactNode };
 
@@ -58,8 +61,8 @@ export function LandingFeatures() {
   return (
     <section id="features" aria-labelledby="features-heading" className="relative isolate flex min-h-[calc(100svh-4.0625rem)] scroll-mt-16 items-center overflow-hidden border-t border-border/70 bg-secondary/40">
       <LandingBackdrop words={FEATURES_WORDS} />
-      <div className="mx-auto w-[min(100%-3rem,1400px)] py-12 md:py-14">
-        <div className="max-w-2xl">
+      <RevealOnView className="mx-auto w-[min(100%-3rem,1400px)] py-12 md:py-14">
+        <div className="hiw-card max-w-2xl" style={{ "--i": 0 } as CSSProperties}>
           <h2 id="features-heading" className="text-4xl font-semibold tracking-tight text-foreground md:text-5xl">
             What you get
           </h2>
@@ -68,17 +71,19 @@ export function LandingFeatures() {
           </p>
         </div>
         <ul className="mt-12 grid gap-6 md:grid-cols-3">
-          {FEATURES.map((feature) => (
-            <li key={feature.title} className="lift flex flex-col gap-4 rounded-2xl border border-border bg-card p-8">
-              <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-accent text-accent-foreground">
-                {feature.icon}
-              </span>
-              <h3 className="text-2xl font-semibold tracking-tight text-balance text-foreground">{feature.title}</h3>
-              <p className="text-base leading-relaxed text-muted-foreground">{feature.body}</p>
+          {FEATURES.map((feature, index) => (
+            <li key={feature.title} style={{ "--i": index + 1 } as CSSProperties} className="hiw-card flex">
+              <div className="lift flex w-full flex-col gap-4 rounded-2xl border border-border bg-card p-8">
+                <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-accent text-accent-foreground">
+                  {feature.icon}
+                </span>
+                <h3 className="text-2xl font-semibold tracking-tight text-balance text-foreground">{feature.title}</h3>
+                <p className="text-base leading-relaxed text-muted-foreground">{feature.body}</p>
+              </div>
             </li>
           ))}
         </ul>
-      </div>
+      </RevealOnView>
     </section>
   );
 }
