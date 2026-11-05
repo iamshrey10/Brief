@@ -28,7 +28,7 @@ describe("the signed in header", () => {
   });
 
   it("takes its width from the page, so the bar lines up with the content under it", () => {
-    expect(renderToStaticMarkup(<AppHeader email="a@b.co" current="documents" />)).toContain("max-w-4xl");
+    expect(renderToStaticMarkup(<AppHeader email="a@b.co" current="documents" />)).toContain("min(100%-3rem,1400px)");
     expect(renderToStaticMarkup(<AppHeader email="a@b.co" current="documents" widthClass="max-w-6xl" />)).toContain("max-w-6xl");
   });
 

@@ -95,11 +95,11 @@ describe("the dashboard top bar", () => {
 
   it("is as wide as the content under it, so their edges line up", async () => {
     const all = elements(await tree());
-    const content = all.find((node) => node.props?.className?.includes("max-w-4xl"));
+    const content = all.find((node) => node.props?.className?.includes("min(100%-3rem,1400px)"));
 
     expect(content).toBeDefined();
     // The header's default width is the same one.
-    expect(renderToStaticMarkup(<AppHeader email="a@b.co" current="documents" />)).toContain("max-w-4xl");
+    expect(renderToStaticMarkup(<AppHeader email="a@b.co" current="documents" />)).toContain("min(100%-3rem,1400px)");
   });
 
   it("no longer carries its own sign out or theme button beside the heading", async () => {

@@ -60,12 +60,12 @@ function StatusNotice({ document }: { document: DocumentSummary }) {
 function PageShell({ email, children, fill = false }: { email: string; children: React.ReactNode; fill?: boolean }) {
   return (
     <div className="flex flex-1 flex-col">
-      <AppHeader email={email} current="documents" widthClass="max-w-6xl" />
+      <AppHeader email={email} current="documents" />
       <div
         className={
           fill
-            ? "mx-auto flex w-full max-w-6xl flex-1 flex-col gap-4 px-6 py-5 lg:h-[calc(100vh-3.5rem)] lg:flex-none lg:overflow-hidden print:h-auto print:overflow-visible"
-            : "mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-6 py-8"
+            ? "mx-auto flex w-[min(100%-3rem,1400px)] flex-1 flex-col gap-4 py-5 lg:h-[calc(100vh-3.5rem)] lg:flex-none lg:overflow-hidden print:h-auto print:overflow-visible"
+            : "mx-auto flex w-[min(100%-3rem,1400px)] flex-1 flex-col gap-6 py-8"
         }
       >
         {children}
