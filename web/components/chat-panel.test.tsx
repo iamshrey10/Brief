@@ -106,6 +106,35 @@ describe("ChatPanel", () => {
     expect(box).toHaveValue("");
   });
 
+  it("offers New chat only once there is a conversation, and clears it back to the start", async () => {
+    askMock.mockResolvedValue({ ok: true, result: FOUND });
+    const { user, box } = renderPanel();
+    expect(screen.queryByRole("button", { name: "New chat" })).not.toBeInTheDocument();
+
+    await user.type(box, "Can I pay early?");
+    await user.click(screen.getByRole("button", { name: "Ask" }));
+    expect(await screen.findByText("Can I pay early?")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "New chat" }));
+    expect(screen.queryByText("Can I pay early?")).not.toBeInTheDocument();
+    expect(screen.getByText("Try asking")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "New chat" })).not.toBeInTheDocument();
+  });
+
+  it("drops an answer that arrives after the chat was cleared", async () => {
+    let resolve!: (value: { ok: true; result: typeof FOUND }) => void;
+    askMock.mockReturnValue(new Promise((done) => (resolve = done)));
+    const { user, box } = renderPanel();
+
+    await user.type(box, "Can I pay early?");
+    await user.click(screen.getByRole("button", { name: "Ask" }));
+    await user.click(await screen.findByRole("button", { name: "New chat" }));
+    resolve({ ok: true, result: FOUND });
+
+    await waitFor(() => expect(screen.getByText("Try asking")).toBeInTheDocument());
+    expect(screen.queryByRole("log")?.textContent).not.toContain(FOUND.answer);
+  });
+
   it("shows the answer with its quoted citation and page", async () => {
     askMock.mockResolvedValue({ ok: true, result: FOUND });
     const { user, box } = renderPanel();

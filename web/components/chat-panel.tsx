@@ -1,5 +1,6 @@
 "use client";
 
+import { RotateCcw } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { suggestionsFor } from "@/lib/suggested-questions";
 import { Button } from "@/components/ui/button";
@@ -66,6 +67,8 @@ export function ChatPanel({
   // What to say about the daily limit of questions, or nothing while plenty are left.
   const [limitNote, setLimitNote] = useState<string | null>(null);
   const nextId = useRef(0);
+  // Bumped on every fresh start, so an answer that arrives after it is dropped instead of reappearing.
+  const chatRun = useRef(0);
   const listRef = useRef<HTMLDivElement>(null);
 
   // Looks at where the person stands today. It is only a hint, so when the numbers cannot be had, or
@@ -99,7 +102,9 @@ export function ChatPanel({
     setDraft("");
     setPending(true);
 
+    const run = chatRun.current;
     const outcome = await askQuestion(documentId, question);
+    if (run !== chatRun.current) return;
     const reply: Message = outcome.ok
       ? { id: nextId.current++, kind: "answer", result: outcome.result }
       : { id: nextId.current++, kind: "error", text: outcome.message, reference: outcome.reference };
@@ -111,11 +116,26 @@ export function ChatPanel({
     if (usage.ok) setLimitNote(questionsLeftNote(usage.usage.ask));
   }
 
+  function startOver() {
+    chatRun.current += 1;
+    setMessages([]);
+    setDraft("");
+    setPending(false);
+  }
+
   return (
     <section
       aria-label="Ask about this document"
       className="flex min-h-0 flex-1 flex-col rounded-lg border border-border bg-background"
     >
+      {(messages.length > 0 || pending) && (
+        <div className="flex justify-end border-b border-border px-3 py-2">
+          <Button type="button" variant="ghost" size="sm" onClick={startOver}>
+            <RotateCcw aria-hidden="true" className="size-3.5" />
+            New chat
+          </Button>
+        </div>
+      )}
       <div
         ref={listRef}
         role="log"
