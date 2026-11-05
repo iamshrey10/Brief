@@ -65,7 +65,7 @@ test("the dashboard says how many documents there are and how many of each kind"
 
 test("choosing Dark on the Profile page turns the site dark and is kept after a reload", async ({ page }) => {
   await signInAsTestReader(page);
-  await page.goto("/dashboard/profile");
+  await page.goto("/dashboard/profile#appearance");
 
   await page.getByRole("radiogroup", { name: "Appearance" }).getByRole("radio", { name: "Dark" }).click();
   await expect(page.locator("html")).toHaveClass(/dark/);
