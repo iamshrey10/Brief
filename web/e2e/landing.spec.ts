@@ -105,20 +105,21 @@ test("the three scenes in How it works play while it is on screen, and stand sti
 });
 
 for (const [name, width, height] of [["a laptop", 1440, 900], ["a wide monitor", 1920, 1080], ["a small laptop", 1280, 720], ["a tablet", 820, 1180], ["a phone", 390, 844]] as const)
-  test(`on ${name} the landing page's first screen has the headline and the way in, and What you get starts just below`, async ({ browser }) => {
+  test(`on ${name} the landing page is three screens: the hero, What you get, and How it works, each at least as tall as the window below the top bar`, async ({ browser }) => {
     const page = await (await browser.newContext({ viewport: { width, height }, reducedMotion: "reduce" })).newPage();
     await page.goto("/");
     const header = (await page.locator("header").first().boundingBox())!;
-    const hero = (await page.locator("section").first().boundingBox())!;
-    const next = (await page.locator("#features").boundingBox())!;
+    const room = height - (header.y + header.height) - 2;
 
-    // The first section starts right under the top bar, and What you get follows straight on, with no gap.
-    expect(Math.abs(hero.y - (header.y + header.height))).toBeLessThanOrEqual(2);
-    expect(Math.abs(next.y - (hero.y + hero.height))).toBeLessThanOrEqual(2);
-    // The headline and the way in are inside the first screen on anything but a phone, and nothing runs off the side.
-    const heading = (await page.getByRole("heading", { level: 1 }).boundingBox())!;
-    const signIn = (await page.getByRole("button", { name: "Sign in with Google" }).boundingBox())!;
-    expect(heading.y + heading.height).toBeLessThanOrEqual(hero.y + hero.height);
-    if (width >= 820) expect(signIn.y + signIn.height).toBeLessThanOrEqual(height);
+    const heroBox = (await page.locator("section").first().locator("xpath=..").boundingBox())!;
+    const featuresBox = (await page.locator("#features").boundingBox())!;
+    const howBox = (await page.locator("#how").boundingBox())!;
+    expect(Math.abs(heroBox.y - (header.y + header.height))).toBeLessThanOrEqual(2);
+    for (const box of [heroBox, featuresBox, howBox]) expect(box.height).toBeGreaterThanOrEqual(room);
+    expect(Math.abs(featuresBox.y - (heroBox.y + heroBox.height))).toBeLessThanOrEqual(2);
+    expect(Math.abs(howBox.y - (featuresBox.y + featuresBox.height))).toBeLessThanOrEqual(2);
+    // The headline and the way in are inside the first screen, and nothing runs off the side.
+    await expect(page.getByRole("heading", { level: 1 })).toBeInViewport();
+    if (width >= 820) await expect(page.getByRole("button", { name: "Sign in with Google" })).toBeInViewport();
     expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
   });

@@ -54,7 +54,7 @@ export const FEATURES: Feature[] = [
 /** Three things Brief does, as cards. The section's id is what the top bar's link jumps to. */
 export function LandingFeatures() {
   return (
-    <section id="features" aria-labelledby="features-heading" className="scroll-mt-16 border-t border-border/70 bg-secondary/40">
+    <section id="features" aria-labelledby="features-heading" className="flex min-h-[calc(100svh-4.0625rem)] scroll-mt-16 items-center border-t border-border/70 bg-secondary/40">
       <div className="mx-auto w-[min(100%-3rem,1400px)] py-12 md:py-14">
         <div className="max-w-2xl">
           <h2 id="features-heading" className="text-3xl font-semibold tracking-tight text-foreground md:text-4xl">
