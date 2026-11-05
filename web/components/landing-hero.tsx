@@ -1,4 +1,3 @@
-import { Play } from "lucide-react";
 import Link from "next/link";
 
 import { DocumentPreview } from "@/components/document-preview";
@@ -63,10 +62,6 @@ export function LandingHero({ signedIn }: { signedIn: boolean }) {
               </Button>
             </form>
           )}
-          <a href="#how" className={buttonVariants({ variant: "outline", size: "lg", className: "h-11 px-5 text-base" })}>
-            <Play aria-hidden="true" className="size-4" />
-            See how it works
-          </a>
         </div>
 
         <ul className="mt-2 flex flex-col gap-2.5 text-sm text-muted-foreground">
