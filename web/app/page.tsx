@@ -11,10 +11,10 @@ export default async function Home() {
   const signedIn = Boolean(session?.user);
 
   return (
-    <div className="flex flex-1 flex-col bg-background">
+    <div className="relative isolate flex flex-1 flex-col bg-background">
+      <LandingBackdrop />
       <SiteHeader signedIn={signedIn} />
-      <div className="relative isolate flex min-h-[calc(100svh-4.0625rem)] items-center overflow-hidden">
-        <LandingBackdrop />
+      <div className="flex min-h-[calc(100svh-4.0625rem)] items-center pb-[16vh]">
         <LandingHero signedIn={signedIn} />
       </div>
       <LandingFeatures />
