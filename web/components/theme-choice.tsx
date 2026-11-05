@@ -1,5 +1,6 @@
 "use client";
 
+import { fadeTheme } from "@/lib/theme-fade";
 import { useSyncExternalStore } from "react";
 import { useTheme } from "next-themes";
 
@@ -30,7 +31,10 @@ export function ThemeChoice() {
             type="button"
             role="radio"
             aria-checked={selected}
-            onClick={() => setTheme(option.value)}
+            onClick={() => {
+              fadeTheme();
+              setTheme(option.value);
+            }}
             className={cn(
               "flex flex-col items-start rounded-xl border px-4 py-3 text-left text-sm transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
               selected

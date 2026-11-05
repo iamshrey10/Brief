@@ -66,7 +66,7 @@ export function LandingFeatures() {
         </div>
         <ul className="mt-10 grid gap-5 md:grid-cols-3">
           {FEATURES.map((feature) => (
-            <li key={feature.title} className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-6">
+            <li key={feature.title} className="lift flex flex-col gap-3 rounded-2xl border border-border bg-card p-6">
               <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent text-accent-foreground">
                 {feature.icon}
               </span>

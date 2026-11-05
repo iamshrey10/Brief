@@ -139,6 +139,51 @@
 }
 
 /*
+ * Small, quick transitions across the site. Links, tabs and row headers ease their color changes, clickable cards (.lift) ease
+ * their shadow and edge, and the theme switch fades the colors for a moment (see lib/theme-fade.ts). None of it delays an action,
+ * and a reader who prefers less motion gets none of it.
+ */
+a,
+summary,
+[role="tab"] {
+  transition:
+    color 150ms ease,
+    background-color 150ms ease,
+    border-color 150ms ease;
+}
+.lift {
+  transition:
+    box-shadow 200ms ease,
+    border-color 200ms ease,
+    transform 200ms ease;
+}
+.lift:hover {
+  border-color: color-mix(in oklch, var(--primary) 35%, var(--border));
+  box-shadow: 0 6px 18px -8px color-mix(in oklch, var(--foreground) 22%, transparent);
+}
+html.theme-fade,
+html.theme-fade *,
+html.theme-fade *::before,
+html.theme-fade *::after {
+  transition:
+    background-color 200ms ease,
+    color 200ms ease,
+    border-color 200ms ease,
+    fill 200ms ease,
+    stroke 200ms ease !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  a,
+  summary,
+  [role="tab"],
+  .lift,
+  html.theme-fade,
+  html.theme-fade * {
+    transition: none !important;
+  }
+}
+
+/*
  * How it works on the landing page. Until a script has run, and for a reader who prefers less motion, nothing here applies and
  * every card is simply there. Otherwise the section is armed (cards waiting) and shown when it scrolls into view, and the
  * cards come in one after another by their --i, with each top line drawing across and each number settling into place.
