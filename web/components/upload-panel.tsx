@@ -157,7 +157,7 @@ export function UploadPanel({ onUploaded }: { onUploaded: (document: DocumentSum
   return (
     <form
       onSubmit={handleSubmit}
-      className="flex flex-col gap-5 rounded-xl border border-border bg-card p-5"
+      className="flex flex-col gap-4 rounded-xl border border-border bg-card p-4"
     >
       {file ? (
         <div className="flex items-center gap-3 rounded-lg border border-border bg-background px-4 py-3">
@@ -188,7 +188,7 @@ export function UploadPanel({ onUploaded }: { onUploaded: (document: DocumentSum
           onDragLeave={() => setDragging(false)}
           onDrop={handleDrop}
           className={cn(
-            "flex cursor-pointer flex-col items-center gap-2 rounded-lg border-2 border-dashed px-6 py-10 text-center transition-colors focus-within:ring-3 focus-within:ring-ring/50",
+            "flex cursor-pointer flex-col items-center gap-1.5 rounded-lg border-2 border-dashed px-6 py-5 text-center transition-colors focus-within:ring-3 focus-within:ring-ring/50",
             dragging ? "border-primary bg-primary/5" : "border-border hover:bg-accent/50",
           )}
         >
@@ -231,7 +231,8 @@ export function UploadPanel({ onUploaded }: { onUploaded: (document: DocumentSum
         </div>
       </fieldset>
 
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-col gap-3 md:flex-row md:items-end">
+      <div className="flex flex-col gap-1 md:flex-1">
         <label htmlFor="upload-folder" className="text-sm font-medium text-foreground">
           Folder
         </label>
@@ -254,15 +255,16 @@ export function UploadPanel({ onUploaded }: { onUploaded: (document: DocumentSum
         )}
       </div>
 
+      <Button type="submit" size="lg" disabled={!file || uploading} className="md:w-48">
+        {uploading ? "Uploading..." : "Upload"}
+      </Button>
+      </div>
+
       {status === "error" && (
         <p role="alert" className="text-sm text-destructive">
           {errorMessage}
         </p>
       )}
-
-      <Button type="submit" size="lg" disabled={!file || uploading}>
-        {uploading ? "Uploading..." : "Upload"}
-      </Button>
       {uploading && (
         <p role="status" className="text-center text-sm text-muted-foreground">
           {STAGE_TEXT[stage]}

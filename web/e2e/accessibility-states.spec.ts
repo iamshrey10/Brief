@@ -79,6 +79,8 @@ for (const scheme of ["light", "dark"] as const) {
       });
       await page.getByRole("button", { name: "Upload", exact: true }).click();
       await expect(page.locator("form").getByRole("alert")).toContainText("You can keep up to 25 documents");
+      // The pointer is still over the Upload button; this checks the page at rest, not the button's hover color.
+      await page.mouse.move(0, 0);
 
       expect(await problems(page)).toEqual([]);
     });

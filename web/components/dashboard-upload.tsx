@@ -24,7 +24,7 @@ export function DashboardUpload() {
       className="rounded-3xl border border-primary/25 bg-gradient-to-br from-accent via-card to-accent/60 p-4 shadow-sm"
     >
       {!open && (
-        <div className="grid items-center gap-4 md:grid-cols-[2fr_1fr]">
+        <div className="grid grid-cols-1 items-center gap-4 md:grid-cols-[2fr_1fr]">
           <div className="flex flex-col items-center gap-3 rounded-2xl border-2 border-dashed border-primary/40 bg-background/60 px-6 py-6 text-center">
             <span aria-hidden="true" className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-md shadow-primary/25 ring-4 ring-primary/10">
               <CloudUpload className="size-6" />
