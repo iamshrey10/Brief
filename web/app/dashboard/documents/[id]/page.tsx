@@ -111,10 +111,11 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
 
   return (
     <PageShell email={email} fill={isReadable(document.status) && clauses.length > 0}>
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <Link href="/dashboard/documents" className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline print:hidden">
+      <div className="flex flex-col gap-1.5">
+        <Link href="/dashboard/documents" className="self-start text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline print:hidden">
           ← Back to your documents
         </Link>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <h1 className="font-heading text-xl font-semibold tracking-tight break-all text-foreground md:text-2xl">
           {document.filename}
         </h1>
@@ -144,6 +145,7 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
             <PrintButton />
           </div>
         )}
+        </div>
       </div>
 
       <StatusNotice document={document} />
