@@ -54,7 +54,7 @@ export default async function DashboardHome() {
               <h1 className="font-heading text-3xl font-semibold tracking-tight md:text-4xl">Dashboard</h1>
               <p className="mt-1.5 max-w-xl text-sm text-primary-foreground md:text-base">Where your documents stand, and what needs doing next.</p>
             </div>
-            <Link href="/dashboard/profile#sharing" className={buttonVariants({ variant: "secondary", size: "lg" })}>
+            <Link href="/dashboard/shared#sharing" className={buttonVariants({ variant: "secondary", size: "lg" })}>
               Share dashboard
             </Link>
           </div>

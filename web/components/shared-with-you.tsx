@@ -28,7 +28,7 @@ export function SharedWithYou({ items, headingLevel = 2 }: { items: SharedWithMe
       {items.length > 0 && (
         <ul aria-label="Dashboards shared with you" className="mb-5 flex flex-col gap-2">
           {items.map((shared) => (
-            <li key={shared.id} className="flex items-center justify-between gap-3 rounded-xl border border-border bg-background px-4 py-3 text-sm">
+            <li key={shared.id} className="lift flex items-center justify-between gap-3 rounded-xl border border-border bg-background px-4 py-3 text-sm">
               <span className="flex min-w-0 items-center gap-3">
                 <span aria-hidden="true" className="flex size-9 shrink-0 items-center justify-center rounded-full bg-accent text-sm font-semibold text-accent-foreground">
                   {personLabel(shared.owner_name, shared.owner_email).charAt(0).toUpperCase()}

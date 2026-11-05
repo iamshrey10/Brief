@@ -6,13 +6,11 @@ import { Lock, Palette, Trash2, Users } from "lucide-react";
 import { ProfileRow } from "@/components/profile-row";
 import { BinList } from "@/components/bin-list";
 import { TwoFactorPanel } from "@/components/two-factor-panel";
-import { SharingPanel } from "@/components/sharing-panel";
 import { ProfileAccount } from "@/components/profile-account";
 import { DeleteAccount } from "@/components/delete-account";
 import { ThemeChoice } from "@/components/theme-choice";
 import { UsageCard } from "@/components/usage-card";
 import { backendGet } from "@/lib/backend";
-import { asShares } from "@/lib/sharing";
 import { asTrash } from "@/lib/trash";
 import { asTwoFactorStatus } from "@/lib/two-factor";
 import { mintServiceToken } from "@/lib/service-token";
@@ -38,17 +36,15 @@ export default async function ProfilePage() {
   const email = (await auth())?.user?.email;
   // The proxy already turns visitors away, and this makes the page safe on its own too.
   if (!email) redirect("/");
-  const [usage, meBody, trashBody, sharesBody, twoFactorBody] = await Promise.all([
+  const [usage, meBody, trashBody, twoFactorBody] = await Promise.all([
     fetchUsageToday(email),
     backendGet(email, "/me"),
     backendGet(email, "/trash"),
-    backendGet(email, "/shares"),
     backendGet(email, "/me/2fa"),
   ]);
   const twoFactor = asTwoFactorStatus(twoFactorBody);
   const me = (meBody && typeof meBody === "object" ? meBody : null) as { first_name?: string | null; last_name?: string | null } | null;
   const trash = asTrash(trashBody);
-  const shares = asShares(sharesBody);
 
   return (
     <div className="flex flex-1 flex-col">
@@ -65,14 +61,13 @@ export default async function ProfilePage() {
             <UsageCard usage={usage} />
           </div>
           <div className="flex min-w-0 flex-col gap-3">
+            <h2 className="font-heading text-xl font-semibold tracking-tight text-foreground">Account &amp; preferences</h2>
             {twoFactor && (
               <ProfileRow anchor="two-step" icon={<Lock className="size-5" />} title="Two-step verification" description="Add a second lock to your account.">
                 <TwoFactorPanel initialEnabled={twoFactor.enabled} initialCodesLeft={twoFactor.recovery_codes_left} />
               </ProfileRow>
             )}
-            <ProfileRow anchor="sharing" icon={<Users className="size-5" />} title="Share your dashboard" description="Let family or friends view your documents.">
-              <SharingPanel initial={shares} />
-            </ProfileRow>
+            <ProfileRow anchor="sharing" href="/dashboard/shared#sharing" icon={<Users className="size-5" />} title="Share your dashboard" description="Let family or friends view your documents." />
             <ProfileRow anchor="bin" icon={<Trash2 className="size-5" />} title="Bin" description="Deleted documents stay for 7 days.">
               <section id="bin" aria-labelledby="bin-heading">
                 <h2 id="bin-heading" className="text-lg font-semibold tracking-tight text-foreground">
