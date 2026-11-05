@@ -62,7 +62,7 @@ describe("the dashboard home", () => {
     expect(getMock).toHaveBeenCalledWith("reader@example.com", "/documents");
   });
 
-  it("puts the way to add documents first, as one button, whether or not there are documents", async () => {
+  it("shows the way to add documents, as one button, whether or not there are documents", async () => {
     for (const documents of [[], [doc("a", "ready")]]) {
       getMock.mockResolvedValue(documents);
       const html = await page();
@@ -70,7 +70,7 @@ describe("the dashboard home", () => {
       expect(html).toContain('aria-label="Add documents"');
       expect(html).toContain("Add documents</button>");
       expect(html).not.toContain("Drop a contract here");
-      expect(html.indexOf('aria-label="Add documents"')).toBeLessThan(html.indexOf("Your documents at a glance"));
+      expect(html.indexOf("Your documents at a glance")).toBeLessThan(html.indexOf('aria-label="Add documents"'));
     }
   });
 
@@ -191,7 +191,7 @@ describe("the dashboard home", () => {
     });
 
     const html = await page();
-    const order = ["Add documents", "Your documents at a glance", "analysis-heading", "activity-heading", "kinds-heading", "still-to-ask-heading"].map((marker) => html.indexOf(marker));
+    const order = ["Your documents at a glance", "Add documents", "analysis-heading", "activity-heading", "kinds-heading", "still-to-ask-heading"].map((marker) => html.indexOf(marker));
 
     expect(order.every((position) => position > 0)).toBe(true);
     expect(order).toEqual([...order].sort((a, b) => a - b));
