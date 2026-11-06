@@ -117,6 +117,7 @@ function EvidenceButton({
   clauseId,
   showQuote,
   position,
+  chipSuffix,
   onSelect,
 }: {
   label: string;
@@ -126,6 +127,8 @@ function EvidenceButton({
   showQuote: boolean;
   /** Which quote this is when there are several for one answer, so they can be told apart by ear. */
   position?: { index: number; total: number };
+  /** Shown after the page when several quotes of one answer are on the same page, so the chips are not identical. */
+  chipSuffix?: string;
   onSelect: (citation: ActiveCitation) => void;
 }) {
   const pageText = page === null ? "Page" : `Page ${page}`;
@@ -147,7 +150,10 @@ function EvidenceButton({
           : "inline-flex items-center gap-1 rounded-full border border-border bg-background px-2.5 py-1 text-xs text-muted-foreground transition-colors outline-none hover:border-primary/50 hover:bg-accent hover:text-accent-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
       }
     >
-      <span className={showQuote ? "block text-xs" : undefined}>{pageText}</span>
+      <span className={showQuote ? "block text-xs" : undefined}>
+        {pageText}
+        {chipSuffix}
+      </span>
       {showQuote && <span className="text-sm italic">&ldquo;{quote}&rdquo;</span>}
     </button>
   );
@@ -193,6 +199,14 @@ function CopyButton({ text, label }: { text: string; label: string }) {
 // ---------------------------------------------------------------------------------------
 // Key terms
 
+/** ", quote 2" for the second quote on a page that has several, so two chips that would both say "Page 4" read "Page 4, quote 1" and "Page 4, quote 2". */
+function quoteSuffix(evidence: { page_number: number | null }[], index: number): string {
+  const page = evidence[index].page_number;
+  const onPage = evidence.filter((item) => item.page_number === page);
+  if (onPage.length < 2) return "";
+  return `, quote ${evidence.slice(0, index + 1).filter((item) => item.page_number === page).length}`;
+}
+
 function KeyTermCard({
   term,
   onSelect,
@@ -211,6 +225,7 @@ function KeyTermCard({
           <EvidenceButton
             key={`${item.clause_id}-${item.quote}`}
             position={{ index, total: term.evidence.length }}
+            chipSuffix={quoteSuffix(term.evidence, index)}
             label={term.label}
             page={item.page_number}
             quote={item.quote}
