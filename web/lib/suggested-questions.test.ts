@@ -14,7 +14,7 @@ describe("suggested questions", () => {
   });
 
   it("gives the lease ones for a lease", () => {
-    expect(suggestionsFor("lease")[0]).toContain("security deposit");
+    expect(suggestionsFor("lease")[0]).toContain("payments");
   });
 
   it("keeps every question short, ending in a question mark, with no em dash", () => {
