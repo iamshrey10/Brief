@@ -82,7 +82,7 @@ def test_the_jitter_is_a_small_random_amount(monkeypatch):
     assert len(values) > 1  # it really is random
 
 
-@pytest.mark.parametrize("code", [400, 401, 403, 404, 500, 503])
+@pytest.mark.parametrize("code", [400, 401, 403, 404, 500])
 def test_an_error_that_is_not_a_rate_limit_is_raised_straight_away(no_real_waiting, code):
     client = ScriptedClient([api_error(code, "something else")])
 
@@ -90,6 +90,24 @@ def test_an_error_that_is_not_a_rate_limit_is_raised_straight_away(no_real_waiti
         call(client)
 
     assert no_real_waiting == [] and len(client.calls) == 1
+
+
+def test_an_overloaded_model_is_tried_again_after_a_growing_wait(no_real_waiting):
+    response = SimpleNamespace(parsed="ok")
+    client = ScriptedClient([api_error(503, "overloaded"), api_error(503, "overloaded"), response])
+
+    assert call(client) is response
+    assert no_real_waiting == [4.0, 8.0]
+    assert len(client.calls) == 3
+
+
+def test_an_overloaded_model_is_given_up_on_after_the_retry_limit(no_real_waiting):
+    client = ScriptedClient([api_error(503, "overloaded") for _ in range(MAX_GENERATION_RETRIES + 1)])
+
+    with pytest.raises(genai_errors.APIError):
+        call(client)
+
+    assert len(client.calls) == MAX_GENERATION_RETRIES + 1
 
 
 def test_a_daily_quota_is_not_waited_for_since_waiting_will_not_help(no_real_waiting):
