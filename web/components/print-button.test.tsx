@@ -23,6 +23,6 @@ describe("the print button", () => {
   it("is left off the printed page itself", () => {
     render(<PrintButton />);
 
-    expect(screen.getByRole("button", { name: "Print or save as PDF" })).toHaveClass("print:hidden");
+    expect(screen.getByRole("button", { name: "Print or save as PDF" })).toHaveClass("print:hidden", "lg:hidden");
   });
 });

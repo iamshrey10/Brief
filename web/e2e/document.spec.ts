@@ -80,7 +80,18 @@ test("on a long document the page itself does not scroll, so the top bar and bot
   expect(await page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight)).toBeLessThanOrEqual(1);
 });
 
+test("the print button is for phones only, since a computer has Cmd or Ctrl+P", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("/dashboard/documents/doc-lease");
+  await expect(page.getByRole("heading", { name: "sample-lease.pdf" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Print or save as PDF" })).toBeHidden();
+
+  await page.setViewportSize({ width: 390, height: 800 });
+  await expect(page.getByRole("button", { name: "Print or save as PDF" })).toBeVisible();
+});
+
 test("printed, the document page is the Overview alone, without the top bar, the tabs or the clause text", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 800 });
   await page.goto("/dashboard/documents/doc-lease");
   await expect(page.getByRole("region", { name: "Key terms" }).getByText("Security deposit")).toBeVisible();
   await expect(page.getByRole("button", { name: "Print or save as PDF" })).toBeVisible();
