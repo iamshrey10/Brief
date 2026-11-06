@@ -81,17 +81,17 @@ describe("ChatPanel", () => {
     const suggestions = screen.getByRole("list", { name: "Suggested questions" });
 
     expect(within(suggestions).getAllByRole("button")).toHaveLength(3);
-    await user.click(within(suggestions).getByRole("button", { name: "What happens if I pay rent late?" }));
+    await user.click(within(suggestions).getByRole("button", { name: "What are my options for ending it early?" }));
 
-    expect(askMock).toHaveBeenCalledWith("doc-1", "What happens if I pay rent late?");
-    expect(await screen.findByText("What happens if I pay rent late?")).toBeInTheDocument();
+    expect(askMock).toHaveBeenCalledWith("doc-1", "What are my options for ending it early?");
+    expect(await screen.findByText("What are my options for ending it early?")).toBeInTheDocument();
     expect(screen.queryByRole("list", { name: "Suggested questions" })).not.toBeInTheDocument();
   });
 
   it("suggests the general questions when the kind of document is not given", () => {
     renderPanel();
 
-    expect(screen.getByRole("button", { name: "What are the key dates in this document?" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "What are my main obligations and key dates?" })).toBeInTheDocument();
   });
 
   it("sends a trimmed question, shows it, and clears the box", async () => {
