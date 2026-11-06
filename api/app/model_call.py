@@ -1,3 +1,4 @@
+import collections
 import logging
 import random
 import threading
@@ -28,7 +29,30 @@ OVERLOADED_WAIT_SECONDS = 4.0
 MAX_CONCURRENT_MODEL_CALLS = 4
 _in_flight = threading.BoundedSemaphore(MAX_CONCURRENT_MODEL_CALLS)
 
+# The free tier of the model allows 15 calls a minute, counting refused ones. Reading one document
+# asks for about twenty, so the calls are spaced to stay just under that, and the last few wait for
+# the minute to roll over instead of being refused and failing the whole page.
+MAX_CALLS_PER_MINUTE = 14
+_started: collections.deque[float] = collections.deque()
+_pace_lock = threading.Lock()
+
 _sleep = time.sleep
+_clock = time.monotonic
+_pause = time.sleep
+
+
+def _wait_for_a_free_minute_slot() -> None:
+    """Blocks until fewer than MAX_CALLS_PER_MINUTE calls started in the last 60 seconds, then takes a slot."""
+    while True:
+        with _pace_lock:
+            now = _clock()
+            while _started and now - _started[0] >= 60.0:
+                _started.popleft()
+            if len(_started) < MAX_CALLS_PER_MINUTE:
+                _started.append(now)
+                return
+            delay = 60.0 - (now - _started[0])
+        _pause(max(delay, 0.05))
 
 
 def _jitter() -> float:
@@ -54,6 +78,7 @@ def generate(client, kind: str, *, model: str, contents, config):
     waited = 0.0
     for attempt in range(MAX_GENERATION_RETRIES + 1):
         try:
+            _wait_for_a_free_minute_slot()
             with _in_flight, timed(kind):
                 return client.models.generate_content(model=model, contents=contents, config=config)
         except genai_errors.APIError as error:
