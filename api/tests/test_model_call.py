@@ -35,6 +35,7 @@ class ScriptedClient:
 
 @pytest.fixture(autouse=True)
 def no_real_waiting(monkeypatch):
+    model_call._started.clear()
     waits: list[float] = []
     monkeypatch.setattr(model_call, "_sleep", waits.append)
     monkeypatch.setattr(model_call, "_jitter", lambda: 0.0)
@@ -223,3 +224,24 @@ def test_only_a_few_calls_are_in_flight_at_once_and_the_rest_wait_their_turn():
         thread.join()
 
     assert state["peak"] <= model_call.MAX_CONCURRENT_MODEL_CALLS
+
+
+def test_calls_beyond_the_per_minute_allowance_wait_for_the_minute_to_roll_over(monkeypatch):
+    now = {"t": 1000.0}
+    pauses: list[float] = []
+
+    def pause(seconds):
+        pauses.append(seconds)
+        now["t"] += seconds
+
+    monkeypatch.setattr(model_call, "_clock", lambda: now["t"])
+    monkeypatch.setattr(model_call, "_pause", pause)
+    client = ScriptedClient([SimpleNamespace(parsed="ok") for _ in range(model_call.MAX_CALLS_PER_MINUTE + 1)])
+
+    for _ in range(model_call.MAX_CALLS_PER_MINUTE):
+        call(client)
+    assert pauses == []  # the allowance is free to use
+
+    call(client)  # one more than the minute allows
+    assert len(pauses) == 1 and 59.9 <= pauses[0] <= 60.0
+    assert len(client.calls) == model_call.MAX_CALLS_PER_MINUTE + 1
