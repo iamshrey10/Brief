@@ -19,24 +19,27 @@ export function LeaseCountdown({ lease, linked = true }: { lease: LeaseEnd | nul
   return (
     <section
       aria-label="Lease remaining"
-      className={cn("flex items-center gap-4 rounded-2xl border p-5", soon ? "border-amber-500/40 bg-amber-50 dark:bg-amber-500/10" : "border-border bg-card")}
+      className={cn("flex flex-col justify-center gap-3 rounded-2xl border p-5", soon ? "border-amber-500/40 bg-amber-50 dark:bg-amber-500/10" : "border-border bg-card")}
     >
-      <span aria-hidden="true" className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-accent text-accent-foreground">
-        <CalendarClock className="size-5" />
-      </span>
-      <div className="min-w-0">
-        <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Lease remaining</p>
-        <p className="font-heading text-2xl font-semibold tracking-tight text-foreground">{leaseDaysText(lease.days)}</p>
-        <p className="truncate text-sm text-muted-foreground">
-          Ends {lease.value} ·{" "}
-          {linked ? (
-            <Link href={`/dashboard/documents/${lease.documentId}`} className="underline underline-offset-2 hover:text-foreground">
-              {lease.filename}
-            </Link>
-          ) : (
-            lease.filename
-          )}
-        </p>
+      <h2 className="text-lg font-semibold tracking-tight text-foreground">Reminders</h2>
+      <div className="flex items-center gap-4">
+        <span aria-hidden="true" className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-accent text-accent-foreground">
+          <CalendarClock className="size-5" />
+        </span>
+        <div className="min-w-0">
+          <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Lease remaining</p>
+          <p className="font-heading text-2xl font-semibold tracking-tight text-foreground">{leaseDaysText(lease.days)}</p>
+          <p className="truncate text-sm text-muted-foreground">
+            Ends {lease.value} ·{" "}
+            {linked ? (
+              <Link href={`/dashboard/documents/${lease.documentId}`} className="underline underline-offset-2 hover:text-foreground">
+                {lease.filename}
+              </Link>
+            ) : (
+              lease.filename
+            )}
+          </p>
+        </div>
       </div>
     </section>
   );

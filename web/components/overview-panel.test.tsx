@@ -232,6 +232,24 @@ describe("OverviewPanel checklist", () => {
     });
   });
 
+  it("tells two quotes on the same page apart on the chips", async () => {
+    const fees: KeyTerm = {
+      ...FOUND_TERM("late_fees", "Late fees", "$15 a day"),
+      evidence: [
+        { clause_id: "clause-fee-a", page_number: 4, quote: "a late fee applies" },
+        { clause_id: "clause-fee-b", page_number: 4, quote: "$15.00 each day thereafter" },
+        { clause_id: "clause-fee-c", page_number: 5, quote: "fees are due with rent" },
+      ],
+    };
+    keyTermsMock.mockResolvedValue({ ok: true, result: { terms: [fees], truncated: false } });
+    checklistMock.mockResolvedValue({ ok: true, result: { answers: [], truncated: false } });
+
+    render(<OverviewPanel filename="lease.pdf" documentId="doc-1" onCitationSelect={vi.fn()} />);
+
+    const buttons = await screen.findAllByRole("button", { name: /Show "Late fees" in the document/ });
+    expect(buttons.map((button) => button.textContent)).toEqual(["Page 4, quote 1", "Page 4, quote 2", "Page 5"]);
+  });
+
   it("names a button that shows a quote with the words it shows first, so the name contains what is on the button", async () => {
     checklistMock.mockResolvedValue({ ok: true, result: { answers: [ANSWERED], truncated: false } });
     keyTermsMock.mockResolvedValue({ ok: true, result: KEY_TERMS });
