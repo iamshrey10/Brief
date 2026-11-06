@@ -1,5 +1,6 @@
 import logging
 import random
+import threading
 import time
 
 from google.genai import errors as genai_errors
@@ -20,6 +21,12 @@ JITTER_SECONDS = 3.0
 # Gemini answers 503 "overloaded" when it is busy, and a moment later the same call usually works.
 # There is no time hint with it, so the wait grows a little with each try: 4s, 8s, 12s.
 OVERLOADED_WAIT_SECONDS = 4.0
+
+# Reading one document asks the model for a dozen or more things at once (three full passes, then two
+# checks on every answer). All at the same moment they pass the per-minute limit, every one is refused
+# and the page shows an error, so only a few are in flight together and the rest wait their turn.
+MAX_CONCURRENT_MODEL_CALLS = 4
+_in_flight = threading.BoundedSemaphore(MAX_CONCURRENT_MODEL_CALLS)
 
 _sleep = time.sleep
 
@@ -47,7 +54,7 @@ def generate(client, kind: str, *, model: str, contents, config):
     waited = 0.0
     for attempt in range(MAX_GENERATION_RETRIES + 1):
         try:
-            with timed(kind):
+            with _in_flight, timed(kind):
                 return client.models.generate_content(model=model, contents=contents, config=config)
         except genai_errors.APIError as error:
             wait = _wait_before_retry(error, attempt)

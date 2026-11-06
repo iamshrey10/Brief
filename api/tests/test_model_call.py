@@ -193,3 +193,33 @@ def test_the_error_that_finally_reaches_the_caller_is_the_models_own(no_real_wai
         call(client)
 
     assert caught.value is error
+
+
+def test_only_a_few_calls_are_in_flight_at_once_and_the_rest_wait_their_turn():
+    import threading
+    import time
+
+    lock = threading.Lock()
+    state = {"now": 0, "peak": 0}
+
+    class SlowClient:
+        def __init__(self):
+            self.models = self
+
+        def generate_content(self, *, model, contents, config):
+            with lock:
+                state["now"] += 1
+                state["peak"] = max(state["peak"], state["now"])
+            time.sleep(0.03)
+            with lock:
+                state["now"] -= 1
+            return SimpleNamespace(parsed="ok")
+
+    client = SlowClient()
+    threads = [threading.Thread(target=call, args=(client,)) for _ in range(12)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert state["peak"] <= model_call.MAX_CONCURRENT_MODEL_CALLS
