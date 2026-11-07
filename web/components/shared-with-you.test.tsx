@@ -37,11 +37,12 @@ describe("SharedWithYou", () => {
     expect(screen.getByText("Asha Rao")).toBeInTheDocument();
   });
 
-  it("with nothing shared, shows only the place to enter a link and code, open", () => {
+  it("with nothing shared, says so and keeps the place to enter a link and code closed until it is asked for", () => {
     const { container } = render(<SharedWithYou items={[]} headingLevel={3} />);
 
     expect(screen.queryByRole("list")).not.toBeInTheDocument();
-    expect(container.querySelector("details")).toHaveAttribute("open");
+    expect(screen.getByText(/Nothing has been shared with you yet/)).toBeInTheDocument();
+    expect(container.querySelector("details")).not.toHaveAttribute("open");
     expect(screen.getByRole("heading", { level: 3 })).toBeInTheDocument();
   });
 });
