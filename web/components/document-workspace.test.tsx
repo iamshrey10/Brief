@@ -135,6 +135,7 @@ async function askAndGetAnswer() {
   await openAskTab(user);
   await user.type(screen.getByLabelText("Your question"), "Can I pay early?{Enter}");
   await screen.findByText(ANSWER.answer);
+  scrollIntoView.mockClear(); // the question scrolling into view is not what these tests are about
   return user;
 }
 

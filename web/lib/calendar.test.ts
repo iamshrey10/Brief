@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildCalendarFile, escapeText, foldLine, type CalendarEvent } from "./calendar";
+import { buildCalendarFile, escapeText, foldLine, googleCalendarUrl, type CalendarEvent } from "./calendar";
 
 const NOW = new Date("2026-10-30T15:00:00.000Z");
 const END: CalendarEvent = {
@@ -58,7 +58,7 @@ describe("buildCalendarFile", () => {
 
 describe("escapeText", () => {
   it("escapes what the format reserves and writes line breaks as \\n", () => {
-    expect(escapeText("a, b; c\\d\ne")).toBe("a\\, b\; c\\\\d\\ne");
+    expect(escapeText("a, b; c\\d\ne")).toBe("a\\, b\\; c\\\\d\\ne");
   });
 });
 
@@ -79,5 +79,19 @@ describe("foldLine", () => {
     const long = `SUMMARY:${"é".repeat(60)}`;
 
     expect(foldLine(long).replace(/\r\n /g, "")).toBe(long);
+  });
+});
+
+describe("googleCalendarUrl", () => {
+  it("opens Google Calendar with an all day event on the date, ending the next day", () => {
+    const url = new URL(
+      googleCalendarUrl({ uid: "u", date: { year: 2027, month: 12, day: 31 }, summary: "Lease ends: a & b.pdf", description: "Check it, please", remindDaysBefore: 7 }),
+    );
+
+    expect(url.origin + url.pathname).toBe("https://calendar.google.com/calendar/render");
+    expect(url.searchParams.get("action")).toBe("TEMPLATE");
+    expect(url.searchParams.get("text")).toBe("Lease ends: a & b.pdf");
+    expect(url.searchParams.get("details")).toBe("Check it, please");
+    expect(url.searchParams.get("dates")).toBe("20271231/20280101");
   });
 });

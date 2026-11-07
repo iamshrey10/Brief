@@ -48,10 +48,14 @@ const NOT_FOUND: AskResult = {
   citations: [],
 };
 
+const scrollIntoViewMock = vi.fn();
+
 beforeEach(() => {
   usageMock.mockResolvedValue({ ok: true, usage: usageWith(0) });
   // jsdom doesn't implement element scrolling, and the panel scrolls its own conversation.
   Object.defineProperty(Element.prototype, "scrollTo", { value: vi.fn(), configurable: true });
+  Object.defineProperty(Element.prototype, "scrollIntoView", { value: scrollIntoViewMock, configurable: true });
+  scrollIntoViewMock.mockClear();
 });
 
 afterEach(() => {
@@ -133,6 +137,18 @@ describe("ChatPanel", () => {
 
     await waitFor(() => expect(screen.getByText("Try asking")).toBeInTheDocument());
     expect(screen.queryByRole("log")?.textContent).not.toContain(FOUND.answer);
+  });
+
+  it("brings the question to the top when it is sent, and does not scroll again when the answer arrives", async () => {
+    askMock.mockResolvedValue({ ok: true, result: FOUND });
+    const { user, box } = renderPanel();
+
+    await user.type(box, "Can I pay early?");
+    await user.click(screen.getByRole("button", { name: "Ask" }));
+    await screen.findByText(FOUND.answer);
+
+    expect(scrollIntoViewMock).toHaveBeenCalledTimes(1);
+    expect(scrollIntoViewMock).toHaveBeenCalledWith(expect.objectContaining({ block: "start" }));
   });
 
   it("shows the answer with its quoted citation and page", async () => {

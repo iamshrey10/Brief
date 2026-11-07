@@ -69,7 +69,6 @@ export function ChatPanel({
   const nextId = useRef(0);
   // Bumped on every fresh start, so an answer that arrives after it is dropped instead of reappearing.
   const chatRun = useRef(0);
-  const listRef = useRef<HTMLDivElement>(null);
 
   // Looks at where the person stands today. It is only a hint, so when the numbers cannot be had, or
   // the panel has gone by the time they arrive, nothing is shown and nothing is thrown.
@@ -83,11 +82,14 @@ export function ChatPanel({
     };
   }, []);
 
-  // Scrolls only the conversation, not the whole page, so a new answer never yanks the
-  // reader away from the document they are comparing it against.
+  // The box grows with the conversation. When a question is sent it is brought to the top of the view, so the
+  // answer that arrives under it is read from its first line, and nothing scrolls when the answer itself arrives.
   useEffect(() => {
-    listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
-  }, [messages, pending]);
+    const last = messages[messages.length - 1];
+    if (last?.kind !== "question") return;
+    const calm = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    document.getElementById(`ask-message-${last.id}`)?.scrollIntoView?.({ block: "start", behavior: calm ? "auto" : "smooth" });
+  }, [messages]);
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -126,7 +128,7 @@ export function ChatPanel({
   return (
     <section
       aria-label="Ask about this document"
-      className="flex min-h-0 flex-1 flex-col rounded-lg border border-border bg-background"
+      className="flex flex-1 flex-col rounded-lg border border-border bg-background"
     >
       {(messages.length > 0 || pending) && (
         <div className="flex justify-end border-b border-border px-3 py-2">
@@ -137,11 +139,10 @@ export function ChatPanel({
         </div>
       )}
       <div
-        ref={listRef}
         role="log"
         aria-live="polite"
         aria-label="Conversation"
-        className="flex flex-1 flex-col gap-3 overflow-y-auto p-4"
+        className="flex flex-1 flex-col gap-3 p-4"
       >
         {messages.length === 0 && !pending && (
           <div className="my-auto px-2 text-center">
@@ -176,7 +177,8 @@ export function ChatPanel({
             return (
               <div
                 key={message.id}
-                className="max-w-[90%] self-end rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground"
+                id={`ask-message-${message.id}`}
+                className="max-w-[90%] scroll-mt-20 self-end rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground"
               >
                 {message.text}
               </div>
@@ -205,7 +207,7 @@ export function ChatPanel({
         {pending && <p className="text-sm text-muted-foreground">Reading the document...</p>}
       </div>
 
-      <form onSubmit={handleSubmit} className="flex flex-col gap-2 border-t border-border p-3">
+      <form onSubmit={handleSubmit} className="sticky bottom-0 z-10 flex flex-col gap-2 rounded-b-lg border-t border-border bg-background p-3">
         <textarea
           value={draft}
           onChange={(event) => setDraft(event.target.value)}

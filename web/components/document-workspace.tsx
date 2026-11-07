@@ -67,12 +67,12 @@ export function DocumentWorkspace({
 
   return (
     <div className="grid items-start gap-6 lg:min-h-0 lg:flex-1 lg:grid-cols-2 lg:grid-rows-1 lg:items-stretch print:block">
-      <div className="flex max-h-[80vh] min-h-[28rem] flex-col gap-3 lg:h-full lg:max-h-none lg:min-h-0 print:static print:h-auto print:max-h-none">
+      <div className="flex max-h-[80vh] min-h-[28rem] flex-col gap-3 overflow-y-auto lg:h-full lg:max-h-none lg:min-h-0 lg:pr-1 print:static print:h-auto print:max-h-none">
         <div
           role="tablist"
           aria-label="Document tools"
           onKeyDown={handleTabKeys}
-          className="grid grid-cols-2 gap-1 rounded-xl border border-border bg-muted p-1 print:hidden"
+          className="sticky top-0 z-20 grid shrink-0 grid-cols-2 gap-1 rounded-xl border border-border bg-muted p-1 print:hidden"
         >
           {TABS.map(({ id, label }) => (
             <button
@@ -118,7 +118,7 @@ export function DocumentWorkspace({
           id="panel-ask"
           aria-labelledby="tab-ask"
           hidden={tab !== "ask"}
-          className="flex min-h-0 flex-1 flex-col lg:h-[32rem] lg:flex-none"
+          className="flex min-h-[24rem] flex-none flex-col lg:min-h-[32rem]"
         >
           <ChatPanel
             documentId={documentId}
