@@ -235,4 +235,70 @@ describe("UploadNotifications", () => {
     expect(screen.getByRole("region", { name: "Notifications" })).toBeInTheDocument();
     expect(document.activeElement).not.toBe(screen.getByRole("button", { name: "Dismiss" }));
   });
+
+  it("also holds a note still while it has the keyboard focus", async () => {
+    listIs([doc("offer", "processing")]);
+    renderWith([doc("offer", "processing")]);
+    const note = screen.getByRole("status");
+
+    fireEvent.focus(note);
+    await tick(20000);
+    expect(screen.getByText("Added offer.pdf")).toBeInTheDocument();
+
+    fireEvent.blur(note);
+    await tick(7100);
+    expect(screen.queryByText("Added offer.pdf")).not.toBeInTheDocument();
+  });
+
+  it("stops looking at a document that is still being read after five minutes", async () => {
+    listIs([doc("offer", "processing")]);
+    renderWith([doc("offer", "processing")]);
+    await tick(3100);
+    const fetchMock = fetch as unknown as ReturnType<typeof vi.fn>;
+
+    await tick(5 * 60 * 1000 + 10000);
+    const callsAtGiveUp = fetchMock.mock.calls.length;
+    await tick(30000);
+
+    expect(fetchMock.mock.calls.length).toBe(callsAtGiveUp);
+  });
+
+  it("says nothing when the list cannot be fetched, and tries again on the next look", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce({ ok: false, json: async () => [] }));
+    renderWith([doc("offer", "processing")]);
+    await tick(3100);
+
+    expect(screen.queryByText(/is ready|couldn't read/)).not.toBeInTheDocument();
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it("leaves the tab title alone while the tab is still hidden", async () => {
+    document.title = "Dashboard | Brief";
+    listIs([doc("offer", "ready")]);
+    Object.defineProperty(document, "hidden", { value: true, configurable: true });
+    renderWith([doc("offer", "processing")]);
+    await tick(3100);
+    await tick(3100);
+    const counted = document.title;
+
+    act(() => {
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+
+    expect(document.title).toBe(counted);
+    Object.defineProperty(document, "hidden", { value: false, configurable: true });
+  });
+
+  it("counts every document when several are ready while the tab is hidden", async () => {
+    document.title = "Dashboard | Brief";
+    listIs([doc("a", "ready"), doc("b", "ready")]);
+    Object.defineProperty(document, "hidden", { value: true, configurable: true });
+    renderWith([doc("a", "processing"), doc("b", "processing")]);
+
+    await tick(3100);
+    await tick(3100);
+
+    expect(document.title).toBe("(2) Ready | Dashboard | Brief");
+    Object.defineProperty(document, "hidden", { value: false, configurable: true });
+  });
 });

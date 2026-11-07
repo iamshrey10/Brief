@@ -50,6 +50,25 @@ describe("the shared dashboard page", () => {
     await expect(SharedDashboardPage(params("s1"))).rejects.toThrow("NEXT_NOT_FOUND");
   });
 
+  it("tells a person whose access was taken away so, plainly, with the owner's name and a way back", async () => {
+    getMock.mockImplementation(async (_email: string, path: string) =>
+      path.endsWith("/removed") ? { owner_email: "owner@example.com", owner_name: "Asha Rao" } : null,
+    );
+
+    const html = renderToStaticMarkup(await SharedDashboardPage(params("gone/1")));
+
+    expect(getMock).toHaveBeenCalledWith("friend@example.com", "/shared/gone%2F1/removed");
+    expect(html).toContain("Your access was removed");
+    expect(html).toContain("Asha Rao");
+    expect(html).toContain('href="/dashboard/shared"');
+  });
+
+  it("uses the email when the owner has no name", async () => {
+    getMock.mockImplementation(async (_email: string, path: string) => (path.endsWith("/removed") ? { owner_email: "owner@example.com", owner_name: null } : null));
+
+    expect(renderToStaticMarkup(await SharedDashboardPage(params("s1")))).toContain("owner@example.com");
+  });
+
   it("asks search engines not to index it", () => {
     expect(metadata.robots).toEqual({ index: false, follow: false });
   });
