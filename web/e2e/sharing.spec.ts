@@ -135,3 +135,24 @@ test("the Shared section is in the top bar, and a link with its code can be type
 
   await expect(page.locator("p[role=alert]")).toContainText("isn't valid any more");
 });
+
+test("when the owner has taken access away, the person is told so plainly, stays signed in, and can go back", async ({ page }) => {
+  await seedSharedDashboard(page, { id: "gone-1", owner_email: "mum@example.com", owner_name: "Asha Rao", status: "removed" });
+
+  await page.goto("/dashboard/shared/gone-1");
+
+  await expect(page.getByRole("heading", { name: "Your access was removed" })).toBeVisible();
+  await expect(page.getByText(/Asha Rao/)).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Sections" }).first()).toBeVisible(); // still signed in
+  await expect(page.getByText("mums-lease.pdf")).toHaveCount(0);
+
+  await page.getByRole("link", { name: "Back to Shared" }).click();
+  await expect(page).toHaveURL(/\/dashboard\/shared$/);
+  await expect(page.getByText(/Nothing has been shared with you yet/)).toBeVisible();
+});
+
+test("a share that never existed is still simply not found", async ({ page }) => {
+  const response = await page.goto("/dashboard/shared/never-was");
+
+  expect(response?.status()).toBe(404);
+});
