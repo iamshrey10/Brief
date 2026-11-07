@@ -24,25 +24,48 @@ export function addedNotice(filenames: string[]): Notice {
   };
 }
 
-export type Settled = { notices: Notice[]; stillWatching: Set<string>; changed: boolean };
+export type Settled = {
+  notices: Notice[];
+  stillWatching: Set<string>;
+  /** Documents that have been read but whose summary and questions have not been prepared yet, so they are not called ready. */
+  toPrepare: DocumentSummary[];
+  changed: boolean;
+};
+
+/** The note shown while a document that has been read gets its key terms and questions worked out. */
+export function preparingNotice(filenames: string[]): Notice {
+  const many = filenames.length > 1;
+  return {
+    kind: "reading",
+    title: many ? `Preparing ${filenames.length} documents` : `Preparing ${filenames[0]}`,
+    body: "Finding the key terms and the questions to ask. Almost there.",
+    closeAfterMs: null,
+  };
+}
 
 /**
  * Given the ids being watched and the list as it is now, says what to tell the person and which ids are still being read.
+ * A document counts as ready only once its summary has been prepared, so what the note promises is there when it is opened.
  * Documents that are ready are said together, so three finishing at once is one note and not three. A document that
  * failed gets its own note with a way to try again, because each one needs its own try. A document that is no longer in
  * the list (it was deleted) is quietly forgotten.
  */
-export function settle(watching: Set<string>, fresh: DocumentSummary[]): Settled {
+export function settle(watching: Set<string>, fresh: DocumentSummary[], prepared: Set<string> = new Set()): Settled {
   const byId = new Map(fresh.map((document) => [document.id, document]));
   const stillWatching = new Set<string>();
   const ready: DocumentSummary[] = [];
   const failed: DocumentSummary[] = [];
+  const toPrepare: DocumentSummary[] = [];
   for (const id of watching) {
     const document = byId.get(id);
     if (!document) continue;
     if (isInProgress(document.status)) stillWatching.add(id);
     else if (document.status === "failed") failed.push(document);
-    else ready.push(document);
+    else if (!prepared.has(id)) {
+      // Read, but the overview is not worked out yet. It is not called ready until it is, so opening it never shows a wait.
+      stillWatching.add(id);
+      toPrepare.push(document);
+    } else ready.push(document);
   }
 
   const notices: Notice[] = [];
@@ -73,5 +96,5 @@ export function settle(watching: Set<string>, fresh: DocumentSummary[]): Settled
       closeAfterMs: null,
     });
   }
-  return { notices, stillWatching, changed: ready.length + failed.length > 0 || stillWatching.size !== watching.size };
+  return { notices, stillWatching, toPrepare, changed: ready.length + failed.length > 0 || stillWatching.size !== watching.size };
 }
