@@ -118,7 +118,7 @@ export function DocumentWorkspace({
           id="panel-ask"
           aria-labelledby="tab-ask"
           hidden={tab !== "ask"}
-          className="flex min-h-[24rem] flex-none flex-col lg:min-h-[32rem]"
+          className="flex min-h-[24rem] flex-none flex-col lg:min-h-[16rem] lg:flex-1"
         >
           <ChatPanel
             documentId={documentId}

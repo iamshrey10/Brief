@@ -128,7 +128,7 @@ export function ChatPanel({
   return (
     <section
       aria-label="Ask about this document"
-      className="flex flex-1 flex-col rounded-lg border border-border bg-background"
+      className="flex min-h-0 flex-1 flex-col rounded-lg border border-border bg-background"
     >
       {(messages.length > 0 || pending) && (
         <div className="flex justify-end border-b border-border px-3 py-2">
@@ -142,7 +142,7 @@ export function ChatPanel({
         role="log"
         aria-live="polite"
         aria-label="Conversation"
-        className="flex flex-1 flex-col gap-3 p-4"
+        className="flex flex-1 flex-col gap-3 p-4 lg:min-h-0 lg:overflow-y-auto"
       >
         {messages.length === 0 && !pending && (
           <div className="my-auto px-2 text-center">
@@ -207,7 +207,7 @@ export function ChatPanel({
         {pending && <p className="text-sm text-muted-foreground">Reading the document...</p>}
       </div>
 
-      <form onSubmit={handleSubmit} className="sticky bottom-0 z-10 flex flex-col gap-2 rounded-b-lg border-t border-border bg-background p-3">
+      <form onSubmit={handleSubmit} className="sticky bottom-0 z-10 flex shrink-0 flex-col gap-2 rounded-b-lg border-t border-border bg-background p-3">
         <textarea
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
