@@ -127,6 +127,8 @@ test("the Shared section is in the top bar, and a link with its code can be type
   await page.getByRole("navigation", { name: "Sections" }).first().getByRole("link", { name: "Shared" }).click();
 
   await expect(page).toHaveURL(/\/dashboard\/shared$/);
+  await expect(page.getByLabel("Share link")).toBeHidden(); // closed until it is asked for
+  await page.getByText("Got a share link and code? Enter them here").click();
   await page.getByLabel("Share link").fill(`http://localhost:3000/shared/join/${"z".repeat(43)}`);
   await page.getByLabel("Six digit code").fill("482913");
   await page.getByRole("button", { name: "Ask for access" }).click();
