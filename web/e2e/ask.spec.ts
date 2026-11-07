@@ -66,7 +66,7 @@ test("clicking the source under an answer highlights the quoted words in the cla
   await expect(page.getByRole("tab", { name: "Ask" })).toHaveAttribute("aria-selected", "true");
 });
 
-test("the Ask box grows with the conversation and the newest question stays in view, with the question box still reachable", async ({
+test("the Ask box fills the window and does not grow past it: a long conversation scrolls inside, the newest question stays in view, and the question box stays reachable", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 800 });
@@ -79,7 +79,8 @@ test("the Ask box grows with the conversation and the newest question stays in v
     await expect(page.getByRole("log", { name: "Conversation" }).getByText(/refundable within 30 days/).last()).toBeVisible();
   }
 
-  expect((await panel.boundingBox())!.height).toBeGreaterThan(before);
+  // It was already as tall as the window allows, so it stays that size and the conversation scrolls inside it.
+  expect(Math.abs((await panel.boundingBox())!.height - before)).toBeLessThanOrEqual(1);
   await expect(page.getByRole("textbox", { name: "Your question" })).toBeInViewport();
   await expect(page.getByRole("log", { name: "Conversation" }).getByText("Fourth question?")).toBeInViewport();
   await expect(page.getByRole("tab", { name: "Ask" })).toBeInViewport();
