@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { CalendarClock } from "lucide-react";
 
+import { ReminderBell } from "@/components/reminder-bell";
 import type { LeaseEnd } from "@/lib/lease-end";
 import { cn } from "@/lib/utils";
 
@@ -21,7 +22,10 @@ export function LeaseCountdown({ lease, linked = true }: { lease: LeaseEnd | nul
       aria-label="Lease remaining"
       className={cn("flex flex-col gap-4 rounded-2xl border p-5", soon ? "border-amber-500/40 bg-amber-50 dark:bg-amber-500/10" : "border-border bg-card")}
     >
-      <h2 className="text-lg font-semibold tracking-tight text-foreground">Reminders</h2>
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-lg font-semibold tracking-tight text-foreground">Reminders</h2>
+        {lease.days >= 0 && <ReminderBell documentId={lease.documentId} filename={lease.filename} value={lease.value} />}
+      </div>
       <div className="flex items-center gap-4">
         <span aria-hidden="true" className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-accent text-accent-foreground">
           <CalendarClock className="size-5" />
