@@ -27,7 +27,7 @@ const ICONS = {
   failed: <AlertTriangle aria-hidden="true" className="size-5 text-destructive" />,
 };
 
-function ToastCard({ toast, onClose, onRetry }: { toast: Toast; onClose: () => void; onRetry: () => void }) {
+function ToastCard({ toast, onClose, onRetry }: { toast: Toast; onClose: () => void; onRetry: (documentId: string) => void }) {
   const [paused, setPaused] = useState(false);
   const { closeAfterMs } = toast;
 
@@ -63,7 +63,7 @@ function ToastCard({ toast, onClose, onRetry }: { toast: Toast; onClose: () => v
             </Link>
           )}
           {action && "run" in action && (
-            <Button type="button" size="sm" className="mt-2" onClick={onRetry}>
+            <Button type="button" size="sm" className="mt-2" onClick={() => onRetry(action.documentId)}>
               {action.label}
             </Button>
           )}
@@ -178,15 +178,13 @@ export function UploadNotifications({ children }: { children: ReactNode }) {
     return () => document.removeEventListener("visibilitychange", back);
   }, []);
 
-  const retry = useCallback(async (toast: Toast) => {
-    if (!toast.action || !("run" in toast.action)) return;
-    const { documentId } = toast.action;
+  const retry = useCallback(async (toastId: number, documentId: string) => {
     const outcome = await retryDocument(documentId);
     if (!outcome.ok) {
-      setToasts((previous) => previous.map((item) => (item.id === toast.id ? { ...item, body: outcome.message } : item)));
+      setToasts((previous) => previous.map((item) => (item.id === toastId ? { ...item, body: outcome.message } : item)));
       return;
     }
-    dismiss(toast.id);
+    dismiss(toastId);
     watching.current.set(documentId, Date.now());
     setWatchedCount(watching.current.size);
     push({ kind: "reading", title: `Reading ${outcome.document.filename} again`, body: READING_HINT, closeAfterMs: 7000 });
@@ -201,7 +199,7 @@ export function UploadNotifications({ children }: { children: ReactNode }) {
       <section aria-label="Notifications" className="pointer-events-none fixed right-4 bottom-4 z-50 w-[min(100vw-2rem,24rem)] print:hidden">
         <ul className="flex flex-col gap-2">
           {toasts.map((toast) => (
-            <ToastCard key={toast.id} toast={toast} onClose={() => dismiss(toast.id)} onRetry={() => void retry(toast)} />
+            <ToastCard key={toast.id} toast={toast} onClose={() => dismiss(toast.id)} onRetry={(documentId) => void retry(toast.id, documentId)} />
           ))}
         </ul>
       </section>
