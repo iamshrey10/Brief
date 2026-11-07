@@ -385,7 +385,7 @@ function ChecklistSection({
     <section aria-label="Before you sign" className="flex flex-col gap-3">
       <SectionHeader title="Before you sign" subtitle={subtitle} />
       {state.status === "loading" && (
-        <LoadingBlock label="Checking the questions people most often miss." />
+        <LoadingBlock label="Checking the questions people most often miss. A long document can take a minute or two the first time, and it is saved afterwards." />
       )}
       {state.status === "error" && <ErrorBlock message={state.message} reference={state.reference} onRetry={retry} />}
       {state.status === "ready" && <ChecklistBody result={state.result} onSelect={onSelect} />}
