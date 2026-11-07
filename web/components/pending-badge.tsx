@@ -16,8 +16,8 @@ export function PendingBadge({ corner = false }: { corner?: boolean }) {
       <span
         aria-hidden="true"
         className={cn(
-          "inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] leading-none font-semibold text-white",
-          corner ? "absolute top-0 right-0.5" : "ml-1.5 align-middle",
+          "inline-flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-red-600 px-1 text-[9px] leading-none font-semibold text-white",
+          corner ? "absolute -top-0.5 right-0" : "ml-1.5 align-middle",
         )}
       >
         {pendingRequests}
