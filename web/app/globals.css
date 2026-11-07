@@ -324,3 +324,11 @@ html.theme-fade *::after {
     animation: none !important;
   }
 }
+
+/* The captions of the demo video are small and quiet, so they do not cover the pages being shown. */
+.demo-video::cue {
+  font-size: 14px;
+  line-height: 1.3;
+  color: #fff;
+  background-color: rgba(0, 0, 0, 0.55);
+}
