@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   approveShare,
+  asAccessRemoved,
   asSharedDashboard,
   asSharedWithMe,
   asShares,
@@ -186,5 +187,17 @@ describe("inviteTokenFrom", () => {
     expect(inviteTokenFrom("")).toBeNull();
     expect(inviteTokenFrom("hello")).toBeNull();
     expect(inviteTokenFrom("https://brief.example/shared/join/short")).toBeNull();
+  });
+});
+
+describe("asAccessRemoved", () => {
+  it("reads whose dashboard it was, with or without a name", () => {
+    expect(asAccessRemoved({ owner_email: "mum@example.com", owner_name: "Asha Rao" })).toEqual({ ownerEmail: "mum@example.com", ownerName: "Asha Rao" });
+    expect(asAccessRemoved({ owner_email: "mum@example.com", owner_name: null })).toEqual({ ownerEmail: "mum@example.com", ownerName: null });
+  });
+
+  it("is null for anything that is not that", () => {
+    expect(asAccessRemoved(null)).toBeNull();
+    expect(asAccessRemoved({ detail: "shared dashboard not found" })).toBeNull();
   });
 });

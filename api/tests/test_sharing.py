@@ -319,6 +319,28 @@ async def test_documents_in_the_bin_are_not_shown_to_the_viewer(client, db_sessi
     assert (await client.get(f"/shared/{invitation['id']}/dashboard")).json()["documents"] == []
 
 
+async def test_after_access_is_taken_away_the_viewer_can_learn_whose_dashboard_it_was_and_gets_no_data(client, db_session, test_user):
+    test_user.first_name, test_user.last_name = "Maya", "Rao"
+    await db_session.commit()
+    friend, stranger = await make_user(db_session), await make_user(db_session, "stranger")
+    invitation = await share_with(client, db_session, test_user, friend)
+
+    act_as(friend)
+    assert (await client.get(f"/shared/{invitation['id']}/removed")).status_code == 404  # still shared, nothing removed
+    act_as(test_user)
+    assert (await client.delete(f"/shares/{invitation['id']}")).status_code == 204
+
+    act_as(friend)
+    response = await client.get(f"/shared/{invitation['id']}/removed")
+    assert response.status_code == 200
+    assert response.json() == {"owner_email": test_user.email, "owner_name": "Maya Rao"}
+    assert (await client.get(f"/shared/{invitation['id']}/dashboard")).status_code == 404
+
+    act_as(stranger)  # someone it was never shared with learns nothing
+    assert (await client.get(f"/shared/{invitation['id']}/removed")).status_code == 404
+    assert (await client.get("/shared/not-an-id/removed")).status_code == 404
+
+
 async def test_a_viewer_sees_only_the_owner_who_shared_and_never_their_own_or_anyones_else(client, db_session, test_user):
     friend, stranger = await make_user(db_session), await make_user(db_session, "stranger")
     await _ready_document(db_session, stranger)

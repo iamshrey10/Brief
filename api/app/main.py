@@ -1402,6 +1402,32 @@ class SharedDashboard(BaseModel):
     key_dates: list[KeyDate]
 
 
+class SharedAccessRemoved(BaseModel):
+    owner_email: str
+    owner_name: str | None = None
+
+
+@app.get(
+    "/shared/{share_id}/removed",
+    tags=["sharing"],
+    summary="Find out that a dashboard shared with you was taken away",
+    description=(
+        "Answers with whose dashboard it was when its owner has removed your access, so the website can say so. Returns no dashboard data. Answers 404 for anything that was not shared with you and removed."
+    ),
+    responses=_errors(401, 404),
+)
+async def shared_access_removed(
+    share_id: str,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> SharedAccessRemoved:
+    found = await sharing.removed_share(session, user, share_id)
+    if found is None:
+        raise HTTPException(status_code=404, detail="shared dashboard not found")
+    _, owner = found
+    return SharedAccessRemoved(owner_email=owner.email, owner_name=sharing.display_name(owner.first_name, owner.last_name))
+
+
 @app.get(
     "/shared/{share_id}/dashboard",
     tags=["sharing"],

@@ -64,6 +64,13 @@ export function asSharedWithMe(body: unknown): SharedWithMe[] {
   );
 }
 
+/** Whose dashboard it was, when its owner has taken access away, or null when the backend's answer is not that. */
+export function asAccessRemoved(body: unknown): { ownerEmail: string; ownerName: string | null } | null {
+  const removed = body as { owner_email?: unknown; owner_name?: unknown } | null;
+  if (!removed || !isText(removed.owner_email)) return null;
+  return { ownerEmail: removed.owner_email, ownerName: isText(removed.owner_name) ? removed.owner_name : null };
+}
+
 /** A shared dashboard, or null when the backend's answer is not one. */
 export function asSharedDashboard(body: unknown): SharedDashboard | null {
   const shared = body as { owner_email?: unknown; owner_name?: unknown; documents?: unknown; insights?: unknown; key_dates?: unknown } | null;

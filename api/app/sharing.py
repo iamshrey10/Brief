@@ -198,6 +198,22 @@ async def viewable_share(
     return share, owner
 
 
+async def removed_share(session: AsyncSession, viewer: User, share_id: str) -> tuple[DashboardShare, User] | None:
+    """A share this person was given and whose owner has since taken it away, with the owner, so they can be told
+    plainly instead of being shown a missing page. Nothing else opens, and no dashboard data is returned with it."""
+    try:
+        key = uuid.UUID(share_id)
+    except ValueError:
+        return None
+    result = await session.execute(
+        select(DashboardShare, User)
+        .join(User, User.id == DashboardShare.owner_id)
+        .where(DashboardShare.id == key, DashboardShare.viewer_id == viewer.id, DashboardShare.status == "revoked")
+    )
+    row = result.first()
+    return (row[0], row[1]) if row else None
+
+
 def display_name(first_name: str | None, last_name: str | None) -> str | None:
     """"First Last" from what the person told us, or None if they have not yet."""
     return " ".join(part for part in (first_name, last_name) if part) or None

@@ -361,7 +361,12 @@ const server = createServer(async (request, response) => {
       return send(response, 204);
     }
   }
-  if (path === "/shared" && method === "GET") return send(response, 200, state.sharedWithMe.map(({ id, owner_email, owner_name = null, status }) => ({ id, owner_email, owner_name, status })));
+  if (path === "/shared" && method === "GET") return send(response, 200, state.sharedWithMe.filter((entry) => entry.status !== "removed").map(({ id, owner_email, owner_name = null, status }) => ({ id, owner_email, owner_name, status })));
+  const removedShare = /^\/shared\/([^/]+)\/removed$/.exec(path);
+  if (removedShare && method === "GET") {
+    const gone = state.sharedWithMe.find((candidate) => candidate.id === removedShare[1] && candidate.status === "removed");
+    return gone ? send(response, 200, { owner_email: gone.owner_email, owner_name: gone.owner_name ?? null }) : send(response, 404, { detail: "shared dashboard not found" });
+  }
   const shared = /^\/shared\/([^/]+)\/dashboard$/.exec(path);
   if (shared && method === "GET") {
     const found = state.sharedWithMe.find((candidate) => candidate.id === shared[1] && candidate.status === "active");
