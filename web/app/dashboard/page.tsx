@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { AppHeader } from "@/components/app-header";
 import { DashboardStats } from "@/components/dashboard-stats";
-import { DashboardUpload } from "@/components/dashboard-upload";
+import { AddDocumentsCard } from "@/components/add-documents-card";
 import { NowReading } from "@/components/now-reading";
 import { DocumentAnalysis } from "@/components/document-analysis";
 import { LeaseCountdown } from "@/components/lease-countdown";
@@ -75,7 +75,7 @@ export default async function DashboardHome() {
 
         <Rise order={3} className="grid grid-cols-1 items-stretch gap-5 lg:grid-cols-3">
           <div className={lease ? "lg:col-span-2" : "lg:col-span-3"}>
-            <DashboardUpload />
+            <AddDocumentsCard />
           </div>
           {lease && <LeaseCountdown lease={lease} />}
         </Rise>

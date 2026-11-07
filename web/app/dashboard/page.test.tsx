@@ -62,13 +62,15 @@ describe("the dashboard home", () => {
     expect(getMock).toHaveBeenCalledWith("reader@example.com", "/documents");
   });
 
-  it("shows the way to add documents, as one button, whether or not there are documents", async () => {
+  it("shows the way to add documents, as one link to the Documents page, whether or not there are documents", async () => {
     for (const documents of [[], [doc("a", "ready")]]) {
       getMock.mockResolvedValue(documents);
       const html = await page();
 
       expect(html).toContain('aria-label="Add documents"');
-      expect(html).toContain("Add documents</button>");
+      expect(html).toContain('href="/dashboard/documents"');
+      expect(html).toContain("Add documents</a>");
+      expect(html).not.toContain("<input");
       expect(html).not.toContain("Drop a contract here");
       expect(html.indexOf("Your documents at a glance")).toBeLessThan(html.indexOf('aria-label="Add documents"'));
     }

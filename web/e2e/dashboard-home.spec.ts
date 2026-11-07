@@ -81,23 +81,18 @@ test("the Dashboard gathers the questions still to ask and shows what Brief foun
   await expect(found.getByRole("progressbar", { name: "Key terms found" }).first()).toHaveAttribute("aria-valuenow", "9");
 });
 
-test("a person can add a document right from the Dashboard, and the numbers update by themselves", async ({ page }) => {
+test("the Dashboard has no upload of its own: Add documents leads to the Documents page, where files are uploaded", async ({ page }) => {
   await page.goto("/dashboard");
   const card = page.getByRole("region", { name: "Add documents" });
   await expect(card).toBeVisible();
   await expect(card.getByRole("heading", { name: "Add your documents" })).toBeVisible();
-  await card.getByRole("button", { name: "Add documents" }).click();
+  await expect(card.getByText("Your documents, securely managed in one place.")).toBeVisible();
+  await expect(page.getByLabel("Choose a file to upload")).toHaveCount(0);
+
+  await card.getByRole("link", { name: "Add documents" }).click();
+
+  await expect(page).toHaveURL(/\/dashboard\/documents$/);
   await expect(page.getByText("Drop a contract here")).toBeVisible();
-
-  await page.getByLabel("Choose a file to upload").setInputFiles({ name: "new-lease.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.4 a tiny made up file") });
-  await card.locator("fieldset").getByText("Lease", { exact: true }).click();
-  await page.getByRole("button", { name: "Upload", exact: true }).click();
-
-  await expect(card.getByRole("status")).toContainText("new-lease.pdf was added.");
-  const documents = page.getByRole("region", { name: "Your documents at a glance" }).locator("li").filter({ hasText: "Documents" }).first();
-  await expect(documents.getByText("3", { exact: true })).toBeVisible();
-  await card.getByRole("link", { name: "Open Documents" }).click();
-  await expect(page.getByRole("region", { name: "Your documents" }).getByText("new-lease.pdf")).toBeVisible();
 });
 
 test("the numbers come first on the Dashboard, then the way to add a document", async ({ page }) => {

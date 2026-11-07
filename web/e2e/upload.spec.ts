@@ -143,11 +143,12 @@ test("the notes have no accessibility problems while they are showing", async ({
 });
 
 test("the Dashboard shows the steps a document goes through while it is read, and offers it when it is ready", async ({ page }) => {
-  await page.goto("/dashboard");
-  await page.getByRole("button", { name: "Add documents" }).click();
+  await page.goto("/dashboard/documents");
   await page.getByLabel("Choose a file to upload").setInputFiles(PDF);
   await page.locator("fieldset").getByText("Lease", { exact: true }).click();
   await page.getByRole("button", { name: "Upload", exact: true }).click();
+  await page.getByRole("link", { name: "Dashboard", exact: true }).click();
+  await expect(page).toHaveURL(/\/dashboard$/);
 
   const reading = page.getByRole("region", { name: "Now reading" });
   await expect(reading.getByText("new-lease.pdf")).toBeVisible();
