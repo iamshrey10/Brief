@@ -25,6 +25,7 @@ test("uploading a PDF sends it to storage, and the document goes from Processing
   await expect(row).toBeVisible();
   await expect(row.getByText(/^Lease/)).toBeVisible();
   await expect(row.getByText("Processing")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Now reading" }).getByText("new-lease.pdf")).toBeVisible(); // the same timeline as on the Dashboard
   await expect(row.getByText("Ready")).toBeVisible({ timeout: 15_000 });
 
   expect(await uploadsReceived(page)).toEqual([

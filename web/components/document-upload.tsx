@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { DocumentList } from "@/components/document-list";
+import { NowReading } from "@/components/now-reading";
 import { UploadPanel } from "@/components/upload-panel";
 import {
   isInProgress,
@@ -88,6 +89,8 @@ export function DocumentUpload({ initialDocuments }: { initialDocuments: Documen
   return (
     <div className="flex w-full flex-col gap-8">
       <UploadPanel onUploaded={(confirmed) => setDocuments((previous) => putFirst(previous, confirmed))} />
+
+      <NowReading />
 
       <DocumentList
         documents={documents}
