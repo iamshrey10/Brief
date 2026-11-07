@@ -48,3 +48,22 @@ describe("the lease countdown card", () => {
     expect(screen.getByRole("region").className).not.toContain("amber");
   });
 });
+
+describe("the reminder bell", () => {
+  const lease = { documentId: "a", filename: "maple.pdf", value: "March 9, 2027", days: 126 };
+
+  it("offers Google Calendar and a calendar file for the lease end", async () => {
+    const { default: userEvent } = await import("@testing-library/user-event");
+    render(<LeaseCountdown lease={lease} />);
+
+    await userEvent.click(screen.getByRole("button", { name: "Remind me in my calendar" }));
+
+    expect(screen.getByRole("link", { name: /Lease ends: March 9, 2027/ })).toHaveAttribute("href", expect.stringContaining("calendar.google.com"));
+    expect(screen.getByRole("button", { name: /Download calendar file/ })).toBeInTheDocument();
+  });
+
+  it("is left out once the lease has ended", () => {
+    render(<LeaseCountdown lease={{ ...lease, days: -3 }} />);
+    expect(screen.queryByRole("button", { name: "Remind me in my calendar" })).not.toBeInTheDocument();
+  });
+});
