@@ -14,7 +14,7 @@ const compact = (date: PlainDate) => toISODate(date).replaceAll("-", "");
 
 /** Text as a calendar file wants it: backslashes, semicolons and commas escaped, line breaks written as \n. */
 export function escapeText(text: string): string {
-  return text.replaceAll("\\", "\\\\").replaceAll(";", "\;").replaceAll(",", "\\,").replace(/\r?\n/g, "\\n");
+  return text.replaceAll("\\", "\\\\").replaceAll(";", "\\;").replaceAll(",", "\\,").replace(/\r?\n/g, "\\n");
 }
 
 /** A line longer than 75 bytes is folded onto the next line, which starts with a space, as the format requires. */
@@ -63,4 +63,15 @@ export function buildCalendarFile(events: CalendarEvent[], now: Date = new Date(
   }
   lines.push("END:VCALENDAR");
   return lines.map(foldLine).join("\r\n") + "\r\n";
+}
+
+/** A link that opens Google Calendar with this all day event filled in, ready to save. Nothing is sent to Google until the person saves it there. */
+export function googleCalendarUrl(event: CalendarEvent): string {
+  const query = new URLSearchParams({
+    action: "TEMPLATE",
+    text: event.summary,
+    dates: `${compact(event.date)}/${compact(nextDay(event.date))}`,
+    details: event.description,
+  });
+  return `https://calendar.google.com/calendar/render?${query.toString()}`;
 }

@@ -37,7 +37,8 @@ describe("the calendar button", () => {
   it("saves a calendar file named after the document, with an event for each clear date and a week's warning before the end", () => {
     render(<CalendarButton documentId="d1" filename="Maple Court.pdf" terms={[term("lease_start", "January 1, 2027"), term("lease_end", "December 31, 2027")]} />);
 
-    fireEvent.click(screen.getByRole("button"));
+    fireEvent.click(screen.getByRole("button", { name: /Add to calendar/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Download calendar file/ }));
 
     expect(download).toHaveBeenCalledOnce();
     const [name, file, type] = download.mock.calls[0];
@@ -47,5 +48,44 @@ describe("the calendar button", () => {
     expect(file).toContain("DTSTART;VALUE=DATE:20271231");
     expect(file).toContain("TRIGGER:-P7D");
     expect(file.match(/BEGIN:VEVENT/g)).toHaveLength(2);
+  });
+
+  it("offers a Google Calendar link for each date, opened in a new tab, with the event filled in", () => {
+    render(<CalendarButton documentId="d1" filename="Maple Court.pdf" terms={[term("lease_start", "January 1, 2027"), term("lease_end", "December 31, 2027")]} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /Add to calendar/ }));
+
+    const links = screen.getAllByRole("link");
+    expect(links).toHaveLength(2);
+    const url = new URL(links[1].getAttribute("href")!);
+    expect(url.origin + url.pathname).toBe("https://calendar.google.com/calendar/render");
+    expect(url.searchParams.get("action")).toBe("TEMPLATE");
+    expect(url.searchParams.get("text")).toBe("Lease ends: Maple Court.pdf");
+    expect(url.searchParams.get("dates")).toBe("20271231/20280101");
+    expect(links[1]).toHaveAttribute("target", "_blank");
+    expect(links[1]).toHaveAttribute("rel", expect.stringContaining("noopener"));
+  });
+
+  it("closes the choices on Escape, and keeps them closed until the button is pressed", () => {
+    render(<CalendarButton documentId="d1" filename="lease.pdf" terms={[term("lease_end", "December 31, 2027")]} />);
+    const button = screen.getByRole("button", { name: /Add to calendar/ });
+    expect(button).toHaveAttribute("aria-expanded", "false");
+
+    fireEvent.click(button);
+    expect(button).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("link", { name: /Lease ends/ })).toBeInTheDocument();
+
+    fireEvent.keyDown(button, { key: "Escape" });
+    expect(button).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+  });
+
+  it("closes the choices when somewhere else is clicked", () => {
+    render(<CalendarButton documentId="d1" filename="lease.pdf" terms={[term("lease_end", "December 31, 2027")]} />);
+    fireEvent.click(screen.getByRole("button", { name: /Add to calendar/ }));
+
+    fireEvent.mouseDown(document.body);
+
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
   });
 });

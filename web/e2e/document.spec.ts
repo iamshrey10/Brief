@@ -112,7 +112,8 @@ test("Add the date to your calendar saves a calendar file with the lease end dat
   const button = page.getByRole("button", { name: /Add to calendar/ });
   await expect(button).toBeVisible();
 
-  const [download] = await Promise.all([page.waitForEvent("download"), button.click()]);
+  await button.click();
+  const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: /Download calendar file/ }).click()]);
 
   expect(download.suggestedFilename()).toBe("sample-lease-dates.ics");
   const file = await (await import("node:fs/promises")).readFile((await download.path())!, "utf8");
@@ -121,6 +122,22 @@ test("Add the date to your calendar saves a calendar file with the lease end dat
   expect(file).toContain("DTSTART;VALUE=DATE:20991231");
   expect(file).toContain("TRIGGER:-P7D");
   expect(file).toContain("\r\n");
+});
+
+test("Add to calendar also offers a Google Calendar link with the lease end filled in", async ({ page }) => {
+  await page.goto("/dashboard/documents/doc-lease");
+  await page.getByRole("button", { name: /Add to calendar/ }).click();
+
+  const link = page.getByRole("link", { name: /Lease ends/ });
+  await expect(link).toBeVisible();
+  const url = new URL((await link.getAttribute("href")) ?? "");
+  expect(url.origin + url.pathname).toBe("https://calendar.google.com/calendar/render");
+  expect(url.searchParams.get("text")).toBe("Lease ends: sample-lease.pdf");
+  expect(url.searchParams.get("dates")).toBe("20991231/21000101");
+  await expect(link).toHaveAttribute("target", "_blank");
+
+  await page.keyboard.press("Escape");
+  await expect(link).toBeHidden();
 });
 
 test("Draft an email shows the questions first, then opens a message with the lease's open questions in it", async ({ page }) => {
