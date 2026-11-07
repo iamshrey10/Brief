@@ -134,11 +134,12 @@ async def test_a_right_code_asks_the_owner_for_approval_and_gives_nothing_yet(cl
     assert (await client.get("/shared")).json() == [{"id": invitation["id"], "owner_email": test_user.email, "owner_name": None, "status": "requested"}]
 
 
-async def test_a_wrong_code_is_refused_and_five_of_them_end_the_invitation_even_for_the_right_code(client, db_session, test_user):
+async def test_a_wrong_code_is_refused_and_three_of_them_end_the_invitation_even_for_the_right_code(client, db_session, test_user):
     friend = await make_user(db_session)
     invitation = await invite(client, test_user)
     wrong = "000000" if invitation["code"] != "000000" else "000001"
 
+    assert sharing.MAX_WRONG_CODES == 3
     for _ in range(sharing.MAX_WRONG_CODES):
         assert (await join(client, friend, invitation, wrong)).status_code == 400
     assert (await join(client, friend, invitation)).status_code == 404

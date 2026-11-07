@@ -1330,7 +1330,7 @@ class JoinedShare(BaseModel):
     tags=["sharing"],
     summary="Use an invitation to ask for access",
     description=(
-        "The signed-in person enters the code from an invitation link. A right code sends the owner a request to approve. Five wrong codes end the invitation, and an unknown, used or expired one is answered the same way as a missing one."
+        "The signed-in person enters the code from an invitation link. A right code sends the owner a request to approve. Three wrong codes end the invitation, and an unknown, used or expired one is answered the same way as a missing one."
     ),
     responses=_errors(400, 401, 404, 409),
 )
@@ -1636,3 +1636,27 @@ async def two_factor_disable(
     if outcome is two_factor.Verified.WRONG:
         raise HTTPException(status_code=400, detail="that code is not right")
     return TwoFactorStatus(enabled=False, recovery_codes_left=0)
+
+
+@app.post(
+    "/me/2fa/recovery-codes",
+    tags=["account"],
+    summary="Make a new set of recovery codes",
+    description=(
+        "Needs a right code from the authenticator app or an unused recovery code. Every old recovery code stops working and ten new ones are returned, shown only this once. Answers 409 when two step verification is not on. Wrong codes are counted, and five lock the account for fifteen minutes."
+    ),
+    responses=_errors(400, 401, 409, 429),
+)
+async def two_factor_new_recovery_codes(
+    body: CodeRequest,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> RecoveryCodes:
+    outcome, codes = await two_factor.regenerate_recovery_codes(session, user, body.code)
+    if outcome is two_factor.Verified.NOT_ON:
+        raise HTTPException(status_code=409, detail="two step verification is not on")
+    if outcome is two_factor.Verified.LOCKED:
+        raise HTTPException(status_code=429, detail="too many wrong codes, try again in 15 minutes", headers={"Retry-After": str(int(two_factor.LOCKED_FOR.total_seconds()))})
+    if outcome is two_factor.Verified.WRONG:
+        raise HTTPException(status_code=400, detail="that code is not right")
+    return RecoveryCodes(recovery_codes=codes)

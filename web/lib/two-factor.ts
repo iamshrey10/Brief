@@ -45,6 +45,12 @@ export const enableTwoFactor = (code: string) =>
     Array.isArray(json.recoveryCodes) ? json.recoveryCodes.filter((c): c is string => typeof c === "string") : null,
   );
 
+/** Makes a new set of recovery codes, with a right code. Every old one stops working, and the new ones come back this once. */
+export const makeNewRecoveryCodes = (code: string) =>
+  post("/api/two-factor/recovery-codes", { code }, (json) =>
+    Array.isArray(json.recoveryCodes) ? json.recoveryCodes.filter((c): c is string => typeof c === "string") : null,
+  );
+
 /** Turns it off, with a right code. */
 export const disableTwoFactor = (code: string) => post("/api/two-factor/disable", { code }, (json) => (json.ok === true ? true : null));
 

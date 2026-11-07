@@ -4,9 +4,9 @@ import QRCode from "qrcode";
 import { useEffect, useState, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
-import { disableTwoFactor, enableTwoFactor, groupSecret, startSetup, type Setup } from "@/lib/two-factor";
+import { disableTwoFactor, enableTwoFactor, groupSecret, makeNewRecoveryCodes, startSetup, type Setup } from "@/lib/two-factor";
 
-type Stage = "off" | "setting up" | "codes" | "on" | "turning off";
+type Stage = "off" | "setting up" | "codes" | "on" | "turning off" | "new codes";
 
 const INPUT = "h-10 w-44 rounded-lg border border-input bg-background px-3 font-mono text-lg tracking-[0.3em] outline-none focus-visible:ring-3 focus-visible:ring-ring/50";
 
@@ -36,6 +36,8 @@ export function TwoFactorPanel({ initialEnabled, initialCodesLeft }: { initialEn
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  // Whether the codes on show are a new set that replaced the old ones, which changes what is said above them.
+  const [replaced, setReplaced] = useState(false);
 
   async function begin() {
     setBusy(true);
@@ -59,6 +61,21 @@ export function TwoFactorPanel({ initialEnabled, initialCodesLeft }: { initialEn
     setCodesLeft(outcome.result.length);
     setSetup(null);
     setCode("");
+    setReplaced(false);
+    setStage("codes");
+  }
+
+  async function makeNew(event: FormEvent) {
+    event.preventDefault();
+    setBusy(true);
+    setError(null);
+    const outcome = await makeNewRecoveryCodes(code);
+    setBusy(false);
+    if (!outcome.ok) return setError(outcome.message);
+    setCodes(outcome.result);
+    setCodesLeft(outcome.result.length);
+    setCode("");
+    setReplaced(true);
     setStage("codes");
   }
 
@@ -120,7 +137,9 @@ export function TwoFactorPanel({ initialEnabled, initialCodesLeft }: { initialEn
 
       {stage === "codes" && (
         <div className="mt-3 flex flex-col gap-3">
-          <p role="status" className="text-sm font-medium text-foreground">Two step verification is on.</p>
+          <p role="status" className="text-sm font-medium text-foreground">
+            {replaced ? "Here are your new recovery codes. The old ones no longer work." : "Two step verification is on."}
+          </p>
           <p className="max-w-xl text-sm text-muted-foreground">
             Save these recovery codes somewhere safe. If you lose your phone, each one signs you in once. They are shown only now.
           </p>
@@ -158,12 +177,36 @@ export function TwoFactorPanel({ initialEnabled, initialCodesLeft }: { initialEn
         <>
           <p className="mt-1 max-w-xl text-sm text-muted-foreground">Brief asks for a code from your authenticator app when you sign in on a browser it does not remember.</p>
           <p className="mt-3 text-sm font-medium text-foreground">Status: on · {codesLeft} recovery {codesLeft === 1 ? "code" : "codes"} left</p>
-          <div className="mt-3">
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button type="button" variant="outline" size="lg" onClick={() => { setError(null); setCode(""); setStage("new codes"); }}>
+              Make new recovery codes
+            </Button>
             <Button type="button" variant="outline" size="lg" onClick={() => { setError(null); setCode(""); setStage("turning off"); }}>
               Turn off
             </Button>
           </div>
         </>
+      )}
+
+      {stage === "new codes" && (
+        <form onSubmit={makeNew} className="mt-3 flex flex-col gap-3">
+          <p className="max-w-xl text-sm text-muted-foreground">
+            This replaces all ten recovery codes. The old ones stop working at once, even the ones you have not used, so use this if you think a copy
+            has leaked or you have lost the list.
+          </p>
+          <div className="flex flex-wrap items-end gap-3">
+            <label className="flex flex-col gap-1 text-sm font-medium text-foreground">
+              Code, or a recovery code, to make new ones
+              <input value={code} onChange={(event) => setCode(event.target.value)} maxLength={32} autoComplete="one-time-code" className={INPUT.replace("w-44", "w-56")} />
+            </label>
+            <Button type="submit" size="lg" disabled={busy || code.trim().length === 0}>
+              {busy ? "Checking..." : "Make new codes"}
+            </Button>
+            <Button type="button" variant="outline" size="lg" disabled={busy} onClick={() => { setStage("on"); setError(null); }}>
+              Cancel
+            </Button>
+          </div>
+        </form>
       )}
 
       {stage === "turning off" && (

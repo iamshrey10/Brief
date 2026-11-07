@@ -16,8 +16,8 @@ from app.models import DashboardShare, User
 MAX_SHARES = 5
 # How long an invitation that has not been approved yet stays usable.
 INVITE_VALID_FOR = timedelta(days=7)
-# Wrong codes allowed on one invitation. The sixth try finds it gone, so a six digit code cannot be guessed.
-MAX_WRONG_CODES = 5
+# Wrong codes allowed on one invitation. The fourth try finds it gone, so a six digit code cannot be guessed.
+MAX_WRONG_CODES = 3
 
 OPEN_STATES = ("invited", "requested", "active")
 

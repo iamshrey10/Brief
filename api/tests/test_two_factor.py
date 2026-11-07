@@ -387,6 +387,49 @@ async def test_wrong_codes_lock_turning_it_off_too(client):
     assert (await client.get("/me/2fa")).json()["enabled"] is True
 
 
+# --- new recovery codes ---
+
+
+async def test_new_recovery_codes_need_a_right_code_and_replace_every_old_one(client, db_session, test_user):
+    secret, old = await turned_on(client)
+
+    assert (await client.post("/me/2fa/recovery-codes", json={"code": "000000"})).status_code == 400
+    assert (await client.get("/me/2fa")).json()["recovery_codes_left"] == 10
+    made = await client.post("/me/2fa/recovery-codes", json={"code": code_at(secret, 1)})
+
+    assert made.status_code == 200
+    fresh = made.json()["recovery_codes"]
+    assert len(fresh) == two_factor.RECOVERY_CODES and len(set(fresh)) == len(fresh) and not set(fresh) & set(old)
+    assert (await client.get("/me/2fa")).json()["recovery_codes_left"] == 10
+    # An old code is of no use now, and a new one works once.
+    assert (await client.post("/me/2fa/verify", json={"code": old[0]})).status_code == 400
+    assert (await client.post("/me/2fa/verify", json={"code": fresh[0]})).status_code == 200
+
+
+async def test_a_recovery_code_can_be_used_to_make_new_ones_and_is_replaced_with_the_rest(client):
+    _, old = await turned_on(client)
+
+    made = await client.post("/me/2fa/recovery-codes", json={"code": old[2]})
+
+    assert made.status_code == 200
+    assert (await client.get("/me/2fa")).json()["recovery_codes_left"] == 10
+
+
+async def test_new_recovery_codes_cannot_be_made_when_it_is_not_on(client):
+    assert (await client.post("/me/2fa/recovery-codes", json={"code": "123456"})).status_code == 409
+
+
+async def test_wrong_codes_lock_making_new_recovery_codes_too(client):
+    secret, _ = await turned_on(client)
+    for _ in range(two_factor.MAX_WRONG_CODES):
+        await client.post("/me/2fa/recovery-codes", json={"code": "000000"})
+
+    locked = await client.post("/me/2fa/recovery-codes", json={"code": code_at(secret, 1)})
+
+    assert locked.status_code == 429
+    assert locked.headers["retry-after"] == "900"
+
+
 # --- people stay apart ---
 
 

@@ -19,6 +19,7 @@ import { callBackend } from "@/lib/two-factor-server";
 import { twoFactorSettled } from "@/lib/two-factor-cookie";
 import { POST as disable } from "./disable/route";
 import { POST as enable } from "./enable/route";
+import { POST as recoveryCodes } from "./recovery-codes/route";
 import { POST as verify } from "./verify/route";
 
 const authMock = auth as unknown as ReturnType<typeof vi.fn>;
@@ -42,6 +43,7 @@ describe.each([
   ["verify", verify, "/me/2fa/verify"],
   ["enable", enable, "/me/2fa/enable"],
   ["disable", disable, "/me/2fa/disable"],
+  ["recovery-codes", recoveryCodes, "/me/2fa/recovery-codes"],
 ])("the %s route", (_name, handler, path) => {
   it("turns away someone who is not signed in, asking the backend nothing", async () => {
     authMock.mockResolvedValue(null);
@@ -173,5 +175,32 @@ describe("turning it off", () => {
 
     expect(response.status).toBe(409);
     expect(await response.json()).toEqual({ error: "not on" });
+  });
+});
+
+describe("making new recovery codes", () => {
+  it("passes the new codes on, once, and changes nothing about this browser", async () => {
+    backendMock.mockResolvedValue(answer(200, { recovery_codes: ["AAAAA-BBBBB", 7, "CCCCC-DDDDD"] }));
+
+    const response = await recoveryCodes(post('{"code":"123456"}'));
+
+    expect(await response.json()).toEqual({ recoveryCodes: ["AAAAA-BBBBB", "CCCCC-DDDDD"] });
+    expect(jar.size).toBe(0);
+    expect(deleted).toEqual([]);
+  });
+
+  it("says it is not on", async () => {
+    backendMock.mockResolvedValue(answer(409));
+
+    const response = await recoveryCodes(post('{"code":"123456"}'));
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({ error: "not on" });
+  });
+
+  it("does not claim success when the answer has no codes", async () => {
+    backendMock.mockResolvedValue(answer(200, {}));
+
+    expect((await recoveryCodes(post('{"code":"123456"}'))).status).toBe(502);
   });
 });

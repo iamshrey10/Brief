@@ -49,12 +49,10 @@ export function SharingPanel({ initial }: { initial: Share[] }) {
     setShares(initial);
   }
   // Someone asking, or an answer being given, changes the count on the bar: ask the page for the list again.
-  const firstCount = useRef(true);
+  const lastCount = useRef(pendingRequests);
   useEffect(() => {
-    if (firstCount.current) {
-      firstCount.current = false;
-      return;
-    }
+    if (lastCount.current === pendingRequests) return; // not a change, and the same when an effect is run twice in development
+    lastCount.current = pendingRequests;
     router.refresh();
   }, [pendingRequests, router]);
   const [label, setLabel] = useState("");
