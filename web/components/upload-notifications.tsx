@@ -7,8 +7,9 @@ import { AlertTriangle, CheckCircle2, Loader2, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { MAX_POLL_DURATION_MS, POLL_INTERVAL_MS, type DocumentSummary } from "@/lib/documents";
+import { fetchChecklist, fetchKeyTerms } from "@/lib/overview";
 import { retryDocument } from "@/lib/retry";
-import { addedNotice, READING_HINT, settle, type Notice } from "@/lib/upload-notices";
+import { addedNotice, preparingNotice, READING_HINT, settle, type Notice } from "@/lib/upload-notices";
 import { cn } from "@/lib/utils";
 
 type Toast = Notice & { id: number; names?: string[] };
@@ -92,6 +93,9 @@ export function UploadNotifications({ children }: { children: ReactNode }) {
   const watching = useRef(new Map<string, number>()); // document id -> when it began to be watched
   const [watchedCount, setWatchedCount] = useState(0);
   const nextId = useRef(0);
+  // Documents whose summary and questions have been worked out, and those being worked out now.
+  const prepared = useRef(new Set<string>());
+  const preparing = useRef(new Set<string>());
   const unseen = useRef(0);
   const baseTitle = useRef<string | null>(null);
 
@@ -127,7 +131,22 @@ export function UploadNotifications({ children }: { children: ReactNode }) {
         const res = await fetch("/api/backend/documents");
         if (!res.ok) return;
         const fresh: DocumentSummary[] = await res.json();
-        const result = settle(new Set(watching.current.keys()), fresh);
+        const result = settle(new Set(watching.current.keys()), fresh, prepared.current);
+        // A document that has been read is worked on in the background first, so "ready" is only said when opening it is quick.
+        const starting = result.toPrepare.filter((document) => !preparing.current.has(document.id));
+        if (starting.length > 0) {
+          for (const document of starting) {
+            preparing.current.add(document.id);
+            void Promise.all([fetchKeyTerms(document.id), fetchChecklist(document.id)]).then(() => {
+              prepared.current.add(document.id);
+              preparing.current.delete(document.id);
+            });
+          }
+          setToasts((previous) => [
+            ...previous.filter((toast) => toast.kind !== "reading"),
+            { ...preparingNotice(starting.map((document) => document.filename)), id: nextId.current++ },
+          ]);
+        }
         for (const id of [...watching.current.keys()]) if (!result.stillWatching.has(id)) watching.current.delete(id);
         setWatchedCount(watching.current.size);
         if (!result.changed) return;

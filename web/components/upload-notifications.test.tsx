@@ -15,6 +15,9 @@ vi.mock("next/link", () => ({
     </a>
   ),
 }));
+const keyTermsMock = vi.fn();
+const checklistMock = vi.fn();
+vi.mock("@/lib/overview", () => ({ fetchKeyTerms: (id: string) => keyTermsMock(id), fetchChecklist: (id: string) => checklistMock(id) }));
 const retryMock = vi.fn();
 vi.mock("@/lib/retry", () => ({ retryDocument: (id: string) => retryMock(id) }));
 
@@ -50,6 +53,8 @@ beforeEach(() => {
   vi.useFakeTimers();
   refresh.mockClear();
   retryMock.mockReset();
+  keyTermsMock.mockReset().mockResolvedValue({ ok: true });
+  checklistMock.mockReset().mockResolvedValue({ ok: true });
 });
 
 afterEach(() => {
@@ -101,7 +106,8 @@ describe("UploadNotifications", () => {
     listIs([doc("offer", "ready")]);
     renderWith([doc("offer", "processing")]);
 
-    await tick(3100);
+    await tick(3100); // read, summary being prepared
+    await tick(3100); // prepared, so now it is ready
 
     expect(screen.getByText("offer.pdf is ready")).toBeInTheDocument();
     expect(screen.queryByText("Added offer.pdf")).not.toBeInTheDocument();
@@ -116,6 +122,7 @@ describe("UploadNotifications", () => {
     listIs([doc("a", "ready"), doc("b", "ready"), doc("c", "ready")]);
     renderWith([doc("a", "processing"), doc("b", "processing"), doc("c", "processing")]);
 
+    await tick(3100);
     await tick(3100);
 
     expect(screen.getByText("3 documents are ready")).toBeInTheDocument();
@@ -152,7 +159,29 @@ describe("UploadNotifications", () => {
 
     listIs([doc("offer", "ready")]);
     await tick(3100);
+    await tick(3100);
     expect(screen.getByText("offer.pdf is ready")).toBeInTheDocument();
+  });
+
+  it("does not say ready while the summary is still being prepared, and says so, then says ready once it is", async () => {
+    let finish!: (value: { ok: true }) => void;
+    keyTermsMock.mockReturnValue(new Promise((done) => (finish = done)));
+    listIs([doc("offer", "ready")]);
+    renderWith([doc("offer", "processing")]);
+
+    await tick(3100);
+    await tick(30000);
+
+    expect(screen.getByText("Preparing offer.pdf")).toBeInTheDocument();
+    expect(screen.queryByText(/is ready/)).not.toBeInTheDocument();
+    expect(keyTermsMock).toHaveBeenCalledTimes(1); // asked once, not on every look
+    expect(checklistMock).toHaveBeenCalledWith("offer");
+
+    await act(async () => finish({ ok: true }));
+    await tick(3100);
+
+    expect(screen.getByText("offer.pdf is ready")).toBeInTheDocument();
+    expect(screen.queryByText("Preparing offer.pdf")).not.toBeInTheDocument();
   });
 
   it("when trying again is refused, says why in the same note", async () => {
@@ -188,6 +217,7 @@ describe("UploadNotifications", () => {
     Object.defineProperty(document, "hidden", { value: true, configurable: true });
     renderWith([doc("offer", "processing")]);
 
+    await tick(3100);
     await tick(3100);
     expect(document.title).toBe("(1) Ready | Dashboard | Brief");
 

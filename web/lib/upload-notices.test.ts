@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { DocumentSummary } from "@/lib/documents";
-import { addedNotice, READING_HINT, settle } from "@/lib/upload-notices";
+import { addedNotice, preparingNotice, READING_HINT, settle } from "@/lib/upload-notices";
 
 const doc = (id: string, status: string, extra: Partial<DocumentSummary> = {}): DocumentSummary => ({
   id,
@@ -38,7 +38,7 @@ describe("settle", () => {
   });
 
   it("tells the person one document is ready, with a link straight to it that stays about ten seconds", () => {
-    const result = settle(new Set(["a"]), [doc("a", "ready")]);
+    const result = settle(new Set(["a"]), [doc("a", "ready")], new Set(["a"]));
 
     expect(result.notices).toEqual([
       { kind: "ready", title: "a.pdf is ready", body: undefined, action: { label: "View document", href: "/dashboard/documents/a" }, closeAfterMs: 10000 },
@@ -48,14 +48,14 @@ describe("settle", () => {
   });
 
   it("groups several that finish together into one note that links to the list", () => {
-    const result = settle(new Set(["a", "b", "c"]), [doc("a", "ready"), doc("b", "ready"), doc("c", "ready")]);
+    const result = settle(new Set(["a", "b", "c"]), [doc("a", "ready"), doc("b", "ready"), doc("c", "ready")], new Set(["a", "b", "c"]));
 
     expect(result.notices).toHaveLength(1);
     expect(result.notices[0]).toMatchObject({ title: "3 documents are ready", action: { label: "View documents", href: "/dashboard/documents" } });
   });
 
   it("says plainly when a scan was hard to read", () => {
-    const [notice] = settle(new Set(["a"]), [doc("a", "needs_retake")]).notices;
+    const [notice] = settle(new Set(["a"]), [doc("a", "needs_retake")], new Set(["a"])).notices;
 
     expect(notice.title).toBe("a.pdf is ready");
     expect(notice.body).toMatch(/hard to read/);
@@ -76,10 +76,22 @@ describe("settle", () => {
   });
 
   it("reports ready and failed together, and keeps watching the rest", () => {
-    const result = settle(new Set(["a", "b", "c"]), [doc("a", "ready"), doc("b", "failed"), doc("c", "processing")]);
+    const result = settle(new Set(["a", "b", "c"]), [doc("a", "ready"), doc("b", "failed"), doc("c", "processing")], new Set(["a"]));
 
     expect(result.notices.map((notice) => notice.kind)).toEqual(["ready", "failed"]);
     expect([...result.stillWatching]).toEqual(["c"]);
+  });
+
+  it("does not call a document ready until its summary is prepared, and asks for it to be prepared", () => {
+    const waiting = settle(new Set(["a"]), [doc("a", "ready")]);
+
+    expect(waiting.notices).toEqual([]);
+    expect([...waiting.stillWatching]).toEqual(["a"]);
+    expect(waiting.toPrepare.map((document) => document.id)).toEqual(["a"]);
+
+    const done = settle(new Set(["a"]), [doc("a", "ready")], new Set(["a"]));
+    expect(done.notices).toHaveLength(1);
+    expect(done.toPrepare).toEqual([]);
   });
 
   it("quietly forgets a document that is no longer in the list", () => {
@@ -92,5 +104,12 @@ describe("settle", () => {
 
   it("ignores documents that were not being watched", () => {
     expect(settle(new Set(), [doc("a", "ready")]).notices).toEqual([]);
+  });
+});
+
+describe("preparingNotice", () => {
+  it("says the summary is being worked out, and stays until it is done", () => {
+    expect(preparingNotice(["a.pdf"])).toMatchObject({ kind: "reading", title: "Preparing a.pdf", closeAfterMs: null });
+    expect(preparingNotice(["a.pdf", "b.pdf"]).title).toBe("Preparing 2 documents");
   });
 });
