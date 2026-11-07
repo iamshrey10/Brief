@@ -1,8 +1,10 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
+import { useUploadNotifications } from "@/components/upload-notifications";
 import { approveShare, createShare, joinLink, lastViewedText, MAX_SHARES, removeShare, shareStatusText, type Invitation, type Share } from "@/lib/sharing";
 
 type Busy = { id: string; what: "approving" | "removing" };
@@ -37,7 +39,24 @@ const nameOf = (share: Share) => share.viewer_name ?? share.viewer_email ?? shar
  * once. When the other person has used them the owner sees who asked and approves, and can take access away at any time.
  */
 export function SharingPanel({ initial }: { initial: Share[] }) {
+  const router = useRouter();
+  const { pendingRequests, refreshRequests } = useUploadNotifications();
   const [shares, setShares] = useState(initial);
+  // When the page is asked for again, what it brings replaces what is shown, so a new request appears without a reload.
+  const [seenInitial, setSeenInitial] = useState(initial);
+  if (seenInitial !== initial) {
+    setSeenInitial(initial);
+    setShares(initial);
+  }
+  // Someone asking, or an answer being given, changes the count on the bar: ask the page for the list again.
+  const firstCount = useRef(true);
+  useEffect(() => {
+    if (firstCount.current) {
+      firstCount.current = false;
+      return;
+    }
+    router.refresh();
+  }, [pendingRequests, router]);
   const [label, setLabel] = useState("");
   const [creating, setCreating] = useState(false);
   const [fresh, setFresh] = useState<{ invitation: Invitation; link: string } | null>(null);
@@ -70,6 +89,7 @@ export function SharingPanel({ initial }: { initial: Share[] }) {
     setBusy(null);
     if (!outcome.ok) return setRowError({ id: share.id, message: outcome.message });
     setShares((current) => current.map((item) => (item.id === share.id ? { ...item, status: "active", expires_at: null } : item)));
+    refreshRequests();
   }
 
   async function remove(share: Share) {
@@ -80,7 +100,11 @@ export function SharingPanel({ initial }: { initial: Share[] }) {
     if (!outcome.ok) return setRowError({ id: share.id, message: outcome.message });
     setShares((current) => current.filter((item) => item.id !== share.id));
     if (fresh?.invitation.id === share.id) setFresh(null);
+    refreshRequests();
   }
+
+  // People waiting to be let in come first, so a new request is the first thing seen.
+  const ordered = [...shares].sort((a, b) => Number(b.status === "requested") - Number(a.status === "requested"));
 
   return (
     <section id="sharing" aria-labelledby="sharing-heading" className="scroll-mt-6 rounded-2xl border border-border bg-card p-6 shadow-sm">
@@ -143,13 +167,19 @@ export function SharingPanel({ initial }: { initial: Share[] }) {
             {shares.length} of {MAX_SHARES} places used
           </p>
           <ul aria-label="People with access" className="mt-2 flex flex-col gap-2">
-            {shares.map((share) => {
+            {ordered.map((share) => {
               const working = busy?.id === share.id;
               const failed = rowError?.id === share.id ? rowError.message : null;
               return (
-                <li key={share.id} className="rounded-lg border border-border px-4 py-3">
+                <li
+                  key={share.id}
+                  className={share.status === "requested" ? "rounded-lg border border-primary/50 bg-accent/40 px-4 py-3 ring-1 ring-primary/20" : "rounded-lg border border-border px-4 py-3"}
+                >
                   <div className="flex flex-wrap items-center gap-3">
                     <div className="min-w-0 flex-1">
+                      {share.status === "requested" && (
+                        <span className="mb-1 inline-block rounded-full bg-red-600 px-2 py-0.5 text-xs font-semibold text-white">New request</span>
+                      )}
                       <p className="truncate text-sm font-medium text-foreground">{nameOf(share)}</p>
                       {share.viewer_name && share.viewer_email && <p className="truncate text-xs text-muted-foreground">{share.viewer_email}</p>}
                       <p className="text-xs text-muted-foreground">

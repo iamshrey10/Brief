@@ -140,3 +140,18 @@ test("the notes have no accessibility problems while they are showing", async ({
 
   expect(results.violations).toEqual([]);
 });
+
+test("the Dashboard shows the steps a document goes through while it is read, and offers it when it is ready", async ({ page }) => {
+  await page.goto("/dashboard");
+  await page.getByRole("button", { name: "Add documents" }).click();
+  await page.getByLabel("Choose a file to upload").setInputFiles(PDF);
+  await page.locator("fieldset").getByText("Lease", { exact: true }).click();
+  await page.getByRole("button", { name: "Upload", exact: true }).click();
+
+  const reading = page.getByRole("region", { name: "Now reading" });
+  await expect(reading.getByText("new-lease.pdf")).toBeVisible();
+  await expect(reading.getByRole("list", { name: "Steps for new-lease.pdf" }).getByRole("listitem")).toHaveCount(4);
+
+  await expect(reading.getByRole("link", { name: "View document" })).toBeVisible({ timeout: 25_000 });
+  await expect(reading.getByRole("list", { name: "Steps for new-lease.pdf" })).toContainText("Ready (done)");
+});

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { DocumentSummary } from "@/lib/documents";
-import { addedNotice, preparingNotice, READING_HINT, settle } from "@/lib/upload-notices";
+import { addedNotice, preparingNotice, READING_HINT, requestNotice, settle } from "@/lib/upload-notices";
 
 const doc = (id: string, status: string, extra: Partial<DocumentSummary> = {}): DocumentSummary => ({
   id,
@@ -65,6 +65,7 @@ describe("settle", () => {
     const result = settle(new Set(["a", "b"]), [doc("a", "failed", { failure_reason: "no_text" }), doc("b", "failed")]);
 
     expect(result.notices).toHaveLength(2);
+    expect(result.failedIds).toEqual(["a", "b"]);
     expect(result.notices[0]).toMatchObject({
       kind: "failed",
       title: "We couldn't read a.pdf",
@@ -111,5 +112,15 @@ describe("preparingNotice", () => {
   it("says the summary is being worked out, and stays until it is done", () => {
     expect(preparingNotice(["a.pdf"])).toMatchObject({ kind: "reading", title: "Preparing a.pdf", closeAfterMs: null });
     expect(preparingNotice(["a.pdf", "b.pdf"]).title).toBe("Preparing 2 documents");
+  });
+});
+
+describe("requestNotice", () => {
+  it("says who is waiting and leads to the place to answer", () => {
+    expect(requestNotice("Asha Rao")).toMatchObject({
+      kind: "request",
+      title: "Asha Rao asked to see your dashboard",
+      action: { label: "Review", href: "/dashboard/shared#sharing" },
+    });
   });
 });

@@ -2,7 +2,7 @@ import { failureMessage, isInProgress, type DocumentSummary } from "@/lib/docume
 
 /** What the person is told about a document they just added, and when. */
 export type Notice = {
-  kind: "reading" | "ready" | "failed";
+  kind: "reading" | "ready" | "failed" | "request";
   title: string;
   body?: string;
   /** A link to open, or a button that does something, offered under the message. */
@@ -27,6 +27,9 @@ export function addedNotice(filenames: string[]): Notice {
 export type Settled = {
   notices: Notice[];
   stillWatching: Set<string>;
+  /** Ids of the documents announced as ready in this look, and of those that failed. */
+  readyIds: string[];
+  failedIds: string[];
   /** Documents that have been read but whose summary and questions have not been prepared yet, so they are not called ready. */
   toPrepare: DocumentSummary[];
   changed: boolean;
@@ -96,5 +99,16 @@ export function settle(watching: Set<string>, fresh: DocumentSummary[], prepared
       closeAfterMs: null,
     });
   }
-  return { notices, stillWatching, toPrepare, changed: ready.length + failed.length > 0 || stillWatching.size !== watching.size };
+  return { notices, stillWatching, toPrepare, readyIds: ready.map((document) => document.id), failedIds: failed.map((document) => document.id), changed: ready.length + failed.length > 0 || stillWatching.size !== watching.size };
+}
+
+/** The note shown when someone has used a share link and code and is waiting to be let in. */
+export function requestNotice(who: string): Notice {
+  return {
+    kind: "request",
+    title: `${who} asked to see your dashboard`,
+    body: "Nothing is shared until you approve it.",
+    action: { label: "Review", href: "/dashboard/shared#sharing" },
+    closeAfterMs: 12000,
+  };
 }

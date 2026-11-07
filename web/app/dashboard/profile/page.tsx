@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { AppHeader } from "@/components/app-header";
 import { Lock, Palette, Trash2, Users } from "lucide-react";
+import { PendingBadge } from "@/components/pending-badge";
 import { ProfileRow } from "@/components/profile-row";
 import { BinList } from "@/components/bin-list";
 import { TwoFactorPanel } from "@/components/two-factor-panel";
@@ -67,7 +68,7 @@ export default async function ProfilePage() {
                 <TwoFactorPanel initialEnabled={twoFactor.enabled} initialCodesLeft={twoFactor.recovery_codes_left} />
               </ProfileRow>
             )}
-            <ProfileRow anchor="sharing" href="/dashboard/shared#sharing" icon={<Users className="size-5" />} title="Share your dashboard" description="Let family or friends view your documents." />
+            <ProfileRow anchor="sharing" href="/dashboard/shared#sharing" badge={<PendingBadge />} icon={<Users className="size-5" />} title="Share your dashboard" description="Let family or friends view your documents." />
             <ProfileRow anchor="bin" icon={<Trash2 className="size-5" />} title="Bin" description="Deleted documents stay for 7 days.">
               <section id="bin" aria-labelledby="bin-heading">
                 <h2 id="bin-heading" className="text-lg font-semibold tracking-tight text-foreground">
