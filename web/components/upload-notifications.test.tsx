@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { DocumentSummary } from "@/lib/documents";
 import { UploadNotifications, useUploadNotifications } from "./upload-notifications";
+import { stepOf } from "@/lib/tracking";
 
 const refresh = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
@@ -256,11 +257,12 @@ describe("UploadNotifications", () => {
     await tick(3100);
     const fetchMock = fetch as unknown as ReturnType<typeof vi.fn>;
 
+    const documentCalls = () => fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/documents")).length;
     await tick(5 * 60 * 1000 + 10000);
-    const callsAtGiveUp = fetchMock.mock.calls.length;
+    const callsAtGiveUp = documentCalls();
     await tick(30000);
 
-    expect(fetchMock.mock.calls.length).toBe(callsAtGiveUp);
+    expect(documentCalls()).toBe(callsAtGiveUp);
   });
 
   it("says nothing when the list cannot be fetched, and tries again on the next look", async () => {
@@ -300,5 +302,164 @@ describe("UploadNotifications", () => {
 
     expect(document.title).toBe("(2) Ready | Dashboard | Brief");
     Object.defineProperty(document, "hidden", { value: false, configurable: true });
+  });
+
+  it("follows the documents being read for the timeline, through to ready, and lets go of them a little after", async () => {
+    function Timeline() {
+      const { tracked } = useUploadNotifications();
+      return <p data-testid="timeline">{tracked.map((entry) => `${entry.document.id}:${stepOf(entry)}`).join(",")}</p>;
+    }
+    listIs([doc("offer", "processing")]);
+    render(
+      <UploadNotifications>
+        <Adder documents={[doc("offer", "processing")]} />
+        <Timeline />
+      </UploadNotifications>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "add" }));
+    expect(screen.getByTestId("timeline")).toHaveTextContent("offer:1");
+
+    listIs([doc("offer", "ready")]);
+    await tick(3100); // read, being prepared
+    expect(screen.getByTestId("timeline")).toHaveTextContent("offer:3"); // prepared at once in this test, so it is done
+    await tick(12100);
+
+    expect(screen.getByTestId("timeline")).toBeEmptyDOMElement();
+  });
+
+  it("picks up a document that is still being read after a reload, without saying it was just added", async () => {
+    function Timeline() {
+      const { tracked } = useUploadNotifications();
+      return <p data-testid="timeline">{tracked.map((entry) => entry.document.id).join(",")}</p>;
+    }
+    listIs([doc("offer", "processing"), doc("old", "ready")]);
+    render(
+      <UploadNotifications>
+        <Timeline />
+      </UploadNotifications>,
+    );
+    await tick(100);
+
+    expect(screen.getByTestId("timeline")).toHaveTextContent("offer");
+    expect(screen.getByTestId("timeline")).not.toHaveTextContent("old");
+    expect(screen.queryByText(/Added/)).not.toBeInTheDocument();
+  });
+});
+
+describe("UploadNotifications requests to see the dashboard", () => {
+  const share = (id: string, status: string, extra: Record<string, unknown> = {}) => ({
+    id,
+    label: null,
+    status,
+    viewer_email: "asha@example.com",
+    viewer_name: "Asha Rao",
+    created_at: "2026-11-06T00:00:00Z",
+    expires_at: null,
+    last_viewed_at: null,
+    ...extra,
+  });
+
+  function Count() {
+    const { pendingRequests } = useUploadNotifications();
+    return <p data-testid="count">{pendingRequests}</p>;
+  }
+
+  function sharesAre(list: unknown[]) {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => list }));
+  }
+
+  it("counts the people waiting to be let in, without a note for those already waiting when the page opened", async () => {
+    sharesAre([share("s1", "requested"), share("s2", "active"), share("s3", "invited")]);
+    render(
+      <UploadNotifications>
+        <Count />
+      </UploadNotifications>,
+    );
+    await tick(100);
+
+    expect(screen.getByTestId("count")).toHaveTextContent("1");
+    expect(screen.queryByText(/asked to see your dashboard/)).not.toBeInTheDocument();
+  });
+
+  it("says so with a note that leads to the answer when someone new asks, and counts them", async () => {
+    sharesAre([]);
+    render(
+      <UploadNotifications>
+        <Count />
+      </UploadNotifications>,
+    );
+    await tick(100);
+    expect(screen.getByTestId("count")).toHaveTextContent("0");
+
+    sharesAre([share("s1", "requested")]);
+    await tick(30100);
+
+    expect(screen.getByTestId("count")).toHaveTextContent("1");
+    expect(screen.getByText("Asha Rao asked to see your dashboard")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Review" })).toHaveAttribute("href", "/dashboard/shared#sharing");
+
+    await tick(30100); // looked at again: the same person is not announced a second time
+    expect(screen.queryAllByText("Asha Rao asked to see your dashboard")).toHaveLength(0); // the first note has gone by itself, and no new one came
+  });
+
+  it("names someone by their email, or just says someone, when there is no name", async () => {
+    sharesAre([]);
+    render(
+      <UploadNotifications>
+        <Count />
+      </UploadNotifications>,
+    );
+    await tick(100);
+
+    sharesAre([share("s1", "requested", { viewer_name: null }), share("s2", "requested", { viewer_name: null, viewer_email: null })]);
+    await tick(30100);
+
+    expect(screen.getByText("asha@example.com asked to see your dashboard")).toBeInTheDocument();
+    expect(screen.getByText("Someone asked to see your dashboard")).toBeInTheDocument();
+  });
+
+  it("looks again straight away when asked, so the count drops after an answer", async () => {
+    function Refresher() {
+      const { refreshRequests } = useUploadNotifications();
+      return (
+        <button type="button" onClick={refreshRequests}>
+          refresh
+        </button>
+      );
+    }
+    sharesAre([share("s1", "requested")]);
+    render(
+      <UploadNotifications>
+        <Count />
+        <Refresher />
+      </UploadNotifications>,
+    );
+    await tick(100);
+    expect(screen.getByTestId("count")).toHaveTextContent("1");
+
+    sharesAre([]);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "refresh" }));
+    });
+
+    expect(screen.getByTestId("count")).toHaveTextContent("0");
+  });
+
+  it("keeps the old count when the list cannot be fetched", async () => {
+    sharesAre([share("s1", "requested")]);
+    render(
+      <UploadNotifications>
+        <Count />
+      </UploadNotifications>,
+    );
+    await tick(100);
+
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, json: async () => [] }));
+    await tick(30100);
+    expect(screen.getByTestId("count")).toHaveTextContent("1");
+
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
+    await tick(30100);
+    expect(screen.getByTestId("count")).toHaveTextContent("1");
   });
 });

@@ -5,6 +5,7 @@ import { auth } from "@/auth";
 import { AppHeader } from "@/components/app-header";
 import { DashboardStats } from "@/components/dashboard-stats";
 import { DashboardUpload } from "@/components/dashboard-upload";
+import { NowReading } from "@/components/now-reading";
 import { DocumentAnalysis } from "@/components/document-analysis";
 import { LeaseCountdown } from "@/components/lease-countdown";
 import { KindBreakdown } from "@/components/kind-breakdown";
@@ -69,6 +70,8 @@ export default async function DashboardHome() {
         <Rise order={2}>
           <DashboardStats stats={stats} />
         </Rise>
+
+        <NowReading />
 
         <Rise order={3} className="grid grid-cols-1 items-stretch gap-5 lg:grid-cols-3">
           <div className={lease ? "lg:col-span-2" : "lg:col-span-3"}>

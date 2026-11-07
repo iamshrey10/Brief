@@ -14,6 +14,7 @@ export function ProfileRow({
   title,
   description,
   href,
+  badge,
   children,
 }: {
   /** The id of the section inside, which a link can point to. */
@@ -23,6 +24,8 @@ export function ProfileRow({
   description: string;
   /** When given, the row is a link to another page instead of opening in place. */
   href?: string;
+  /** Something shown beside the title, such as a count of what needs attention. */
+  badge?: ReactNode;
   children?: ReactNode;
 }) {
   const ref = useRef<HTMLDetailsElement>(null);
@@ -45,7 +48,10 @@ export function ProfileRow({
           {icon}
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block text-sm font-semibold text-foreground">{title}</span>
+          <span className="block text-sm font-semibold text-foreground">
+            {title}
+            {badge}
+          </span>
           <span className="block text-xs text-muted-foreground">{description}</span>
         </span>
         <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />

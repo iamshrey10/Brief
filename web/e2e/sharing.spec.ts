@@ -156,3 +156,30 @@ test("a share that never existed is still simply not found", async ({ page }) =>
 
   expect(response?.status()).toBe(404);
 });
+
+test("when someone has used the link and code, a red number marks Shared and Profile, leads to the request, and goes once it is answered", async ({ page }) => {
+  await page.goto("/dashboard/shared#sharing");
+  await page.getByLabel(/Who is it for/).fill("Mum");
+  await page.getByRole("button", { name: "Create invitation" }).click();
+  const link = await page.getByRole("region", { name: "New invitation" }).getByLabel("Invitation link").inputValue();
+  await page.goto(new URL(link).pathname);
+  await page.getByLabel("Six digit code").fill("482913");
+  await page.getByRole("button", { name: "Ask for access" }).click();
+  await expect(page.getByRole("status")).toContainText("Your request was sent to");
+
+  await page.goto("/dashboard");
+  const sections = page.getByRole("navigation", { name: "Sections" }).first();
+  await expect(sections.getByRole("link", { name: /^Shared.*1 person is waiting for your approval/ })).toBeVisible();
+  await expect(sections.getByRole("link", { name: /^Profile.*1 person is waiting for your approval/ })).toBeVisible();
+
+  // From Profile, the row leads to the request.
+  await sections.getByRole("link", { name: /^Profile/ }).click();
+  await page.getByRole("link", { name: /Share your dashboard/ }).click();
+  await expect(page).toHaveURL(/\/dashboard\/shared#sharing/);
+  const request = page.getByRole("list", { name: "People with access" }).getByRole("listitem").first();
+  await expect(request).toContainText("New request");
+
+  await page.getByRole("button", { name: "Approve friend@example.com" }).click();
+  await expect(request).toContainText("Can view");
+  await expect(sections.getByRole("link", { name: /^Shared$/ })).toBeVisible();
+});

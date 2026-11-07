@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { PendingBadge } from "@/components/pending-badge";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { signOutToHome } from "@/lib/auth-actions";
@@ -72,6 +73,7 @@ function SectionLinks({ current }: { current: AppSection | null }) {
       )}
     >
       {section.label}
+      {(section.id === "shared" || section.id === "profile") && <PendingBadge />}
     </Link>
   ));
 }

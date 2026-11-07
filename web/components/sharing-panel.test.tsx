@@ -8,6 +8,9 @@ vi.mock("@/lib/sharing", async (importOriginal) => {
   return { ...actual, createShare: vi.fn(), approveShare: vi.fn(), removeShare: vi.fn() };
 });
 
+const refreshMock = vi.fn();
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: refreshMock }) }));
+
 import { approveShare, createShare, removeShare, type Share } from "@/lib/sharing";
 import { SharingPanel } from "./sharing-panel";
 
@@ -200,5 +203,18 @@ describe("approving and removing", () => {
     fireEvent.click(screen.getByRole("button", { name: "Cancel invitation for Unnamed invitation" }));
 
     await waitFor(() => expect(screen.queryByRole("region", { name: "New invitation" })).not.toBeInTheDocument());
+  });
+
+  it("puts people waiting to be let in first, marked as a new request", () => {
+    render(
+      <SharingPanel
+        initial={[share({ id: "a", status: "active", viewer_name: "Active Person", viewer_email: "a@example.com", expires_at: null }), share({ id: "b", status: "requested", viewer_name: "Asha Rao", viewer_email: "asha@example.com" })]}
+      />,
+    );
+
+    const people = within(screen.getByRole("list", { name: "People with access" })).getAllByRole("listitem");
+    expect(people[0]).toHaveTextContent("New request");
+    expect(people[0]).toHaveTextContent("Asha Rao");
+    expect(people[1]).not.toHaveTextContent("New request");
   });
 });
