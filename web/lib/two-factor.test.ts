@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { asTwoFactorStatus, disableTwoFactor, enableTwoFactor, groupSecret, messageForCodeFailure, startSetup, verifyCode } from "./two-factor";
+import { asTwoFactorStatus, disableTwoFactor, enableTwoFactor, groupSecret, makeNewRecoveryCodes, messageForCodeFailure, startSetup, verifyCode } from "./two-factor";
 
 const fetchMock = vi.fn();
 vi.stubGlobal("fetch", fetchMock);
@@ -80,6 +80,19 @@ describe("the calls", () => {
 
     expect(await disableTwoFactor("123456")).toEqual({ ok: true, result: true });
     expect(fetchMock).toHaveBeenCalledWith("/api/two-factor/disable", expect.anything());
+  });
+
+  it("makes new recovery codes, keeping only text", async () => {
+    fetchMock.mockResolvedValue(reply(200, { recoveryCodes: ["NEWAA-BBBBB", 5, "NEWCC-DDDDD"] }));
+
+    expect(await makeNewRecoveryCodes("123456")).toEqual({ ok: true, result: ["NEWAA-BBBBB", "NEWCC-DDDDD"] });
+    expect(fetchMock).toHaveBeenCalledWith("/api/two-factor/recovery-codes", expect.anything());
+  });
+
+  it("says why making new recovery codes failed", async () => {
+    fetchMock.mockResolvedValue(reply(400, { error: "wrong" }));
+
+    expect(await makeNewRecoveryCodes("000000")).toEqual({ ok: false, message: expect.stringContaining("isn't right") });
   });
 
   it("starts the setup and returns the secret and address", async () => {

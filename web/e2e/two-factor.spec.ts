@@ -157,6 +157,28 @@ test("it is turned off with a right code, and the next visit asks for nothing", 
   await expect(page).toHaveURL(/\/dashboard$/);
 });
 
+test("new recovery codes can be made with a code, and the old ones are replaced", async ({ page }) => {
+  const secret = await turnOn(page);
+  const region = page.getByRole("region", { name: "Two step verification" });
+  const first = await page.getByRole("list", { name: "Recovery codes" }).getByRole("listitem").first().textContent();
+  await page.getByRole("button", { name: "I have saved them" }).click();
+
+  await page.getByRole("button", { name: "Make new recovery codes" }).click();
+  await page.getByLabel(/to make new ones/).fill("000000");
+  await page.getByRole("button", { name: "Make new codes" }).click();
+  await expect(page.locator("p[role=alert]")).toContainText("isn't right");
+
+  await page.getByLabel(/to make new ones/).fill(totp(secret));
+  await page.getByRole("button", { name: "Make new codes" }).click();
+
+  await expect(page.getByRole("status").filter({ hasText: "Here are your new recovery codes" })).toBeVisible();
+  const fresh = page.getByRole("list", { name: "Recovery codes" }).getByRole("listitem");
+  await expect(fresh).toHaveCount(10);
+  expect(await fresh.first().textContent()).not.toBe(first);
+  await page.getByRole("button", { name: "I have saved them" }).click();
+  await expect(region).toContainText("Status: on · 10 recovery codes left");
+});
+
 test("five wrong codes are answered as locked", async ({ page }) => {
   await seedTwoFactor(page);
   await page.goto("/dashboard");

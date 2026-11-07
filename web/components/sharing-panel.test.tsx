@@ -217,4 +217,12 @@ describe("approving and removing", () => {
     expect(people[0]).toHaveTextContent("Asha Rao");
     expect(people[1]).not.toHaveTextContent("New request");
   });
+
+  it("does not ask the page for the list again just because it opened", () => {
+    refreshMock.mockClear();
+
+    render(<SharingPanel initial={[share({})]} />);
+
+    expect(refreshMock).not.toHaveBeenCalled();
+  });
 });

@@ -9,20 +9,23 @@ vi.mock("@/lib/two-factor", async (importOriginal) => ({
   startSetup: vi.fn(),
   enableTwoFactor: vi.fn(),
   disableTwoFactor: vi.fn(),
+  makeNewRecoveryCodes: vi.fn(),
 }));
 
-import { disableTwoFactor, enableTwoFactor, startSetup } from "@/lib/two-factor";
+import { disableTwoFactor, enableTwoFactor, makeNewRecoveryCodes, startSetup } from "@/lib/two-factor";
 import { TwoFactorPanel } from "./two-factor-panel";
 
 const startMock = vi.mocked(startSetup);
 const enableMock = vi.mocked(enableTwoFactor);
 const disableMock = vi.mocked(disableTwoFactor);
+const newCodesMock = vi.mocked(makeNewRecoveryCodes);
 const CODES = Array.from({ length: 10 }, (_, i) => `ABCDE-FGH${i}J`);
 
 beforeEach(() => {
   startMock.mockReset();
   enableMock.mockReset();
   disableMock.mockReset();
+  newCodesMock.mockReset();
   startMock.mockResolvedValue({ ok: true, result: { secret: "ABCDEFGHIJKLMNOP", otpauth_uri: "otpauth://totp/Brief" } });
 });
 afterEach(cleanup);
@@ -184,5 +187,34 @@ describe("when it is on", () => {
 
     expect(region()).toHaveTextContent("Status: on");
     expect(disableMock).not.toHaveBeenCalled();
+  });
+
+  it("makes a new set of recovery codes with a code, shows them once with a note that the old ones no longer work, and counts ten", async () => {
+    newCodesMock.mockResolvedValue({ ok: true, result: CODES });
+    render(<TwoFactorPanel initialEnabled initialCodesLeft={2} />);
+    fireEvent.click(screen.getByRole("button", { name: "Make new recovery codes" }));
+    expect(region()).toHaveTextContent("The old ones stop working at once");
+    fireEvent.change(screen.getByLabelText(/to make new ones/), { target: { value: "123456" } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Make new codes" }));
+
+    expect(await screen.findByRole("status")).toHaveTextContent("Here are your new recovery codes. The old ones no longer work.");
+    expect(newCodesMock).toHaveBeenCalledExactlyOnceWith("123456");
+    expect(within(screen.getByRole("list", { name: "Recovery codes" })).getAllByRole("listitem")).toHaveLength(10);
+    fireEvent.click(screen.getByRole("button", { name: "I have saved them" }));
+    expect(region()).toHaveTextContent("10 recovery codes left");
+  });
+
+  it("says why when new recovery codes are refused, and keeps the old ones", async () => {
+    newCodesMock.mockResolvedValue({ ok: false, message: "That code isn't right." });
+    render(<TwoFactorPanel initialEnabled initialCodesLeft={2} />);
+    fireEvent.click(screen.getByRole("button", { name: "Make new recovery codes" }));
+    fireEvent.change(screen.getByLabelText(/to make new ones/), { target: { value: "000000" } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Make new codes" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("isn't right");
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(region()).toHaveTextContent("2 recovery codes left");
   });
 });

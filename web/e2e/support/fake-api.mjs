@@ -314,6 +314,16 @@ const server = createServer(async (request, response) => {
     const { device_token: device } = await readJson(request);
     return send(response, 200, { required: two.enabled, trusted: two.enabled && Boolean(device) && two.devices.includes(device) });
   }
+  if (path === "/me/2fa/recovery-codes" && method === "POST") {
+    const { code } = await readJson(request);
+    if (!two.enabled) return send(response, 409, { detail: "two step verification is not on" });
+    if (!totpMatches(two.secret, String(code)) && !two.recovery.includes(String(code))) {
+      two.wrong += 1;
+      return send(response, 400, { detail: "that code is not right" });
+    }
+    two.recovery = Array.from({ length: 10 }, (_, i) => `NEWCD${i}-WXYZ${i}`);
+    return send(response, 200, { recovery_codes: [...two.recovery] });
+  }
   if (path === "/me/2fa/disable" && method === "POST") {
     const { code } = await readJson(request);
     if (!two.enabled) return send(response, 409, { detail: "two step verification is not on" });

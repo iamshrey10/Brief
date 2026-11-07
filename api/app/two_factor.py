@@ -238,6 +238,26 @@ async def check(session: AsyncSession, user: User, device_token: str | None, now
     return True, True
 
 
+async def regenerate_recovery_codes(session: AsyncSession, user: User, code: str, now: datetime | None = None) -> tuple[Verified, list[str]]:
+    """Replaces the recovery codes with ten new ones, shown only now. Needs a right code, so someone at an unlocked phone cannot
+    do it, and every old code stops working at once, used or not, so a copy that leaked is of no use."""
+    now = now or _now()
+    row = await _row(session, user.id)
+    if row is None or not row.enabled:
+        return Verified.NOT_ON, []
+    tried, _ = await _try_code(session, row, code, now)
+    if tried is Tried.LOCKED:
+        return Verified.LOCKED, []
+    if tried is Tried.WRONG:
+        return Verified.WRONG, []
+    await session.execute(delete(RecoveryCode).where(RecoveryCode.user_id == user.id))
+    codes = [new_recovery_code() for _ in range(RECOVERY_CODES)]
+    for code_text in codes:
+        session.add(RecoveryCode(user_id=user.id, code_hash=_keyed(_normal_recovery(code_text))))
+    await session.commit()
+    return Verified.OK, codes
+
+
 async def disable(session: AsyncSession, user: User, code: str, now: datetime | None = None) -> Verified:
     """Turns two step verification off, which needs a right code, so someone at an unlocked phone cannot do it."""
     now = now or _now()
