@@ -4,17 +4,21 @@ import { useUploadNotifications } from "@/components/upload-notifications";
 import { cn } from "@/lib/utils";
 
 /**
- * A small red number beside something that leads to the people waiting to be let in, so a request is never missed. It shows
+ * A small red number that marks something leading to the people waiting to be let in, so a request is never missed. In the
+ * top bar it sits at the top right of the word (`corner`, inside something positioned); elsewhere it follows the title. It shows
  * nothing when nobody is waiting. Screen readers hear how many are waiting, the number itself is only for the eyes.
  */
-export function PendingBadge({ className }: { className?: string }) {
+export function PendingBadge({ corner = false }: { corner?: boolean }) {
   const { pendingRequests } = useUploadNotifications();
   if (pendingRequests === 0) return null;
   return (
     <>
       <span
         aria-hidden="true"
-        className={cn("ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1.5 text-xs leading-none font-semibold text-white", className)}
+        className={cn(
+          "inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] leading-none font-semibold text-white",
+          corner ? "absolute top-0 right-0.5" : "ml-1.5 align-middle",
+        )}
       >
         {pendingRequests}
       </span>
