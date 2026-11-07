@@ -143,3 +143,23 @@ test("the Dashboard shows how long the lease has left, linking to that lease", a
   await expect(card).toContainText("Ends December 31, 2099");
   await expect(card.getByRole("link", { name: "sample-lease.pdf" })).toHaveAttribute("href", "/dashboard/documents/doc-lease");
 });
+
+test("the bell on the lease reminder hands the date to a calendar file, says it was added, and still says so after a reload", async ({ page }) => {
+  await page.goto("/dashboard");
+  const card = page.getByRole("region", { name: "Lease remaining" });
+
+  await card.getByRole("button", { name: "Remind me in my calendar" }).click();
+  const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: /Download calendar file/ }).click()]);
+  expect(download.suggestedFilename()).toBe("sample-lease-lease-end.ics");
+  const file = await (await download.createReadStream()).toArray();
+  const text = Buffer.concat(file).toString();
+  expect(text).toContain("DTSTART;VALUE=DATE:20991231");
+  expect(text).toContain("UID:doc-lease-lease_end@brief");
+
+  await expect(card.getByRole("button", { name: "Added to your calendar" })).toBeVisible();
+  await page.reload();
+  await expect(card.getByRole("button", { name: "Added to your calendar" })).toBeVisible();
+  await card.getByRole("button", { name: "Added to your calendar" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Added to your calendar" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Download calendar file/ })).toHaveCount(0);
+});

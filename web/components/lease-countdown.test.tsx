@@ -1,10 +1,17 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
 import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const download = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/download", async (original) => ({ ...(await original<typeof import("@/lib/download")>()), downloadTextFile: download }));
 
 import { LeaseCountdown, leaseDaysText } from "./lease-countdown";
 
+beforeEach(() => {
+  window.localStorage.clear();
+  download.mockReset();
+});
 afterEach(cleanup);
 
 describe("the lease countdown words", () => {
@@ -65,5 +72,92 @@ describe("the reminder bell", () => {
   it("is left out once the lease has ended", () => {
     render(<LeaseCountdown lease={{ ...lease, days: -3 }} />);
     expect(screen.queryByRole("button", { name: "Remind me in my calendar" })).not.toBeInTheDocument();
+  });
+});
+
+describe("the reminder bell remembers what it did", () => {
+  const lease = { documentId: "a", filename: "maple.pdf", value: "March 9, 2027", days: 126 };
+  const bell = (name: string) => screen.getByRole("button", { name });
+
+  it("saves one calendar file with the lease end, then says it was added", async () => {
+    const { default: userEvent } = await import("@testing-library/user-event");
+    render(<LeaseCountdown lease={lease} />);
+
+    await userEvent.click(bell("Remind me in my calendar"));
+    await userEvent.click(screen.getByRole("button", { name: /Download calendar file/ }));
+
+    expect(download).toHaveBeenCalledTimes(1);
+    const [name, text, type] = download.mock.calls[0];
+    expect(name).toBe("maple-lease-end.ics");
+    expect(type).toBe("text/calendar");
+    expect(text).toContain("UID:a-lease_end@brief");
+    expect(text).toContain("DTSTART;VALUE=DATE:20270309");
+    expect(text).toContain("SUMMARY:Lease ends: maple.pdf");
+    expect(bell("Added to your calendar")).toBeInTheDocument();
+  });
+
+  it("says so after the page is opened again, and offers no second copy unless asked", async () => {
+    const { default: userEvent } = await import("@testing-library/user-event");
+    const first = render(<LeaseCountdown lease={lease} />);
+    await userEvent.click(bell("Remind me in my calendar"));
+    await userEvent.click(screen.getByRole("button", { name: /Download calendar file/ }));
+    first.unmount();
+
+    render(<LeaseCountdown lease={lease} />);
+    await userEvent.click(await screen.findByRole("button", { name: "Added to your calendar" }));
+
+    expect(screen.getByRole("status")).toHaveTextContent("Added to your calendar");
+    expect(screen.queryByRole("button", { name: /Download calendar file/ })).not.toBeInTheDocument();
+    expect(download).toHaveBeenCalledTimes(1);
+
+    await userEvent.click(screen.getByRole("button", { name: "Not there? Add it again" }));
+    expect(bell("Remind me in my calendar")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Download calendar file/ })).toBeInTheDocument();
+  });
+
+  it("marks the reminder added when the Google Calendar link is used", async () => {
+    const { default: userEvent } = await import("@testing-library/user-event");
+    render(<LeaseCountdown lease={lease} />);
+    await userEvent.click(bell("Remind me in my calendar"));
+    const link = screen.getByRole("link", { name: /Lease ends: March 9, 2027/ });
+    link.addEventListener("click", (event) => event.preventDefault());
+
+    await userEvent.click(link);
+
+    expect(bell("Added to your calendar")).toBeInTheDocument();
+    expect(window.localStorage.getItem("brief-reminder-added:a:March 9, 2027")).toBe("1");
+  });
+
+  it("says plainly when the file could not be made, and does not mark it added", async () => {
+    const { default: userEvent } = await import("@testing-library/user-event");
+    download.mockImplementation(() => {
+      throw new Error("blocked");
+    });
+    render(<LeaseCountdown lease={lease} />);
+
+    await userEvent.click(bell("Remind me in my calendar"));
+    await userEvent.click(screen.getByRole("button", { name: /Download calendar file/ }));
+
+    expect(screen.getByRole("alert")).toHaveTextContent("The calendar file could not be made. Please try again.");
+    expect(bell("Remind me in my calendar")).toBeInTheDocument();
+    expect(window.localStorage.getItem("brief-reminder-added:a:March 9, 2027")).toBeNull();
+  });
+
+  it("still works when the browser will not store anything", async () => {
+    const { default: userEvent } = await import("@testing-library/user-event");
+    const blocked = vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new Error("no storage");
+    });
+    const set = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("no storage");
+    });
+    render(<LeaseCountdown lease={lease} />);
+
+    await userEvent.click(bell("Remind me in my calendar"));
+    await userEvent.click(screen.getByRole("button", { name: /Download calendar file/ }));
+
+    expect(bell("Added to your calendar")).toBeInTheDocument();
+    blocked.mockRestore();
+    set.mockRestore();
   });
 });
