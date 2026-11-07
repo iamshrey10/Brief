@@ -5,6 +5,7 @@ import { CloudUpload, FileText } from "lucide-react";
 import { FOLDERS } from "@/lib/folders";
 import { DocTypeIcon } from "@/components/doc-type-icon";
 import { Button } from "@/components/ui/button";
+import { useUploadNotifications } from "@/components/upload-notifications";
 import {
   ACCEPTED_FILE_TYPES,
   contentTypeFor,
@@ -39,6 +40,7 @@ export const SAMPLE_LEASE_URL = "/samples/sample-lease.pdf";
  * accepted, so each can do what it needs to (add it to its list, or refresh its numbers).
  */
 export function UploadPanel({ onUploaded }: { onUploaded: (document: DocumentSummary) => void }) {
+  const notifications = useUploadNotifications();
   const [file, setFile] = useState<File | null>(null);
   const [docType, setDocType] = useState("loan");
   // Empty means automatic: the folder for the kind.
@@ -145,6 +147,7 @@ export function UploadPanel({ onUploaded }: { onUploaded: (document: DocumentSum
 
       setFile(null);
       setStatus("idle");
+      notifications.uploaded(confirmed);
       onUploaded(confirmed);
     } catch (err) {
       setStatus("error");

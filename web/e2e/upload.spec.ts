@@ -108,3 +108,35 @@ test("an upload can be filed in a folder of its own choosing, and the list says 
   const row = page.getByRole("region", { name: "Your documents" }).getByRole("listitem").filter({ hasText: "new-lease.pdf" });
   await expect(row).toContainText("In Personal documents");
 });
+
+test("adding a document says so, and when it is ready a note with a link to it appears on whatever page the person has moved to", async ({ page }) => {
+  await choose(page, PDF);
+  await page.locator("fieldset").getByText("Lease", { exact: true }).click();
+  await page.getByRole("button", { name: "Upload", exact: true }).click();
+
+  const notes = page.getByRole("region", { name: "Notifications" });
+  await expect(notes.getByText("Added new-lease.pdf")).toBeVisible();
+  await expect(notes.getByText("Short files take seconds, long ones a minute or two.")).toBeVisible();
+
+  // The person goes elsewhere while it is read.
+  await page.getByRole("navigation", { name: "Sections" }).first().getByRole("link", { name: "Profile" }).click();
+  await expect(page).toHaveURL(/\/dashboard\/profile/);
+
+  await expect(notes.getByText("new-lease.pdf is ready")).toBeVisible({ timeout: 20_000 });
+  await notes.getByRole("link", { name: "View document" }).click();
+  await expect(page).toHaveURL(/\/dashboard\/documents\/doc-new-1$/);
+});
+
+test("the notes have no accessibility problems while they are showing", async ({ page }) => {
+  const { default: AxeBuilder } = await import("@axe-core/playwright");
+  await choose(page, PDF);
+  await page.locator("fieldset").getByText("Lease", { exact: true }).click();
+  await page.getByRole("button", { name: "Upload", exact: true }).click();
+  const notes = page.getByRole("region", { name: "Notifications" });
+  await expect(notes.getByText("Added new-lease.pdf")).toBeVisible();
+  await page.evaluate(() => Promise.all(document.getAnimations().filter((a) => a.effect?.getComputedTiming().iterations !== Infinity).map((a) => a.finished.catch(() => undefined))));
+
+  const results = await new AxeBuilder({ page }).include("section[aria-label=Notifications]").analyze();
+
+  expect(results.violations).toEqual([]);
+});
