@@ -1,0 +1,77 @@
+import { failureMessage, isInProgress, type DocumentSummary } from "@/lib/documents";
+
+/** What the person is told about a document they just added, and when. */
+export type Notice = {
+  kind: "reading" | "ready" | "failed";
+  title: string;
+  body?: string;
+  /** A link to open, or a button that does something, offered under the message. */
+  action?: { label: string; href: string } | { label: string; run: "retry"; documentId: string };
+  /** Milliseconds until it goes away by itself, or null when it stays until it is dismissed. */
+  closeAfterMs: number | null;
+};
+
+export const READING_HINT = "Short files take seconds, long ones a minute or two.";
+
+/** The note shown when documents are added. More than one at a time is said once, with the count. */
+export function addedNotice(filenames: string[]): Notice {
+  const many = filenames.length > 1;
+  return {
+    kind: "reading",
+    title: many ? `Added ${filenames.length} documents` : `Added ${filenames[0]}`,
+    body: `${many ? "Reading them now." : "Reading it now."} ${READING_HINT}`,
+    closeAfterMs: 7000,
+  };
+}
+
+export type Settled = { notices: Notice[]; stillWatching: Set<string>; changed: boolean };
+
+/**
+ * Given the ids being watched and the list as it is now, says what to tell the person and which ids are still being read.
+ * Documents that are ready are said together, so three finishing at once is one note and not three. A document that
+ * failed gets its own note with a way to try again, because each one needs its own try. A document that is no longer in
+ * the list (it was deleted) is quietly forgotten.
+ */
+export function settle(watching: Set<string>, fresh: DocumentSummary[]): Settled {
+  const byId = new Map(fresh.map((document) => [document.id, document]));
+  const stillWatching = new Set<string>();
+  const ready: DocumentSummary[] = [];
+  const failed: DocumentSummary[] = [];
+  for (const id of watching) {
+    const document = byId.get(id);
+    if (!document) continue;
+    if (isInProgress(document.status)) stillWatching.add(id);
+    else if (document.status === "failed") failed.push(document);
+    else ready.push(document);
+  }
+
+  const notices: Notice[] = [];
+  if (ready.length === 1) {
+    const [document] = ready;
+    const hard = document.status === "needs_retake";
+    notices.push({
+      kind: "ready",
+      title: `${document.filename} is ready`,
+      body: hard ? "The scan was hard to read, so some answers may be missing. A clearer copy would help." : undefined,
+      action: { label: "View document", href: `/dashboard/documents/${document.id}` },
+      closeAfterMs: 10000,
+    });
+  } else if (ready.length > 1) {
+    notices.push({
+      kind: "ready",
+      title: `${ready.length} documents are ready`,
+      action: { label: "View documents", href: "/dashboard/documents" },
+      closeAfterMs: 10000,
+    });
+  }
+  for (const document of failed) {
+    notices.push({
+      kind: "failed",
+      title: `We couldn't read ${document.filename}`,
+      body: failureMessage(document) ?? undefined,
+      action: { label: "Try again", run: "retry", documentId: document.id },
+      closeAfterMs: null,
+    });
+  }
+  return { notices, stillWatching, changed: ready.length + failed.length > 0 || stillWatching.size !== watching.size };
+}
