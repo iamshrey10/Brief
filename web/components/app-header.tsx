@@ -66,14 +66,14 @@ function SectionLinks({ current }: { current: AppSection | null }) {
       href={section.href}
       aria-current={section.id === current ? "page" : undefined}
       className={cn(
-        "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+        "relative rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
         section.id === current
           ? "bg-accent text-accent-foreground"
           : "text-muted-foreground hover:bg-muted hover:text-foreground",
       )}
     >
       {section.label}
-      {(section.id === "shared" || section.id === "profile") && <PendingBadge />}
+      {(section.id === "shared" || section.id === "profile") && <PendingBadge corner />}
     </Link>
   ));
 }
