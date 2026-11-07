@@ -16,6 +16,8 @@ import {
 } from "lucide-react";
 import { DocTypeIcon } from "@/components/doc-type-icon";
 import { Button } from "@/components/ui/button";
+import { useUploadNotifications } from "@/components/upload-notifications";
+import { stepOf, stepText } from "@/lib/tracking";
 import { cn } from "@/lib/utils";
 import { deleteDocument, MAX_FILENAME_LENGTH, moveDocument, updateDocument } from "@/lib/document-actions";
 import { FOLDERS, folderOf, isFiledElsewhere, folderLabel } from "@/lib/folders";
@@ -32,11 +34,12 @@ import {
   type DocumentSummary,
 } from "@/lib/documents";
 
-function StatusBadge({ status }: { status: string }) {
-  const label = statusLabel(status);
+function StatusBadge({ status, preparing = false }: { status: string; preparing?: boolean }) {
+  const label = preparing ? "Preparing" : statusLabel(status);
   const base = "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium";
 
-  if (status === "ready") {
+  // Read, but its summary and questions are still being worked out: not called ready until it is, the same as the notes say.
+  if (status === "ready" && !preparing) {
     return (
       <span className={cn(base, "bg-primary/10 text-primary")}>
         <CircleCheck aria-hidden className="size-3.5" />
@@ -370,6 +373,9 @@ function DocumentRow({
   onUpdated?: (document: DocumentSummary) => void;
   onDeleted?: (id: string) => void;
 }) {
+  const { tracked } = useUploadNotifications();
+  const followed = tracked.find((entry) => entry.document.id === doc.id);
+  const preparing = followed !== undefined && stepOf(followed) === 2;
   const [mode, setMode] = useState<Mode>("view");
   const [retrying, setRetrying] = useState(false);
   const [retryError, setRetryError] = useState<string | null>(null);
@@ -461,6 +467,7 @@ function DocumentRow({
           {isFiledElsewhere(doc) && ` · In ${folderLabel(folderOf(doc))}`}
         </span>
         {progress && <span className="mt-0.5 block text-xs text-muted-foreground">{progress}</span>}
+        {preparing && followed && <span className="mt-0.5 block text-xs text-muted-foreground">{stepText(followed)}</span>}
         {failure && <span className="mt-0.5 block text-xs text-muted-foreground">{failure}</span>}
         {retryError && (
           <span role="alert" className="mt-0.5 block text-xs text-destructive">
@@ -468,7 +475,7 @@ function DocumentRow({
           </span>
         )}
       </span>
-      <StatusBadge status={doc.status} />
+      <StatusBadge status={doc.status} preparing={preparing} />
       {readable && <ChevronRight aria-hidden className="size-4 shrink-0 text-muted-foreground" />}
     </>
   );
