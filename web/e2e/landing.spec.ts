@@ -12,7 +12,7 @@ test("the landing page says what Brief is and offers to sign in", async ({ page 
   await expect(page.locator('meta[property="og:site_name"]')).toHaveAttribute("content", "Brief");
 });
 
-test("See how it works scrolls to How it works, which comes after What you get, and the page has the attribute Next needs for smooth scrolling", async ({ page }) => {
+test("How it works comes after What you get, a link to it lands there, and the page has the attribute Next needs for smooth scrolling", async ({ page }) => {
   await page.goto("/");
   await expect(page.locator("html")).toHaveAttribute("data-scroll-behavior", "smooth");
   await expect(page.getByRole("navigation", { name: "Sections" })).toHaveCount(0);
@@ -21,9 +21,36 @@ test("See how it works scrolls to How it works, which comes after What you get, 
   const how = (await page.getByRole("heading", { level: 2, name: "How it works" }).boundingBox())!;
   expect(features.y).toBeLessThan(how.y);
 
-  await page.getByRole("link", { name: "See how it works" }).click();
-  await expect(page).toHaveURL(/#how$/);
+  await page.goto("/#how");
   await expect(page.getByRole("heading", { level: 2, name: "How it works" })).toBeInViewport();
+});
+
+test("Watch how it works opens the short video with captions in a window, and Escape puts it away", async ({ page }) => {
+  await page.goto("/");
+
+  await page.getByRole("button", { name: "Watch how it works" }).click();
+
+  const window = page.getByRole("dialog", { name: "Brief in 35 seconds" });
+  await expect(window).toBeVisible();
+  const video = window.locator("video");
+  await expect(video).toHaveAttribute("poster", "/demo/brief-demo-poster.jpg");
+  await expect(video.locator("track")).toHaveAttribute("kind", "captions");
+  // The files are really served, and are a video and its captions.
+  expect((await page.request.get("/demo/brief-demo.mp4")).headers()["content-type"]).toContain("video/mp4");
+  expect(await (await page.request.get("/demo/brief-demo.vtt")).text()).toMatch(/^WEBVTT/);
+  const duration = await video.evaluate((element: HTMLVideoElement) => new Promise<number>((resolve) => {
+    if (element.readyState >= 1) return resolve(element.duration);
+    element.addEventListener("loadedmetadata", () => resolve(element.duration), { once: true });
+  }));
+  expect(duration).toBeGreaterThan(30);
+  expect(duration).toBeLessThan(40);
+
+  const { default: AxeBuilder } = await import("@axe-core/playwright");
+  const results = await new AxeBuilder({ page }).analyze();
+  expect(results.violations).toEqual([]);
+
+  await page.keyboard.press("Escape");
+  await expect(window).toBeHidden();
 });
 
 test("the top bar stays in view after scrolling to the bottom", async ({ page }) => {

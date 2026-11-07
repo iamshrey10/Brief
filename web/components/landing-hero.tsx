@@ -1,6 +1,6 @@
-import { Play } from "lucide-react";
 import Link from "next/link";
 
+import { DemoVideoButton } from "@/components/demo-video";
 import { Rise } from "@/components/rise";
 
 import { DocumentPreview } from "@/components/document-preview";
@@ -72,10 +72,7 @@ export function LandingHero({ signedIn }: { signedIn: boolean }) {
                 </Button>
               </form>
             )}
-            <a href="#how" className={buttonVariants({ variant: "outline", size: "lg", className: "h-12 px-6 text-lg" })}>
-              <Play aria-hidden="true" className="size-4" />
-              See how it works
-            </a>
+            <DemoVideoButton />
           </div>
         </Rise>
 

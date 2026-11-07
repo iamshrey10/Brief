@@ -1,0 +1,54 @@
+"use client";
+
+import { Play, X } from "lucide-react";
+import { useRef, useState } from "react";
+
+import { Button } from "@/components/ui/button";
+
+/**
+ * The button on the first screen that plays a 35 second walk through of Brief: why it was built, how it works and how private it is.
+ * It opens in a window over the page, with captions, and the video is only fetched once it is opened. Escape, the Close button or a click
+ * outside it puts it away, and it stops playing when it goes.
+ */
+export function DemoVideoButton() {
+  const dialog = useRef<HTMLDialogElement>(null);
+  const [open, setOpen] = useState(false);
+
+  function show() {
+    setOpen(true);
+    dialog.current?.showModal();
+  }
+
+  return (
+    <>
+      <Button type="button" variant="outline" size="lg" className="h-12 px-6 text-lg" onClick={show}>
+        <Play aria-hidden="true" className="size-4" />
+        Watch how it works
+      </Button>
+      <dialog
+        ref={dialog}
+        aria-label="Brief in 35 seconds"
+        onClose={() => setOpen(false)}
+        onClick={(event) => {
+          if (event.target === event.currentTarget) dialog.current?.close();
+        }}
+        className="m-auto w-[min(94vw,1040px)] max-w-none rounded-2xl border border-border bg-card p-3 text-card-foreground shadow-2xl backdrop:bg-black/70"
+      >
+        <div className="flex items-center justify-between gap-3 px-2 pb-3">
+          <p className="text-sm font-medium text-foreground">Brief in 35 seconds</p>
+          <Button type="button" variant="ghost" size="sm" onClick={() => dialog.current?.close()}>
+            <X aria-hidden="true" className="size-4" />
+            Close
+          </Button>
+        </div>
+        {open && (
+          <video className="w-full rounded-lg bg-black" controls autoPlay playsInline preload="metadata" poster="/demo/brief-demo-poster.jpg">
+            <source src="/demo/brief-demo.mp4" type="video/mp4" />
+            <track kind="captions" src="/demo/brief-demo.vtt" srcLang="en" label="English" default />
+            Your browser can&apos;t play this video.
+          </video>
+        )}
+      </dialog>
+    </>
+  );
+}
