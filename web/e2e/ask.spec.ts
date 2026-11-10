@@ -85,3 +85,17 @@ test("the Ask box fills the window and does not grow past it: a long conversatio
   await expect(page.getByRole("log", { name: "Conversation" }).getByText("Fourth question?")).toBeInViewport();
   await expect(page.getByRole("tab", { name: "Ask" })).toBeInViewport();
 });
+
+test("the questions offered are about what Brief found in this document, and one asks it", async ({ page }) => {
+  const suggestions = page.getByRole("list", { name: "Suggested questions" });
+
+  // The fake document's key terms are the deposit, the late fee and the lease end (and a pet policy that it does not mention).
+  await expect(suggestions.getByRole("button")).toHaveText(["How does the security deposit work?", "What is the late fee?", "When does the lease end?"]);
+  await expect(suggestions).not.toContainText(/pet/i);
+
+  await suggestions.getByRole("button", { name: "What is the late fee?" }).click();
+
+  const conversation = page.getByRole("log", { name: "Conversation" });
+  await expect(conversation.getByText("What is the late fee?")).toBeVisible();
+  await expect(conversation.getByText("From the document")).toBeVisible();
+});

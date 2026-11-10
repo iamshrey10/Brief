@@ -374,6 +374,30 @@ describe("OverviewPanel checklist", () => {
   });
 });
 
+describe("OverviewPanel telling the page what was found", () => {
+  it("tells it the key terms once they have loaded, and not before", async () => {
+    keyTermsMock.mockResolvedValue({ ok: true, result: KEY_TERMS });
+    checklistMock.mockResolvedValue({ ok: true, result: CHECKLIST });
+    const onKeyTerms = vi.fn();
+
+    render(<OverviewPanel filename="lease.pdf" documentId="doc-1" onCitationSelect={vi.fn()} onKeyTerms={onKeyTerms} />);
+    expect(onKeyTerms).not.toHaveBeenCalled();
+
+    await screen.findByRole("region", { name: "Key terms" });
+    await waitFor(() => expect(onKeyTerms).toHaveBeenCalledWith(KEY_TERMS.terms));
+  });
+
+  it("tells it null when the key terms could not be had, so it can fall back to general questions", async () => {
+    keyTermsMock.mockResolvedValue({ ok: false, message: "could not read the key terms" });
+    checklistMock.mockResolvedValue({ ok: true, result: CHECKLIST });
+    const onKeyTerms = vi.fn();
+
+    render(<OverviewPanel filename="lease.pdf" documentId="doc-1" onCitationSelect={vi.fn()} onKeyTerms={onKeyTerms} />);
+
+    await waitFor(() => expect(onKeyTerms).toHaveBeenCalledWith(null));
+  });
+});
+
 describe("OverviewPanel when something fails", () => {
   it("shows the message in the section that failed and still shows the other one", async () => {
     keyTermsMock.mockResolvedValue({ ok: false, message: "I couldn't read this document just now." });
