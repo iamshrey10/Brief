@@ -226,3 +226,72 @@ describe("approving and removing", () => {
     expect(refreshMock).not.toHaveBeenCalled();
   });
 });
+
+describe("emailing the invitation", () => {
+  const LINK = `${window.location.origin}/shared/join/${INVITATION.token}`;
+  const open = async (ownerName = "Alex Morgan") => {
+    createMock.mockResolvedValue({ ok: true, result: INVITATION });
+    render(<SharingPanel initial={[]} ownerName={ownerName} />);
+    fireEvent.click(screen.getByRole("button", { name: "Create invitation" }));
+    return within(await screen.findByRole("region", { name: "New invitation" }));
+  };
+
+  it("offers Gmail and the person's mail app, with the link and the code already written into the message", async () => {
+    const fresh = await open();
+
+    const gmail = fresh.getByRole("link", { name: "Email it with Gmail" });
+    const mailApp = fresh.getByRole("link", { name: "Email it with my mail app" });
+
+    const message = new URL(gmail.getAttribute("href")!);
+    expect(message.searchParams.get("su")).toBe("Alex Morgan shared a Brief dashboard with you");
+    expect(message.searchParams.get("body")).toContain(LINK);
+    expect(message.searchParams.get("body")).toContain("482913");
+    expect(gmail).toHaveAttribute("target", "_blank");
+    expect(mailApp.getAttribute("href")).toContain("mailto:?subject=");
+    expect(mailApp.getAttribute("href")).toContain(encodeURIComponent(LINK));
+  });
+
+  it("puts the address that was typed in the To line", async () => {
+    const fresh = await open();
+
+    fireEvent.change(fresh.getByLabelText(/Their email address/), { target: { value: " mum@example.com " } });
+
+    expect(new URL(fresh.getByRole("link", { name: "Email it with Gmail" }).getAttribute("href")!).searchParams.get("to")).toBe("mum@example.com");
+    expect(fresh.getByRole("link", { name: "Email it with my mail app" }).getAttribute("href")).toContain("mailto:mum@example.com?");
+  });
+
+  it("turns the two buttons off and says why when the address does not look right", async () => {
+    const fresh = await open();
+
+    fireEvent.change(fresh.getByLabelText(/Their email address/), { target: { value: "mum@" } });
+
+    expect(fresh.getByRole("alert")).toHaveTextContent("does not look like an email address");
+    expect(fresh.queryByRole("link", { name: /Email it/ })).not.toBeInTheDocument();
+    expect(fresh.getByText("Email it with Gmail")).toHaveAttribute("aria-disabled", "true");
+    expect(fresh.getByLabelText(/Their email address/)).toHaveAttribute("aria-invalid", "true");
+  });
+
+  it("says it is Brief that sends nothing, and that approval is what protects the dashboard", async () => {
+    const fresh = await open();
+
+    expect(fresh.getByText(/Brief does not send it or keep it/)).toBeInTheDocument();
+    expect(fresh.getByText(/nobody sees your dashboard until you approve them here/)).toBeInTheDocument();
+  });
+
+  it("forgets the address when the invitation is put away", async () => {
+    const fresh = await open();
+    fireEvent.change(fresh.getByLabelText(/Their email address/), { target: { value: "mum@example.com" } });
+
+    fireEvent.click(fresh.getByRole("button", { name: "Done" }));
+
+    expect(screen.queryByRole("region", { name: "New invitation" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Create invitation" }));
+    expect(within(await screen.findByRole("region", { name: "New invitation" })).getByLabelText(/Their email address/)).toHaveValue("");
+  });
+
+  it("writes a message without a name when the person has none", async () => {
+    const fresh = await open("");
+
+    expect(new URL(fresh.getByRole("link", { name: "Email it with Gmail" }).getAttribute("href")!).searchParams.get("su")).toBe("A Brief dashboard shared with you");
+  });
+});

@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@/auth", () => ({ auth: vi.fn(), signOut: vi.fn() }));
 vi.mock("@/lib/backend", () => ({ backendGet: vi.fn() }));
 vi.mock("@/components/shared-with-you", () => ({ SharedWithYou: ({ items }: { items: unknown[] }) => <p>shared with you: {items.length}</p> }));
-vi.mock("@/components/sharing-panel", () => ({ SharingPanel: ({ initial }: { initial: unknown[] }) => <p>sharing panel: {initial.length}</p> }));
+vi.mock("@/components/sharing-panel", () => ({ SharingPanel: ({ initial, ownerName }: { initial: unknown[]; ownerName?: string }) => <p>sharing panel: {initial.length} as {ownerName}</p> }));
 vi.mock("next/navigation", () => ({
   redirect: vi.fn((to: string) => {
     throw new Error(`NEXT_REDIRECT:${to}`);
@@ -41,7 +41,20 @@ describe("the Shared page", () => {
     expect(getMock).toHaveBeenCalledWith("friend@example.com", "/shares");
     expect(html).toContain("shared with you: 0");
     expect(html).toContain("sharing panel: 0");
+    expect(getMock).toHaveBeenCalledWith("friend@example.com", "/me");
     expect(html.match(/<h1/g)).toHaveLength(1);
+  });
+
+  it("gives the sharing panel the person's name, for the message they send", async () => {
+    getMock.mockImplementation(async (_email: string, path: string) => (path === "/me" ? { id: "u1", first_name: "Maya", last_name: "Rao" } : []));
+
+    expect(renderToStaticMarkup(await SharedPage())).toContain("as Maya Rao");
+  });
+
+  it("gives an empty name when the person has none or the backend cannot be reached", async () => {
+    getMock.mockResolvedValue(null);
+
+    expect(renderToStaticMarkup(await SharedPage())).toMatch(/sharing panel: 0 as(<!-- -->)?\s*<\/p>/);
   });
 
   it("asks search engines not to index it", () => {
