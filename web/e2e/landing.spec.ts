@@ -30,7 +30,7 @@ test("Watch how it works opens the short video with captions in a window, and Es
 
   await page.getByRole("button", { name: "Watch how it works" }).click();
 
-  const window = page.getByRole("dialog", { name: "Brief in 40 seconds" });
+  const window = page.getByRole("dialog", { name: "Brief in 90 seconds" });
   await expect(window).toBeVisible();
   const video = window.locator("video");
   await expect(video).toHaveAttribute("poster", "/demo/brief-demo-poster.jpg");
@@ -42,8 +42,8 @@ test("Watch how it works opens the short video with captions in a window, and Es
     if (element.readyState >= 1) return resolve(element.duration);
     element.addEventListener("loadedmetadata", () => resolve(element.duration), { once: true });
   }));
-  expect(duration).toBeGreaterThan(35);
-  expect(duration).toBeLessThan(45);
+  expect(duration).toBeGreaterThan(80);
+  expect(duration).toBeLessThan(90);
 
   const { default: AxeBuilder } = await import("@axe-core/playwright");
   const results = await new AxeBuilder({ page }).analyze();

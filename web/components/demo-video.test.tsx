@@ -42,7 +42,7 @@ describe("DemoVideoButton", () => {
     expect(captions).toHaveAttribute("kind", "captions");
     expect(captions).toHaveAttribute("src", "/demo/brief-demo.vtt");
     expect(captions).toHaveAttribute("srclang", "en");
-    expect(dialog()).toHaveAccessibleName("Brief in 40 seconds");
+    expect(dialog()).toHaveAccessibleName("Brief in 90 seconds");
   });
 
   it("is put away, and the video taken out so it stops, by the Close button", () => {
