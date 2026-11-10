@@ -157,3 +157,24 @@ test("the Dashboard shows the steps a document goes through while it is read, an
   await expect(reading.getByRole("link", { name: "View document" })).toBeVisible({ timeout: 25_000 });
   await expect(reading.getByRole("list", { name: "Steps for new-lease.pdf" })).toContainText("Ready (done)");
 });
+
+test("the kind of document is guessed from the file name, and when the name says nothing the person is asked", async ({ page }) => {
+  const kinds = page.locator("fieldset");
+  await expect(kinds.getByRole("radio", { checked: true })).toHaveCount(0);
+
+  await choose(page, { ...PDF, name: "student-loan-note.pdf" });
+  await expect(kinds.getByRole("radio", { name: "Education loan" })).toBeChecked();
+  await expect(page.getByText("Guessed from the file name. Change it if it is wrong.")).toBeVisible();
+
+  await page.getByRole("button", { name: "Remove student-loan-note.pdf" }).click();
+  await choose(page, { ...PDF, name: "scan0001.pdf" });
+  await expect(kinds.getByRole("radio", { checked: true })).toHaveCount(0);
+  await expect(page.getByText(/Choose what kind of document it is/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Upload", exact: true })).toBeDisabled();
+
+  await kinds.getByText("Job offer", { exact: true }).click();
+  await expect(page.getByRole("button", { name: "Upload", exact: true })).toBeEnabled();
+  await page.getByRole("button", { name: "Upload", exact: true }).click();
+  const row = page.getByRole("region", { name: "Your documents" }).getByRole("listitem").filter({ hasText: "scan0001.pdf" });
+  await expect(row.getByText(/^Job offer/)).toBeVisible();
+});
