@@ -257,7 +257,7 @@ export function UploadPanel({ onUploaded }: { onUploaded: (document: DocumentSum
             </label>
           ))}
         </div>
-        {file && (guessed || !docType) && (
+        {file && !uploading && (guessed || !docType) && (
           <p id="doc-kind-hint" role="status" className="text-xs text-muted-foreground">
             {guessed ? "Guessed from the file name. Change it if it is wrong." : "Choose what kind of document it is, so Brief reads it the right way."}
           </p>
