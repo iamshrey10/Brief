@@ -1,5 +1,5 @@
 """Grounded Q&A evaluation: does the full pipeline cite the right clause, and does it say
-"I couldn't find this" when the document genuinely doesn't cover a question?
+"not covered" when the document genuinely doesn't cover a question?
 
 Runs the real pipeline, retrieval, Gemini, and the citation check, over the questions of a labeled
 fixture (see eval_fixtures.py) against a temporary document, then writes a dated markdown report to
