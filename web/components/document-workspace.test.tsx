@@ -322,3 +322,47 @@ describe("DocumentWorkspace chat citations", () => {
     expect(scrollIntoView).toHaveBeenCalledTimes(2);
   });
 });
+
+describe("the questions offered on the Ask tab", () => {
+  const found = (name: string) => ({ name, label: name, found: true, value: "x", clause_id: "clause-a", page_number: 1, quote: "q", evidence: [] });
+  const renderLoan = () => {
+    const user = userEvent.setup();
+    render(<DocumentWorkspace filename="loan.pdf" documentId="doc-1" docType="loan" clauses={CLAUSES} />);
+    return user;
+  };
+
+  it("are about what was found in this document, and nothing else", async () => {
+    keyTermsMock.mockResolvedValue({ ok: true, result: { terms: [found("monthly_payment"), found("late_fee"), { ...found("prepayment_penalty"), found: false }], truncated: false } });
+    const user = renderLoan();
+    await user.click(screen.getByRole("tab", { name: "Ask" }));
+
+    const suggestions = await screen.findByRole("list", { name: "Suggested questions" });
+
+    expect(within(suggestions).getAllByRole("button").map((button) => button.textContent)).toEqual(["How do my monthly payments work?", "What is the late fee?"]);
+  });
+
+  it("say they are being found while the key terms are still being worked out", async () => {
+    keyTermsMock.mockReturnValue(new Promise(() => {}));
+    const user = renderLoan();
+    await user.click(screen.getByRole("tab", { name: "Ask" }));
+
+    expect(screen.getByText("Finding good questions for this document...")).toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "Suggested questions" })).not.toBeInTheDocument();
+  });
+
+  it("are the general ones for its kind when too little was found", async () => {
+    keyTermsMock.mockResolvedValue({ ok: true, result: { terms: [found("monthly_payment")], truncated: false } });
+    const user = renderLoan();
+    await user.click(screen.getByRole("tab", { name: "Ask" }));
+
+    expect(await screen.findByRole("button", { name: "What will this cost me in total, including interest and fees?" })).toBeInTheDocument();
+  });
+
+  it("are the general ones for its kind when the key terms could not be had", async () => {
+    keyTermsMock.mockResolvedValue({ ok: false, message: "could not read the key terms" });
+    const user = renderLoan();
+    await user.click(screen.getByRole("tab", { name: "Ask" }));
+
+    expect(await screen.findByRole("button", { name: "What are my repayment obligations and deadlines?" })).toBeInTheDocument();
+  });
+});

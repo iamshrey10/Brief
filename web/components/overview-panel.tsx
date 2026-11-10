@@ -463,14 +463,23 @@ export function OverviewPanel({
   filename,
   docType = "other",
   onCitationSelect,
+  onKeyTerms,
 }: {
   documentId: string;
   filename: string;
   docType?: string;
   onCitationSelect: (citation: ActiveCitation) => void;
+  /** Told what the key terms are when they have loaded, or null when they could not be had, so the Ask tab can offer questions the document answers. */
+  onKeyTerms?: (terms: KeyTerm[] | null) => void;
 }): ReactNode {
   const keyTerms = useLoad<KeyTermsResult>(documentId, fetchKeyTerms);
   const checklist = useLoad<ChecklistResult>(documentId, fetchChecklist);
+
+  const termsState = keyTerms.state;
+  useEffect(() => {
+    if (termsState.status === "ready") onKeyTerms?.(termsState.result.terms);
+    else if (termsState.status === "error") onKeyTerms?.(null);
+  }, [termsState, onKeyTerms]);
 
   return (
     <section

@@ -92,6 +92,26 @@ describe("ChatPanel", () => {
     expect(screen.queryByRole("list", { name: "Suggested questions" })).not.toBeInTheDocument();
   });
 
+  it("suggests the questions it is given, which come from the document itself, instead of the general ones", async () => {
+    askMock.mockResolvedValue({ ok: true, result: FOUND });
+    const user = userEvent.setup();
+    render(<ChatPanel documentId="doc-1" docType="loan" suggestions={["How do my monthly payments work?", "What is the late fee?"]} onCitationSelect={vi.fn()} />);
+    const suggestions = screen.getByRole("list", { name: "Suggested questions" });
+
+    expect(within(suggestions).getAllByRole("button").map((button) => button.textContent)).toEqual(["How do my monthly payments work?", "What is the late fee?"]);
+    await user.click(within(suggestions).getByRole("button", { name: "What is the late fee?" }));
+
+    expect(askMock).toHaveBeenCalledWith("doc-1", "What is the late fee?");
+  });
+
+  it("says it is finding questions while they are being worked out, and shows no buttons yet", () => {
+    render(<ChatPanel documentId="doc-1" docType="loan" suggestions="loading" onCitationSelect={vi.fn()} />);
+
+    expect(screen.getByRole("status")).toHaveTextContent("Finding good questions for this document...");
+    expect(screen.queryByRole("list", { name: "Suggested questions" })).not.toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Your question" })).toBeEnabled();
+  });
+
   it("suggests the general questions when the kind of document is not given", () => {
     renderPanel();
 

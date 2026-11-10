@@ -55,10 +55,13 @@ function AnswerBubble({
 export function ChatPanel({
   documentId,
   docType,
+  suggestions,
   onCitationSelect,
 }: {
   documentId: string;
   docType?: string;
+  /** The questions to offer before the first one: a list, or "loading" while they are being worked out. The general ones for the kind when left out. */
+  suggestions?: string[] | "loading";
   onCitationSelect: (citation: AskCitation) => void;
 }) {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -155,19 +158,25 @@ export function ChatPanel({
             </p>
             <div className="mt-5 flex flex-col items-center gap-2">
               <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Try asking</p>
-              <ul aria-label="Suggested questions" className="flex flex-wrap justify-center gap-2">
-                {suggestionsFor(docType).map((question) => (
-                  <li key={question}>
-                    <button
-                      type="button"
-                      onClick={() => void send(question)}
-                      className="rounded-full border border-border bg-card px-3 py-1.5 text-left text-xs text-foreground transition-colors outline-none hover:border-primary/50 hover:bg-accent focus-visible:ring-3 focus-visible:ring-ring/50"
-                    >
-                      {question}
-                    </button>
-                  </li>
-                ))}
-              </ul>
+              {suggestions === "loading" ? (
+                <p role="status" className="text-xs text-muted-foreground">
+                  Finding good questions for this document...
+                </p>
+              ) : (
+                <ul aria-label="Suggested questions" className="flex flex-wrap justify-center gap-2">
+                  {(suggestions ?? suggestionsFor(docType)).map((question) => (
+                    <li key={question}>
+                      <button
+                        type="button"
+                        onClick={() => void send(question)}
+                        className="rounded-full border border-border bg-card px-3 py-1.5 text-left text-xs text-foreground transition-colors outline-none hover:border-primary/50 hover:bg-accent focus-visible:ring-3 focus-visible:ring-ring/50"
+                      >
+                        {question}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           </div>
         )}

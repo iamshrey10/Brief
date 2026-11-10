@@ -5,6 +5,8 @@ import { ChatPanel } from "@/components/chat-panel";
 import { ClauseViewer } from "@/components/clause-viewer";
 import { OverviewPanel } from "@/components/overview-panel";
 import type { ActiveCitation, ClauseData } from "@/lib/documents";
+import type { KeyTerm } from "@/lib/overview";
+import { suggestionsFor, suggestionsFromTerms } from "@/lib/suggested-questions";
 import { cn } from "@/lib/utils";
 
 type Tab = "overview" | "ask";
@@ -49,6 +51,9 @@ export function DocumentWorkspace({
 }) {
   const [activeCitation, setActiveCitation] = useState<ActiveCitation | null>(null);
   const [tab, setTab] = useState<Tab>("overview");
+  // The key terms found in this document, once known (undefined while they are being worked out, null when they could not be had).
+  const [terms, setTerms] = useState<KeyTerm[] | null | undefined>(undefined);
+  const suggestions = terms === undefined ? "loading" : ((terms && suggestionsFromTerms(docType, terms)) ?? suggestionsFor(docType));
   const tabButtons = useRef<Record<Tab, HTMLButtonElement | null>>({ overview: null, ask: null });
 
   // A new object every time, so choosing the same evidence again scrolls again.
@@ -111,7 +116,7 @@ export function DocumentWorkspace({
           hidden={tab !== "overview"}
           className="flex min-h-0 flex-1 flex-col"
         >
-          <OverviewPanel documentId={documentId} filename={filename} docType={docType} onCitationSelect={showInDocument} />
+          <OverviewPanel documentId={documentId} filename={filename} docType={docType} onCitationSelect={showInDocument} onKeyTerms={setTerms} />
         </div>
         <div
           role="tabpanel"
@@ -123,6 +128,7 @@ export function DocumentWorkspace({
           <ChatPanel
             documentId={documentId}
             docType={docType}
+            suggestions={suggestions}
             onCitationSelect={(citation) =>
               showInDocument({ clauseId: citation.clause_id, quote: citation.quote })
             }
