@@ -84,3 +84,16 @@ test("a delete confirmation fits a phone and its buttons can be reached", async 
   await expect(group.getByRole("button", { name: "Delete", exact: true })).toBeInViewport();
   expect(await sidewaysOverflow(page)).toBeLessThanOrEqual(0);
 });
+
+test("on a phone the upload form offers to photograph a paper contract, and the photo is picked like a file", async ({ page }) => {
+  await page.goto("/dashboard/documents");
+  const camera = page.getByText("Take a photo of a paper contract").first();
+  await expect(camera).toBeVisible();
+  const box = await camera.boundingBox();
+  expect(box!.height).toBeGreaterThanOrEqual(24);
+
+  await page.getByLabel("Take a photo of a paper contract").setInputFiles({ name: "image.jpg", mimeType: "image/jpeg", buffer: Buffer.from("jpeg") });
+
+  await expect(page.getByText("image.jpg")).toBeVisible();
+  expect(await sidewaysOverflow(page)).toBeLessThanOrEqual(0);
+});
