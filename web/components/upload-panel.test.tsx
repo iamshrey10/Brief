@@ -44,6 +44,19 @@ describe("the upload panel", () => {
     expect(screen.getByText(/drop a contract here/i)).toBeInTheDocument();
   });
 
+  it("offers to photograph a paper contract with the phone's back camera, and a photo is treated like any chosen file", () => {
+    render(<UploadPanel />);
+
+    const camera = screen.getByLabelText("Take a photo of a paper contract");
+    expect(camera).toHaveAttribute("capture", "environment");
+    expect(camera).toHaveAttribute("accept", "image/*");
+
+    fireEvent.change(camera, { target: { files: [new File(["jpeg"], "image.jpg", { type: "image/jpeg" })] } });
+
+    expect(screen.getByText("image.jpg")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Take a photo of a paper contract")).toBeNull();
+  });
+
   it("tells nobody about a document that was refused, and shows why", async () => {
     fetchMock.mockImplementation(async () => ({ ok: false, status: 400, json: async () => ({ detail: "file is too large, 50MB max" }) }) as Response);
     const onUploaded = vi.fn();

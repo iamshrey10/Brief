@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type DragEvent, type FormEvent } from "react";
-import { CloudUpload, FileText } from "lucide-react";
+import { Camera, CloudUpload, FileText } from "lucide-react";
 import { FOLDERS } from "@/lib/folders";
 import { DocTypeIcon } from "@/components/doc-type-icon";
 import { Button } from "@/components/ui/button";
@@ -222,13 +222,32 @@ export function UploadPanel({ onUploaded }: { onUploaded: (document: DocumentSum
         >
           <CloudUpload aria-hidden className="size-8 text-muted-foreground" />
           <span className="text-sm font-medium text-foreground">
-            Drop a contract here, or <span className="text-primary underline">choose a file</span>
+            <span className="hidden sm:inline">Drop a contract here, or </span>
+            <span className="text-primary underline">
+              <span className="sm:hidden">Choose a file</span>
+              <span className="hidden sm:inline">choose a file</span>
+            </span>
           </span>
           <span className="text-xs text-muted-foreground">PDF, JPG, PNG, or HEIC, up to 50 MB</span>
           <input
             type="file"
             accept={ACCEPTED_FILE_TYPES.join(",")}
             aria-label="Choose a file to upload"
+            onChange={(event) => chooseFile(event.target.files?.[0])}
+            className="sr-only"
+          />
+        </label>
+      )}
+      {!file && (
+        // For a phone: opens the camera at once, so a paper contract can be photographed. A computer has no use for it.
+        <label className="flex h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-border bg-background text-sm font-medium text-foreground transition-colors hover:bg-accent/50 focus-within:ring-3 focus-within:ring-ring/50 sm:hidden">
+          <Camera aria-hidden className="size-4" />
+          Take a photo of a paper contract
+          <input
+            type="file"
+            accept="image/*"
+            capture="environment"
+            aria-label="Take a photo of a paper contract"
             onChange={(event) => chooseFile(event.target.files?.[0])}
             className="sr-only"
           />
