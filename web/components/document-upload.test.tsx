@@ -188,8 +188,10 @@ describe("DocumentUpload form", () => {
     return zone;
   }
 
+  // The name of a file may say nothing about its kind, and then nothing is chosen: these tests are about what happens next, so they choose one.
   function chooseFile(file: File) {
     fireEvent.change(screen.getByLabelText("Choose a file to upload"), { target: { files: [file] } });
+    if (!screen.queryByRole("radio", { checked: true })) fireEvent.click(screen.getByRole("radio", { name: "Education loan" }));
   }
 
   /** A server that accepts an upload, recording what was asked of it. */
@@ -305,10 +307,10 @@ describe("DocumentUpload form", () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
-  it("lets the kind of document be picked, starting on education loan", () => {
+  it("lets the kind of document be picked, starting with none chosen", () => {
     render(<DocumentUpload initialDocuments={[]} />);
 
-    expect(screen.getByRole("radio", { name: "Education loan" })).toBeChecked();
+    expect(screen.queryByRole("radio", { checked: true })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("radio", { name: "Lease" }));
 
