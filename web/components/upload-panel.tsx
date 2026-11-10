@@ -16,6 +16,7 @@ import {
 } from "@/lib/documents";
 import { cn } from "@/lib/utils";
 import { startFailureMessage } from "@/lib/upload";
+import { guessDocKind } from "@/lib/guess-kind";
 
 const DOC_TYPES = Object.entries(DOC_TYPE_LABELS).map(([value, label]) => ({ value, label }));
 
@@ -42,7 +43,10 @@ export const SAMPLE_LEASE_URL = "/samples/sample-lease.pdf";
 export function UploadPanel({ onUploaded }: { onUploaded: (document: DocumentSummary) => void }) {
   const notifications = useUploadNotifications();
   const [file, setFile] = useState<File | null>(null);
-  const [docType, setDocType] = useState("loan");
+  // Nothing is chosen until the file name says what it is, or the person chooses. A wrong default would label a document wrongly.
+  const [docType, setDocType] = useState("");
+  // Whether the kind shown was guessed from the file name, so it can be said, and replaced by the next file's guess.
+  const [guessed, setGuessed] = useState(false);
   // Empty means automatic: the folder for the kind.
   const [folder, setFolder] = useState("");
   const [status, setStatus] = useState<Status>("idle");
@@ -69,6 +73,25 @@ export function UploadPanel({ onUploaded }: { onUploaded: (document: DocumentSum
     setFile(candidate);
     setStatus("idle");
     setErrorMessage("");
+    // A kind the person chose themselves is kept. Otherwise the name of this file decides, or nothing does.
+    if (!docType || guessed) {
+      const guess = guessDocKind(candidate.name);
+      setDocType(guess ?? "");
+      setGuessed(guess !== null);
+    }
+  }
+
+  function chooseKind(kind: string) {
+    setDocType(kind);
+    setGuessed(false);
+  }
+
+  function removeFile() {
+    setFile(null);
+    if (guessed) {
+      setDocType("");
+      setGuessed(false);
+    }
   }
 
   function handleDragOver(event: DragEvent) {
@@ -84,7 +107,7 @@ export function UploadPanel({ onUploaded }: { onUploaded: (document: DocumentSum
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    if (!file) return;
+    if (!file || !docType) return;
     await upload(file, docType);
   }
 
@@ -146,6 +169,8 @@ export function UploadPanel({ onUploaded }: { onUploaded: (document: DocumentSum
       const confirmed: DocumentSummary = await confirmRes.json();
 
       setFile(null);
+      setDocType("");
+      setGuessed(false);
       setStatus("idle");
       notifications.uploaded(confirmed);
       onUploaded(confirmed);
@@ -180,7 +205,7 @@ export function UploadPanel({ onUploaded }: { onUploaded: (document: DocumentSum
             size="sm"
             disabled={uploading}
             aria-label={`Remove ${file.name}`}
-            onClick={() => setFile(null)}
+            onClick={removeFile}
           >
             Remove
           </Button>
@@ -222,7 +247,7 @@ export function UploadPanel({ onUploaded }: { onUploaded: (document: DocumentSum
                 name="doc-type"
                 value={type.value}
                 checked={docType === type.value}
-                onChange={() => setDocType(type.value)}
+                onChange={() => chooseKind(type.value)}
                 className="peer sr-only"
               />
               <span className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm text-muted-foreground transition-colors peer-checked:border-primary peer-checked:bg-primary/5 peer-checked:text-foreground peer-focus-visible:ring-3 peer-focus-visible:ring-ring/50 peer-disabled:opacity-50 hover:bg-accent">
@@ -232,6 +257,11 @@ export function UploadPanel({ onUploaded }: { onUploaded: (document: DocumentSum
             </label>
           ))}
         </div>
+        {file && (guessed || !docType) && (
+          <p id="doc-kind-hint" role="status" className="text-xs text-muted-foreground">
+            {guessed ? "Guessed from the file name. Change it if it is wrong." : "Choose what kind of document it is, so Brief reads it the right way."}
+          </p>
+        )}
       </fieldset>
 
       <div className="flex flex-col gap-3 md:flex-row md:items-end">
@@ -258,7 +288,7 @@ export function UploadPanel({ onUploaded }: { onUploaded: (document: DocumentSum
         )}
       </div>
 
-      <Button type="submit" size="lg" disabled={!file || uploading} className="md:w-48">
+      <Button type="submit" size="lg" disabled={!file || !docType || uploading} className="md:w-48">
         {uploading ? "Uploading..." : "Upload"}
       </Button>
       </div>

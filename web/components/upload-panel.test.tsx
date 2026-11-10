@@ -115,3 +115,90 @@ describe("the upload panel", () => {
     expect(body).toMatchObject({ doc_type: "other", folder: "Personal_Documents" });
   });
 });
+
+describe("the kind of document, guessed from the file name", () => {
+  const pick = (name: string) => fireEvent.change(screen.getByLabelText("Choose a file to upload"), { target: { files: [new File(["%PDF-1.4"], name, { type: "application/pdf" })] } });
+  const radio = (name: string) => screen.getByRole("radio", { name });
+  const sentKind = () => JSON.parse((fetchMock.mock.calls.find(([url]) => url === "/api/backend/documents")![1] as RequestInit).body as string).doc_type;
+
+  it("starts with no kind chosen, so nothing is labelled wrongly", () => {
+    render(<UploadPanel onUploaded={vi.fn()} />);
+
+    for (const name of ["Education loan", "Lease", "Job offer", "Other"]) expect(radio(name)).not.toBeChecked();
+  });
+
+  it("chooses the kind the name points to, says it was a guess, and sends that kind", async () => {
+    render(<UploadPanel onUploaded={vi.fn()} />);
+
+    pick("2-job-offer-letter.pdf");
+
+    expect(radio("Job offer")).toBeChecked();
+    expect(screen.getByRole("status")).toHaveTextContent("Guessed from the file name. Change it if it is wrong.");
+    fireEvent.click(screen.getByRole("button", { name: "Upload" }));
+    await tick();
+    expect(sentKind()).toBe("offer");
+  });
+
+  it("chooses nothing when the name says nothing, asks for a choice, and keeps Upload off until there is one", async () => {
+    render(<UploadPanel onUploaded={vi.fn()} />);
+
+    pick("IMG_2041.pdf");
+
+    for (const name of ["Education loan", "Lease", "Job offer", "Other"]) expect(radio(name)).not.toBeChecked();
+    expect(screen.getByRole("status")).toHaveTextContent("Choose what kind of document it is");
+    expect(screen.getByRole("button", { name: "Upload" })).toBeDisabled();
+
+    fireEvent.click(radio("Lease"));
+
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Upload" })).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: "Upload" }));
+    await tick();
+    expect(sentKind()).toBe("lease");
+  });
+
+  it("lets the person change a guess, and then leaves their choice alone for the next file", () => {
+    render(<UploadPanel onUploaded={vi.fn()} />);
+    pick("my-loan.pdf");
+    fireEvent.click(radio("Other"));
+
+    expect(radio("Other")).toBeChecked();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Remove my-loan.pdf" }));
+    pick("rental-agreement.pdf");
+
+    expect(radio("Other")).toBeChecked();
+  });
+
+  it("lets the next file's name replace an earlier guess, and clears a guess when the file is removed", () => {
+    render(<UploadPanel onUploaded={vi.fn()} />);
+    pick("my-loan.pdf");
+    expect(radio("Education loan")).toBeChecked();
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove my-loan.pdf" }));
+    expect(radio("Education loan")).not.toBeChecked();
+    pick("rental-agreement.pdf");
+    expect(radio("Lease")).toBeChecked();
+    fireEvent.click(screen.getByRole("button", { name: "Remove rental-agreement.pdf" }));
+    pick("IMG_1.pdf");
+
+    expect(radio("Lease")).not.toBeChecked();
+  });
+
+  it("does not guess when the name points two ways", () => {
+    render(<UploadPanel onUploaded={vi.fn()} />);
+
+    pick("lease-or-loan.pdf");
+
+    for (const name of ["Education loan", "Lease", "Job offer", "Other"]) expect(radio(name)).not.toBeChecked();
+  });
+
+  it("starts the next upload with nothing chosen again", async () => {
+    render(<UploadPanel onUploaded={vi.fn()} />);
+    pick("my-loan.pdf");
+    fireEvent.click(screen.getByRole("button", { name: "Upload" }));
+    await tick();
+
+    for (const name of ["Education loan", "Lease", "Job offer", "Other"]) expect(radio(name)).not.toBeChecked();
+  });
+});
