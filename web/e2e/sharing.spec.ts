@@ -183,3 +183,29 @@ test("when someone has used the link and code, a red number marks Shared and Pro
   await expect(request).toContainText("Can view");
   await expect(sections.getByRole("link", { name: /^Shared$/ })).toBeVisible();
 });
+
+test("a new invitation can be emailed from the page: the message already holds the link and the code", async ({ page }) => {
+  await page.goto("/dashboard/shared#sharing");
+  await page.getByLabel(/Who is it for/).fill("Mum");
+  await page.getByRole("button", { name: "Create invitation" }).click();
+
+  const fresh = page.getByRole("region", { name: "New invitation" });
+  const link = await fresh.getByLabel("Invitation link").inputValue();
+  const code = (await fresh.getByLabel("Invitation code").textContent())!.trim();
+  await fresh.getByLabel(/Their email address/).fill("mum@example.com");
+
+  const gmail = new URL((await fresh.getByRole("link", { name: "Email it with Gmail" }).getAttribute("href"))!);
+  expect(gmail.searchParams.get("to")).toBe("mum@example.com");
+  expect(gmail.searchParams.get("body")).toContain(link);
+  expect(gmail.searchParams.get("body")).toContain(`type this code: ${code}`);
+  const mailto = (await fresh.getByRole("link", { name: "Email it with my mail app" }).getAttribute("href"))!;
+  expect(mailto.startsWith("mailto:mum@example.com?subject=")).toBe(true);
+  expect(decodeURIComponent(mailto)).toContain(link);
+
+  await fresh.getByLabel(/Their email address/).fill("mum@");
+  await expect(fresh.getByRole("alert")).toContainText("does not look like an email address");
+  await expect(fresh.getByRole("link", { name: /Email it/ })).toHaveCount(0);
+
+  const results = await new AxeBuilder({ page }).include("section[aria-label='New invitation']").analyze();
+  expect(results.violations).toEqual([]);
+});

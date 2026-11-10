@@ -3,8 +3,9 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { useUploadNotifications } from "@/components/upload-notifications";
+import { buildShareEmail, looksLikeEmail } from "@/lib/share-email";
 import { approveShare, createShare, joinLink, lastViewedText, MAX_SHARES, removeShare, shareStatusText, type Invitation, type Share } from "@/lib/sharing";
 
 type Busy = { id: string; what: "approving" | "removing" };
@@ -32,13 +33,67 @@ function CopyButton({ text, label }: { text: string; label: string }) {
   );
 }
 
+/**
+ * Email the invitation without copying anything: a short message with the link and the code already inside opens in the
+ * person's own email, to read and send. Brief does not send it and does not keep it.
+ */
+function EmailIt({ ownerName, link, code, sendTo, onSendTo }: { ownerName: string; link: string; code: string; sendTo: string; onSendTo: (value: string) => void }) {
+  const typed = sendTo.trim();
+  const invalid = typed !== "" && !looksLikeEmail(typed);
+  const email = buildShareEmail({ ownerName, link, code, to: typed });
+  const linkClass = buttonVariants({ variant: "default", size: "sm" });
+  return (
+    <div className="mt-4 border-t border-primary/20 pt-3">
+      <label className="flex flex-col gap-1.5 text-sm font-medium text-foreground">
+        Their email address (optional)
+        <input
+          type="email"
+          value={sendTo}
+          onChange={(event) => onSendTo(event.target.value)}
+          maxLength={254}
+          autoComplete="off"
+          placeholder="name@example.com"
+          aria-invalid={invalid}
+          aria-describedby={invalid ? "share-email-problem" : undefined}
+          className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm font-normal outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+        />
+      </label>
+      {invalid && (
+        <p id="share-email-problem" role="alert" className="mt-1.5 text-xs text-destructive">
+          That does not look like an email address. Fix it, or leave it empty and type it in your email.
+        </p>
+      )}
+      <div className="mt-3 flex flex-wrap gap-2">
+        {invalid ? (
+          <>
+            <span className={`${linkClass} pointer-events-none opacity-50`} aria-disabled="true">Email it with Gmail</span>
+            <span className={`${linkClass} pointer-events-none opacity-50`} aria-disabled="true">Email it with my mail app</span>
+          </>
+        ) : (
+          <>
+            <a href={email.gmailHref} target="_blank" rel="noopener noreferrer" className={linkClass}>
+              Email it with Gmail
+            </a>
+            <a href={email.mailtoHref} className={linkClass}>
+              Email it with my mail app
+            </a>
+          </>
+        )}
+      </div>
+      <p className="mt-2 text-xs text-muted-foreground">
+        A short message with the link and the code opens in your own email, ready to send. Brief does not send it or keep it. The link and code sit in the same email, so the one thing that matters is your approval: nobody sees your dashboard until you approve them here.
+      </p>
+    </div>
+  );
+}
+
 const nameOf = (share: Share) => share.viewer_name ?? share.viewer_email ?? share.label ?? "Unnamed invitation";
 
 /**
  * Where a person lets family or friends look at their dashboard, and only look. An invitation is a link and a code shown
  * once. When the other person has used them the owner sees who asked and approves, and can take access away at any time.
  */
-export function SharingPanel({ initial }: { initial: Share[] }) {
+export function SharingPanel({ initial, ownerName = "" }: { initial: Share[]; ownerName?: string }) {
   const router = useRouter();
   const { pendingRequests, refreshRequests } = useUploadNotifications();
   const [shares, setShares] = useState(initial);
@@ -58,6 +113,7 @@ export function SharingPanel({ initial }: { initial: Share[] }) {
   const [label, setLabel] = useState("");
   const [creating, setCreating] = useState(false);
   const [fresh, setFresh] = useState<{ invitation: Invitation; link: string } | null>(null);
+  const [sendTo, setSendTo] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
   const [busy, setBusy] = useState<Busy | null>(null);
   const [rowError, setRowError] = useState<{ id: string; message: string } | null>(null);
@@ -150,10 +206,13 @@ export function SharingPanel({ initial }: { initial: Share[] }) {
             </span>
             <CopyButton text={fresh.invitation.code} label="the code" />
           </div>
+
+          <EmailIt ownerName={ownerName} link={fresh.link} code={fresh.invitation.code} sendTo={sendTo} onSendTo={setSendTo} />
+
           <p className="mt-3 text-xs text-muted-foreground">
-            It works for 7 days. They sign in with Google, open the link and enter the code, and then you approve them here. Send the code in a separate message if you can.
+            It works for 7 days. They sign in with Google, open the link and enter the code, and then you approve them here before they can see anything.
           </p>
-          <Button type="button" variant="ghost" size="sm" className="mt-2" onClick={() => setFresh(null)}>
+          <Button type="button" variant="ghost" size="sm" className="mt-2" onClick={() => { setFresh(null); setSendTo(""); }}>
             Done
           </Button>
         </section>

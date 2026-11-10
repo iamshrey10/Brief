@@ -14,7 +14,9 @@ export default async function SharedPage() {
   const email = (await auth())?.user?.email;
   // The proxy already turns visitors away, and this makes the page safe on its own too.
   if (!email) redirect("/");
-  const [sharedBody, sharesBody] = await Promise.all([backendGet(email, "/shared"), backendGet(email, "/shares")]);
+  const [sharedBody, sharesBody, meBody] = await Promise.all([backendGet(email, "/shared"), backendGet(email, "/shares"), backendGet(email, "/me")]);
+  const me = (meBody && typeof meBody === "object" ? meBody : null) as { first_name?: string | null; last_name?: string | null } | null;
+  const ownerName = [me?.first_name, me?.last_name].filter(Boolean).join(" ");
   const items = asSharedWithMe(sharedBody);
   const shares = asShares(sharesBody);
 
@@ -28,7 +30,7 @@ export default async function SharedPage() {
         </div>
         <div className="grid grid-cols-1 items-stretch gap-5 lg:grid-cols-2">
           <SharedWithYou items={items} headingLevel={2} />
-          <SharingPanel initial={shares} />
+          <SharingPanel initial={shares} ownerName={ownerName} />
         </div>
       </div>
     </div>
