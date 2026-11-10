@@ -32,7 +32,7 @@ and it is not legal advice. Say that last one out loud.
 3. The Overview with the Security deposit card showing its two quote buttons.
 4. "Before you sign" with a gap open.
 5. An answer with its source highlighted in the clause.
-6. "I couldn't find this in the document."
+6. "This document doesn't seem to cover that." (no guess)
 7. A failure message ending in `Reference: xxxxxxxx`.
 8. The phone width (390 by 844) of the Overview.
 9. The architecture diagram from `docs/ARCHITECTURE.md`.

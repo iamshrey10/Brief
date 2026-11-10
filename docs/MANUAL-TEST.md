@@ -46,7 +46,7 @@ Open the lease.
 
 - [ ] Ask "What is the security deposit?". You get an answer and a **From the document** source. Clicking the source
       highlights the exact words.
-- [ ] Ask something the lease never says. You get "I couldn't find this in the document", and no guess.
+- [ ] Ask something the lease never says. You are told the document does not seem to cover it, and no guess is made.
 - [ ] An empty question cannot be sent.
 
 ## 5. When something goes wrong, and following it

@@ -130,7 +130,7 @@ flowchart TD
     None -- no --> NotFound
     None -- yes --> Ask["Ask the model to answer from only those clauses,<br/>with a quote for each citation (temperature 0, JSON)"]
     Ask --> Found{"Did it say the document covers it?"}
-    Found -- no --> NotFound["I couldn't find this in the document."]
+    Found -- no --> NotFound["The document does not seem to cover it."]
     Found -- yes --> Check["Check each citation:<br/>it names a clause the model was shown, and its quote<br/>appears in that clause, ignoring case and spacing"]
     Check --> Any{"Any citation left?"}
     Any -- no --> Withheld["I couldn't confirm an answer from the document's<br/>exact wording, so I'd rather not guess."]

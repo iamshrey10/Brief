@@ -44,7 +44,7 @@ const FOUND: AskResult = {
 
 const NOT_FOUND: AskResult = {
   found: false,
-  answer: "I couldn't find this in the document.",
+  answer: "This document doesn't seem to cover that. I looked through it and found nothing to answer from, so I won't guess. Try asking it another way, or ask the other side.",
   citations: [],
 };
 

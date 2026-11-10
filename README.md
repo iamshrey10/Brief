@@ -38,7 +38,7 @@ An answer is only shown if its evidence holds up.
 2. The model is told to answer from those clauses only, and to quote the passage it relied on.
 3. Brief checks that each quote really appears in the clause it names, word for word. A quote that
    does not is thrown away.
-4. If nothing survives the check, you get "I couldn't find this in the document" and no guess.
+4. If nothing survives the check, you are told the document does not seem to cover it, and nothing is guessed.
 
 The text of an uploaded contract is treated as text to read, never as instructions to follow. Key
 terms such as the interest rate or the late fee go through the same checks, and every number in a

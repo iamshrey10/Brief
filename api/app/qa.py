@@ -25,7 +25,10 @@ ANSWER_MODEL = "gemini-3.5-flash-lite"
 # 96% of the time in the retrieval evaluation).
 CONTEXT_CLAUSES = 8
 
-NOT_FOUND_ANSWER = "I couldn't find this in the document."
+NOT_FOUND_ANSWER = (
+    "This document doesn't seem to cover that. I looked through it and found nothing to answer "
+    "from, so I won't guess. Try asking it another way, or ask the other side."
+)
 UNVERIFIED_ANSWER = (
     "I couldn't confirm an answer to this from the document's exact wording, so I'd "
     "rather not guess."
