@@ -45,7 +45,7 @@ describe("the upload panel", () => {
   });
 
   it("offers to photograph a paper contract with the phone's back camera, and a photo is treated like any chosen file", () => {
-    render(<UploadPanel />);
+    render(<UploadPanel onUploaded={vi.fn()} />);
 
     const camera = screen.getByLabelText("Take a photo of a paper contract");
     expect(camera).toHaveAttribute("capture", "environment");
