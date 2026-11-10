@@ -6,7 +6,7 @@ import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 
 /**
- * The button on the first screen that plays a 40 second walk through of Brief: why it was built, how it works and how private it is.
+ * The button on the first screen that plays a 90 second walk through of Brief: why it was built, how it works and how private it is.
  * It opens in a window over the page, with captions, and the video is only fetched once it is opened. Escape, the Close button or a click
  * outside it puts it away, and it stops playing when it goes.
  */
@@ -27,7 +27,7 @@ export function DemoVideoButton() {
       </Button>
       <dialog
         ref={dialog}
-        aria-label="Brief in 40 seconds"
+        aria-label="Brief in 90 seconds"
         onClose={() => setOpen(false)}
         onClick={(event) => {
           if (event.target === event.currentTarget) dialog.current?.close();
@@ -35,7 +35,7 @@ export function DemoVideoButton() {
         className="m-auto w-[min(94vw,1040px)] max-w-none rounded-2xl border border-border bg-card p-3 text-card-foreground shadow-2xl backdrop:bg-black/70"
       >
         <div className="flex items-center justify-between gap-3 px-2 pb-3">
-          <p className="text-sm font-medium text-foreground">Brief in 40 seconds</p>
+          <p className="text-sm font-medium text-foreground">Brief in 90 seconds</p>
           <Button type="button" variant="ghost" size="sm" onClick={() => dialog.current?.close()}>
             <X aria-hidden="true" className="size-4" />
             Close
@@ -44,7 +44,7 @@ export function DemoVideoButton() {
         {open && (
           <video className="demo-video w-full rounded-lg bg-black" controls autoPlay playsInline preload="metadata" poster="/demo/brief-demo-poster.jpg">
             <source src="/demo/brief-demo.mp4" type="video/mp4" />
-            <track kind="captions" src="/demo/brief-demo.vtt" srcLang="en" label="English" default />
+            <track kind="captions" src="/demo/brief-demo.vtt" srcLang="en" label="English" />
             Your browser can&apos;t play this video.
           </video>
         )}

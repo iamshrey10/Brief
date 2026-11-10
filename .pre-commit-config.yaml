@@ -8,4 +8,5 @@ repos:
         exclude: ^web/pnpm-lock\.yaml$
       - id: check-added-large-files
         args: ['--maxkb=1000']
+        exclude: ^web/public/demo/brief-demo\.mp4$
       - id: check-merge-conflict
