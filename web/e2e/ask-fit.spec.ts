@@ -29,6 +29,9 @@ for (const screen of SCREENS) {
     const box = page.getByRole("textbox", { name: "Your question" });
     const button = page.getByRole("button", { name: "Ask", exact: true }).last();
     await expect(box).toBeVisible();
+    // The suggested questions are worked out from the document's key terms and appear a moment after the tab opens. Measure once
+    // they are there, so the page has its final height.
+    await expect(page.getByRole("list", { name: "Suggested questions" })).toBeVisible();
 
     // Nothing sticks out of the window sideways, and the page itself does not scroll sideways.
     const sideways = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
@@ -59,6 +62,7 @@ test("a long conversation scrolls inside the panel and the question box stays pu
   await page.setViewportSize({ width: 1366, height: 650 });
   await page.goto("/dashboard/documents/doc-lease");
   await page.getByRole("tab", { name: "Ask" }).click();
+  await expect(page.getByRole("list", { name: "Suggested questions" })).toBeVisible();
   const box = page.getByRole("textbox", { name: "Your question" });
   const before = (await box.boundingBox())!;
 
