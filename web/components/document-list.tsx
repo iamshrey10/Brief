@@ -626,13 +626,13 @@ export function DocumentList({
               placeholder="Search by name"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              className="h-9 w-48 rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
+              className="h-9 w-48 max-sm:h-11 max-sm:w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
             />
             <select
               aria-label="Show documents of kind"
               value={kind}
               onChange={(event) => setKind(event.target.value)}
-              className="h-9 rounded-lg border border-input bg-background px-2 text-sm text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+              className="h-9 max-sm:h-11 rounded-lg border border-input bg-background px-2 text-sm text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
             >
               <option value="all">All kinds</option>
               {countByKind(documents).map((entry) => (
@@ -645,7 +645,7 @@ export function DocumentList({
               aria-label="Sort documents"
               value={order}
               onChange={(event) => setOrder(event.target.value as DocumentOrder)}
-              className="h-9 rounded-lg border border-input bg-background px-2 text-sm text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+              className="h-9 max-sm:h-11 rounded-lg border border-input bg-background px-2 text-sm text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
             >
               {(Object.keys(ORDER_LABELS) as DocumentOrder[]).map((value) => (
                 <option key={value} value={value}>

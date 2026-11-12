@@ -65,10 +65,10 @@ export default async function Dashboard() {
             Brief explains what a document says. It isn&apos;t legal advice.
           </p>
           <nav aria-label="Legal" className="flex gap-4">
-            <Link href="/privacy" className="text-xs text-muted-foreground underline-offset-4 hover:underline">
+            <Link href="/privacy" className="inline-flex text-xs text-muted-foreground max-sm:min-h-11 max-sm:items-center underline-offset-4 hover:underline">
               Privacy
             </Link>
-            <Link href="/terms" className="text-xs text-muted-foreground underline-offset-4 hover:underline">
+            <Link href="/terms" className="inline-flex text-xs text-muted-foreground max-sm:min-h-11 max-sm:items-center underline-offset-4 hover:underline">
               Terms
             </Link>
           </nav>

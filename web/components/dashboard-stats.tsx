@@ -65,7 +65,7 @@ export function DashboardStats({ stats, readOnly = false }: { stats: DocumentSta
       </ul>
       {!readOnly && stats.needsAttention > 0 && (
         <p className="mt-3 text-sm text-muted-foreground">
-          <Link href="/dashboard/documents" className="font-medium text-primary underline-offset-4 hover:underline">
+          <Link href="/dashboard/documents" className="inline-flex font-medium text-primary max-sm:min-h-11 max-sm:items-center underline-offset-4 hover:underline">
             Open your documents
           </Link>{" "}
           to read again or retake the ones that need it.

@@ -33,7 +33,7 @@ export function AppHeader({
     <header className="sticky top-0 z-40 border-b border-border/70 bg-background/85 backdrop-blur print:hidden">
       <div className={`mx-auto flex flex-wrap items-center justify-between gap-x-4 ${widthClass}`}>
         <div className="flex h-14 items-center gap-6">
-          <Link href="/dashboard" className="font-heading text-xl font-semibold tracking-tight text-foreground">
+          <Link href="/dashboard" className="font-heading text-xl font-semibold tracking-tight text-foreground max-sm:inline-flex max-sm:min-h-11 max-sm:items-center">
             Brief<span className="text-primary">.</span>
           </Link>
           <nav aria-label="Sections" className="hidden items-center gap-1 sm:flex">
@@ -66,7 +66,7 @@ function SectionLinks({ current }: { current: AppSection | null }) {
       href={section.href}
       aria-current={section.id === current ? "page" : undefined}
       className={cn(
-        "relative rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+        "relative rounded-md px-3 py-1.5 text-sm font-medium transition-colors max-sm:flex max-sm:min-h-11 max-sm:items-center",
         section.id === current
           ? "bg-accent text-accent-foreground"
           : "text-muted-foreground hover:bg-muted hover:text-foreground",

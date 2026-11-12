@@ -169,7 +169,7 @@ export function ChatPanel({
                       <button
                         type="button"
                         onClick={() => void send(question)}
-                        className="rounded-full border border-border bg-card px-3 py-1.5 text-left text-xs text-foreground transition-colors outline-none hover:border-primary/50 hover:bg-accent focus-visible:ring-3 focus-visible:ring-ring/50"
+                        className="rounded-full border border-border bg-card px-3 py-1.5 text-left text-xs max-sm:min-h-11 max-sm:px-4 text-foreground transition-colors outline-none hover:border-primary/50 hover:bg-accent focus-visible:ring-3 focus-visible:ring-ring/50"
                       >
                         {question}
                       </button>

@@ -18,17 +18,17 @@ export function SiteFooter() {
         </div>
         <div className="flex flex-col gap-3 md:items-end">
           <nav aria-label="Legal" className="flex gap-5 text-sm text-muted-foreground">
-            <Link href="/privacy" className="underline-offset-4 hover:text-foreground hover:underline">
+            <Link href="/privacy" className="inline-flex max-sm:min-h-11 max-sm:items-center underline-offset-4 hover:text-foreground hover:underline">
               Privacy
             </Link>
-            <Link href="/terms" className="underline-offset-4 hover:text-foreground hover:underline">
+            <Link href="/terms" className="inline-flex max-sm:min-h-11 max-sm:items-center underline-offset-4 hover:text-foreground hover:underline">
               Terms
             </Link>
             <a
               href={REPOSITORY_URL}
               target="_blank"
               rel="noopener noreferrer"
-              className="underline-offset-4 hover:text-foreground hover:underline"
+              className="inline-flex max-sm:min-h-11 max-sm:items-center underline-offset-4 hover:text-foreground hover:underline"
             >
               Source on GitHub
             </a>

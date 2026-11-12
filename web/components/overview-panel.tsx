@@ -146,8 +146,8 @@ function EvidenceButton({
       onClick={() => onSelect({ clauseId, quote })}
       className={
         showQuote
-          ? "block w-full rounded-md border-l-2 border-primary px-3 py-1.5 text-left text-muted-foreground transition-colors outline-none hover:bg-accent hover:text-accent-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
-          : "inline-flex items-center gap-1 rounded-full border border-border bg-background px-2.5 py-1 text-xs text-muted-foreground transition-colors outline-none hover:border-primary/50 hover:bg-accent hover:text-accent-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
+          ? "block w-full rounded-md border-l-2 border-primary px-3 py-1.5 max-sm:min-h-11 text-left text-muted-foreground transition-colors outline-none hover:bg-accent hover:text-accent-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
+          : "inline-flex items-center gap-1 rounded-full border border-border bg-background px-2.5 py-1 text-xs max-sm:min-h-11 max-sm:px-4 text-muted-foreground transition-colors outline-none hover:border-primary/50 hover:bg-accent hover:text-accent-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
       }
     >
       <span className={showQuote ? "block text-xs" : undefined}>

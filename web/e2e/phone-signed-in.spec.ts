@@ -97,3 +97,42 @@ test("on a phone the upload form offers to photograph a paper contract, and the 
   await expect(page.getByText("image.jpg")).toBeVisible();
   expect(await sidewaysOverflow(page)).toBeLessThanOrEqual(0);
 });
+
+async function tooSmall(page: Page, names: (string | RegExp)[], role: "button" | "link" | "tab" = "button"): Promise<string[]> {
+  const small: string[] = [];
+  for (const name of names) {
+    const target = page.getByRole(role, { name, exact: typeof name === "string" }).first();
+    await expect(target).toBeVisible();
+    const box = await target.boundingBox();
+    if (box!.height < 43.5 || box!.width < 43.5) small.push(`${name}: ${Math.round(box!.width)}x${Math.round(box!.height)}`);
+  }
+  return small;
+}
+
+test("on a phone the buttons a thumb has to hit are at least 44 pixels each way", async ({ page }) => {
+  await page.goto("/dashboard/documents");
+  await expect(page.getByRole("region", { name: "Your documents" }).getByText("sample-lease.pdf")).toBeVisible();
+
+  expect(await tooSmall(page, ["Edit sample-lease.pdf", "Read sample-lease.pdf again", "View original sample-lease.pdf", "Delete sample-lease.pdf", "Upload"])).toEqual([]);
+  expect(await tooSmall(page, ["Dashboard", "Documents", "Shared", "Profile"], "link")).toEqual([]);
+  for (const label of ["Search your documents", "Show documents of kind", "Sort documents"]) {
+    const box = await page.getByLabel(label).boundingBox();
+    expect(box!.height, label).toBeGreaterThanOrEqual(43.5);
+  }
+});
+
+test("on a phone the Find box has a full row, and its arrows, chips and questions are 44 pixels", async ({ page }) => {
+  await page.goto("/dashboard/documents/doc-lease");
+  await expect(page.getByRole("region", { name: "Key terms" }).getByText("Security deposit")).toBeVisible();
+
+  const find = await page.getByRole("searchbox", { name: "Find in this document" }).boundingBox();
+  expect(find!.width).toBeGreaterThan(300);
+  expect(find!.height).toBeGreaterThanOrEqual(43.5);
+  expect(await tooSmall(page, ["Previous match", "Next match", /^Show "Security deposit" in the document/])).toEqual([]);
+
+  await page.getByRole("tab", { name: "Ask" }).click();
+  const suggestions = page.getByRole("list", { name: "Suggested questions" }).getByRole("button");
+  await expect(suggestions.first()).toBeVisible();
+  for (const box of await suggestions.evaluateAll((els) => els.map((el) => el.getBoundingClientRect().height))) expect(box).toBeGreaterThanOrEqual(43.5);
+  expect(await sidewaysOverflow(page)).toBeLessThanOrEqual(0);
+});

@@ -36,7 +36,7 @@ export function LeaseCountdown({ lease, linked = true }: { lease: LeaseEnd | nul
           <p className="truncate text-sm text-muted-foreground">
             Ends {lease.value} ·{" "}
             {linked ? (
-              <Link href={`/dashboard/documents/${lease.documentId}`} className="underline underline-offset-2 hover:text-foreground">
+              <Link href={`/dashboard/documents/${lease.documentId}`} className="inline-flex underline underline-offset-2 max-sm:min-h-11 max-sm:items-center hover:text-foreground">
                 {lease.filename}
               </Link>
             ) : (

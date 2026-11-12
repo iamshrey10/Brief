@@ -269,7 +269,7 @@ export function UploadPanel({ onUploaded }: { onUploaded: (document: DocumentSum
                 onChange={() => chooseKind(type.value)}
                 className="peer sr-only"
               />
-              <span className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm text-muted-foreground transition-colors peer-checked:border-primary peer-checked:bg-primary/5 peer-checked:text-foreground peer-focus-visible:ring-3 peer-focus-visible:ring-ring/50 peer-disabled:opacity-50 hover:bg-accent">
+              <span className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm max-sm:min-h-11 text-muted-foreground transition-colors peer-checked:border-primary peer-checked:bg-primary/5 peer-checked:text-foreground peer-focus-visible:ring-3 peer-focus-visible:ring-ring/50 peer-disabled:opacity-50 hover:bg-accent">
                 <DocTypeIcon type={type.value} className="size-4 shrink-0" />
                 {type.label}
               </span>
@@ -293,7 +293,7 @@ export function UploadPanel({ onUploaded }: { onUploaded: (document: DocumentSum
           value={folder}
           disabled={uploading}
           onChange={(event) => setFolder(event.target.value)}
-          className="rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+          className="rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none max-sm:min-h-11 focus-visible:ring-3 focus-visible:ring-ring/50"
         >
           <option value="">Automatic, by kind</option>
           {FOLDERS.map((option) => (
@@ -328,7 +328,7 @@ export function UploadPanel({ onUploaded }: { onUploaded: (document: DocumentSum
           type="button"
           onClick={() => void trySample()}
           disabled={uploading}
-          className="font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50"
+          className="inline-flex font-medium text-primary underline-offset-4 outline-none max-sm:min-h-11 max-sm:items-center hover:underline focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50"
         >
           Try a sample lease
         </button>
