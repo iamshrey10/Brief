@@ -30,6 +30,10 @@ export function stepText(tracked: TrackedDocument): string {
       const done = Math.min(Math.max(Math.floor(document.progress_done ?? 0), 0), total);
       return `Reading part ${done} of ${total}`;
     }
+    const ahead = document.queue_ahead;
+    if (document.status === "uploaded" && typeof ahead === "number" && ahead > 0) {
+      return `Waiting for its turn, ${ahead} ${ahead === 1 ? "document is" : "documents are"} ahead`;
+    }
     return "Reading the document";
   }
   if (step === 2) return "Finding the key terms and the questions to ask";

@@ -2,10 +2,11 @@ import datetime
 import math
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.models import Usage
 
 # How many times one person can do each kind of model-backed thing in a day (UTC). Every one of these
@@ -14,7 +15,12 @@ from app.models import Usage
 #   ask     a question about a document
 #   read    starting to read a document: a new upload, a retry, or reading it again
 #   analyze working out the key terms or the must-ask questions of a document (saved, so once each)
-DAILY_LIMITS = {"ask": 100, "read": 30, "analyze": 60}
+DAILY_LIMITS = {"ask": 40, "read": 10, "analyze": 20}
+
+# About how many calls to the model each kind of use makes, to count the whole site's work in one number. A
+# question is one call, reading a document (the text, and the vectors that make it searchable) a few, and
+# working out the key terms and the must-ask questions a dozen or more. These are estimates, not measurements.
+CALLS_PER_USE = {"ask": 1, "read": 4, "analyze": 15}
 
 
 async def spend(
@@ -49,6 +55,19 @@ async def spend(
     counted = (await session.execute(statement)).scalar_one_or_none()
     await session.commit()
     return counted is not None
+
+
+async def model_calls_today(session: AsyncSession, today: datetime.date | None = None) -> int:
+    """About how many calls to the model the whole site has made today, from everyone's counts."""
+    day = today or datetime.datetime.now(datetime.timezone.utc).date()
+    rows = await session.execute(select(Usage.kind, func.sum(Usage.count)).where(Usage.day == day).group_by(Usage.kind))
+    return sum(CALLS_PER_USE.get(kind, 0) * int(total or 0) for kind, total in rows.all())
+
+
+async def site_is_full(session: AsyncSession, today: datetime.date | None = None) -> bool:
+    """Whether the whole site has used up today's model work, so nobody can start more until tomorrow.
+    It protects the model's own limit and the bill, and counts the same for every person."""
+    return await model_calls_today(session, today) >= settings.global_daily_model_calls
 
 
 async def usage_today(

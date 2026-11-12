@@ -19,6 +19,17 @@ describe("stepOf", () => {
   });
 });
 
+describe("stepText while a document waits for its turn", () => {
+  it("says how many documents are ahead, and says nothing of a line when nobody is", () => {
+    expect(stepText(tracked("uploaded", false, { queue_ahead: 1 }))).toBe("Waiting for its turn, 1 document is ahead");
+    expect(stepText(tracked("uploaded", false, { queue_ahead: 4 }))).toBe("Waiting for its turn, 4 documents are ahead");
+    expect(stepText(tracked("uploaded", false, { queue_ahead: 0 }))).toBe("Reading the document");
+    expect(stepText(tracked("uploaded", false, { queue_ahead: null }))).toBe("Reading the document");
+    // A document being read has no line, whatever an old answer said.
+    expect(stepText(tracked("processing", false, { queue_ahead: 3 }))).toBe("Reading the document");
+  });
+});
+
 describe("stepText", () => {
   it("says what is happening in plain words, with the part when it is known", () => {
     expect(stepText(tracked("pending"))).toBe("Sending your file");

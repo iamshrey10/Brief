@@ -1008,3 +1008,29 @@ async def test_reading_a_file_happens_off_the_event_loop_so_a_long_scan_cannot_f
     await ingest_document(document.id)
 
     assert threads and threads[0] != main
+
+
+# --- One person's documents are read one after another ---
+
+
+async def test_one_persons_documents_are_read_one_after_another_but_two_people_read_together():
+    import uuid
+
+    from app import ingestion
+
+    person, other = uuid.uuid4(), uuid.uuid4()
+    log: list[str] = []
+
+    async def read(name: str, user_id):
+        async with ingestion._one_read_at_a_time(user_id):
+            log.append(f"{name} starts")
+            await asyncio.sleep(0.02)
+            log.append(f"{name} ends")
+
+    await asyncio.gather(read("a1", person), read("a2", person), read("b1", other))
+
+    # a2 never starts before a1 has ended, while b1 does not wait for either of them.
+    assert log.index("a1 ends") < log.index("a2 starts")
+    assert log.index("b1 starts") < log.index("a1 ends")
+    # Nothing is kept once nobody is waiting.
+    assert ingestion._user_turns == {} and ingestion._user_waiting == {}

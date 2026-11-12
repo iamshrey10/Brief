@@ -245,3 +245,42 @@ def test_calls_beyond_the_per_minute_allowance_wait_for_the_minute_to_roll_over(
     call(client)  # one more than the minute allows
     assert len(pauses) == 1 and 59.9 <= pauses[0] <= 60.0
     assert len(client.calls) == model_call.MAX_CALLS_PER_MINUTE + 1
+
+
+def test_reading_a_document_leaves_part_of_the_minute_free_for_questions(monkeypatch):
+    now = {"t": 1000.0}
+    pauses: list[float] = []
+
+    def pause(seconds):
+        pauses.append(seconds)
+        now["t"] += seconds
+
+    monkeypatch.setattr(model_call, "_clock", lambda: now["t"])
+    monkeypatch.setattr(model_call, "_pause", pause)
+    monkeypatch.setattr(model_call, "MAX_CALLS_PER_MINUTE", 14)
+    monkeypatch.setattr(model_call, "CALLS_RESERVED_FOR_QUESTIONS", 4)
+    client = ScriptedClient([SimpleNamespace(parsed="ok") for _ in range(30)])
+
+    for _ in range(10):
+        call(client, "key_terms")
+    assert pauses == []  # reading may use all but the reserved four
+
+    # Four questions still go straight through, though the document reading has used its share of the minute.
+    for _ in range(4):
+        call(client, "answer")
+    assert pauses == []
+
+    # The next piece of reading has to wait for the minute to roll over, the next question would too.
+    call(client, "key_terms")
+    assert len(pauses) == 1 and 59.9 <= pauses[0] <= 60.0
+
+
+def test_a_question_does_not_wait_behind_documents_being_read(monkeypatch):
+    # All the places for reading are taken, and a question still gets its own.
+    taken = [model_call._in_flight.acquire() for _ in range(model_call.MAX_CONCURRENT_MODEL_CALLS)]
+    try:
+        client = ScriptedClient([SimpleNamespace(parsed="ok")])
+        assert call(client, "answer").parsed == "ok"
+    finally:
+        for _ in taken:
+            model_call._in_flight.release()

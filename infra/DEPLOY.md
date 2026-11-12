@@ -21,8 +21,11 @@ Prices and free tier limits change, so check each host's page on the day.
 - A host that runs the API container (`api/Dockerfile`) and one for the website (`web/Dockerfile`, or Vercel).
 - A Postgres with the **pgvector** extension, a Redis, and the R2 bucket.
 - Whether to pay for Gemini. The free tier allows 15 requests a minute and one document takes about 19 calls, so a
-  few people reading at once will hit it. The per person daily limits (100 questions, 30 reads, 60 overviews) cap
-  what one account can spend, but not what many accounts can.
+  few people reading at once will hit it. The per person daily limits (40 questions, 10 reads, 20 overviews) cap
+  what one account can spend. What many accounts can spend is capped by `GLOBAL_DAILY_MODEL_CALLS` (the whole site, per
+  day) and the pace of the model by `MODEL_CALLS_PER_MINUTE`, `MODEL_CALLS_RESERVED_FOR_QUESTIONS` and
+  `MAX_CONCURRENT_MODEL_CALLS`. They are set for the free tier. After switching Gemini to a paid tier, raise them to what
+  the tier allows, and set a spending cap and alert in Google Cloud.
 
 ## 2. The API
 

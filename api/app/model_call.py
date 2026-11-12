@@ -6,6 +6,7 @@ import time
 
 from google.genai import errors as genai_errors
 
+from app.config import settings
 from app.ingestion import _rate_limit_wait
 from app.telemetry import timed
 
@@ -26,13 +27,21 @@ OVERLOADED_WAIT_SECONDS = 4.0
 # Reading one document asks the model for a dozen or more things at once (three full passes, then two
 # checks on every answer). All at the same moment they pass the per-minute limit, every one is refused
 # and the page shows an error, so only a few are in flight together and the rest wait their turn.
-MAX_CONCURRENT_MODEL_CALLS = 4
+MAX_CONCURRENT_MODEL_CALLS = settings.max_concurrent_model_calls
 _in_flight = threading.BoundedSemaphore(MAX_CONCURRENT_MODEL_CALLS)
+# A question is a single call that a person is watching, and reading a document is about twenty. So a question
+# has a small allowance of its own, and does not wait behind the documents being read.
+MAX_CONCURRENT_QUESTION_CALLS = 2
+_question_in_flight = threading.BoundedSemaphore(MAX_CONCURRENT_QUESTION_CALLS)
+# The kinds of call a person is waiting on at once. Everything else is part of reading a document.
+QUESTION_KINDS = frozenset({"answer"})
 
 # The free tier of the model allows 15 calls a minute, counting refused ones. Reading one document
 # asks for about twenty, so the calls are spaced to stay just under that, and the last few wait for
 # the minute to roll over instead of being refused and failing the whole page.
-MAX_CALLS_PER_MINUTE = 14
+MAX_CALLS_PER_MINUTE = settings.model_calls_per_minute
+# How many of those a minute only questions may use, so reading documents cannot use up the whole minute.
+CALLS_RESERVED_FOR_QUESTIONS = settings.model_calls_reserved_for_questions
 _started: collections.deque[float] = collections.deque()
 _pace_lock = threading.Lock()
 
@@ -41,14 +50,18 @@ _clock = time.monotonic
 _pause = time.sleep
 
 
-def _wait_for_a_free_minute_slot() -> None:
-    """Blocks until fewer than MAX_CALLS_PER_MINUTE calls started in the last 60 seconds, then takes a slot."""
+def _wait_for_a_free_minute_slot(question: bool = True) -> None:
+    """Blocks until fewer calls than the allowance started in the last 60 seconds, then takes a slot.
+
+    A question may use the whole allowance. Reading a document may use all but CALLS_RESERVED_FOR_QUESTIONS
+    of it, so there is always room for someone's question."""
+    allowance = MAX_CALLS_PER_MINUTE if question else max(MAX_CALLS_PER_MINUTE - CALLS_RESERVED_FOR_QUESTIONS, 1)
     while True:
         with _pace_lock:
             now = _clock()
             while _started and now - _started[0] >= 60.0:
                 _started.popleft()
-            if len(_started) < MAX_CALLS_PER_MINUTE:
+            if len(_started) < allowance:
                 _started.append(now)
                 return
             delay = 60.0 - (now - _started[0])
@@ -78,8 +91,9 @@ def generate(client, kind: str, *, model: str, contents, config):
     waited = 0.0
     for attempt in range(MAX_GENERATION_RETRIES + 1):
         try:
-            _wait_for_a_free_minute_slot()
-            with _in_flight, timed(kind):
+            question = kind in QUESTION_KINDS
+            _wait_for_a_free_minute_slot(question)
+            with _question_in_flight if question else _in_flight, timed(kind):
                 return client.models.generate_content(model=model, contents=contents, config=config)
         except genai_errors.APIError as error:
             wait = _wait_before_retry(error, attempt)
