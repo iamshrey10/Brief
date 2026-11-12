@@ -33,7 +33,7 @@ export function LeaseCountdown({ lease, linked = true }: { lease: LeaseEnd | nul
         <div className="min-w-0">
           <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Lease remaining</p>
           <p className="font-heading text-2xl font-semibold tracking-tight text-foreground">{leaseDaysText(lease.days)}</p>
-          <p className="truncate text-sm text-muted-foreground">
+          <p className="text-sm break-words text-muted-foreground sm:truncate">
             Ends {lease.value} ·{" "}
             {linked ? (
               <Link href={`/dashboard/documents/${lease.documentId}`} className="inline-flex underline underline-offset-2 max-sm:min-h-11 max-sm:items-center hover:text-foreground">
