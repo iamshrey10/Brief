@@ -24,7 +24,7 @@ Prices and free tier limits change, so check each host's page on the day.
   few people reading at once will hit it. The per person daily limits (40 questions, 10 reads, 20 overviews) cap
   what one account can spend. What many accounts can spend is capped by `GLOBAL_DAILY_MODEL_CALLS` (the whole site, per
   day) and the pace of the model by `MODEL_CALLS_PER_MINUTE`, `MODEL_CALLS_RESERVED_FOR_QUESTIONS` and
-  `MAX_CONCURRENT_MODEL_CALLS`. They are set for the free tier. After switching Gemini to a paid tier, raise them to what
+  `MAX_CONCURRENT_MODEL_CALLS`. They are set for Tier 1 of the paid tier (300 a minute, 3,000 a day, to protect the prepaid credit). Beyond that, raise them to what
   the tier allows, and set a spending cap and alert in Google Cloud.
 
 ## 2. The API

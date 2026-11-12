@@ -56,19 +56,18 @@ class Settings(BaseSettings):
     r2_endpoint_url: str = ""
 
     gemini_api_key: str = ""
-    # How many calls to the model Brief makes in a minute, in total, for everyone. The free tier of Gemini
-    # allows 15, so the default stays just under it. After switching to a paid tier, raise it to what the
-    # tier allows.
-    model_calls_per_minute: int = 14
+    # How many calls to the model Brief makes in a minute, in total, for everyone. Tier 1 of the paid Gemini
+    # API allows 4,000 for Flash-Lite, so this stays far below it. On the free tier (15 a minute) set 14.
+    model_calls_per_minute: int = 300
     # Of those, how many a minute are kept for questions, so a few documents being read cannot make
     # everyone's questions wait. Reading a document uses only the rest.
-    model_calls_reserved_for_questions: int = 4
+    model_calls_reserved_for_questions: int = 60
     # How many calls to the model are being waited on at the same moment.
-    max_concurrent_model_calls: int = 4
+    max_concurrent_model_calls: int = 12
     # The most model work, counted in calls, that the whole site does in a day (UTC). Past it Brief says it is
-    # busy until tomorrow, instead of reaching the model's own limit or running up a bill. The default is
-    # about three quarters of what the free tier allows in a day.
-    global_daily_model_calls: int = 15000
+    # busy until tomorrow, instead of reaching the model's own limit or running up a bill. It is the real
+    # spending guard: raise it only as the prepaid credit allows. Tier 1 itself allows 150,000 a day.
+    global_daily_model_calls: int = 3000
 
     # A failed check must name the setting, never print its value, so a secret cannot end up in a log.
     model_config = SettingsConfigDict(env_file=".env", extra="ignore", hide_input_in_errors=True)
