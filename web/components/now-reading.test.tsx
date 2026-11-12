@@ -109,4 +109,39 @@ describe("NowReading", () => {
     expect(within(region).getAllByText(/\.pdf$/)).toHaveLength(3);
     expect(within(region).getByText("And 2 more being read.")).toBeInTheDocument();
   });
+
+  describe("on a phone", () => {
+    const scrollIntoView = vi.fn();
+    const setWidth = (phone: boolean) =>
+      vi.stubGlobal("matchMedia", (query: string) => ({ matches: query.includes("max-width: 639px") ? phone : false, media: query, addEventListener() {}, removeEventListener() {} }));
+
+    beforeEach(() => {
+      scrollIntoView.mockClear();
+      Element.prototype.scrollIntoView = scrollIntoView;
+    });
+
+    it("brings the card into view when the first document starts being read, since it sits above the Upload button", () => {
+      listIs([doc("lease", "processing")]);
+      setWidth(true);
+      show([doc("lease", "processing")]);
+
+      expect(scrollIntoView).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not move the page on a laptop", () => {
+      listIs([doc("lease", "processing")]);
+      setWidth(false);
+      show([doc("lease", "processing")]);
+
+      expect(scrollIntoView).not.toHaveBeenCalled();
+    });
+
+    it("is placed first on a phone, above the upload box", () => {
+      listIs([doc("lease", "processing")]);
+      setWidth(true);
+      show([doc("lease", "processing")]);
+
+      expect(screen.getByRole("region", { name: "Now reading" })).toHaveClass("max-sm:order-first");
+    });
+  });
 });
