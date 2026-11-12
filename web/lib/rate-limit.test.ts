@@ -22,7 +22,11 @@ vi.mock("ioredis", () => ({
   },
 }));
 
-import { checkRateLimit, redisIsReachable } from "./rate-limit";
+import {
+  checkRateLimit,
+  describeRedisError,
+  redisIsReachable,
+} from "./rate-limit";
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -48,7 +52,8 @@ afterEach(() => {
 
 async function use(identifier: string, times: number): Promise<boolean[]> {
   const results: boolean[] = [];
-  for (let i = 0; i < times; i++) results.push(await checkRateLimit(identifier));
+  for (let i = 0; i < times; i++)
+    results.push(await checkRateLimit(identifier));
   return results;
 }
 
@@ -107,10 +112,71 @@ describe("checkRateLimit", () => {
     expect(redis.expires[0][0]).toBe([...redis.counts.keys()][0]);
   });
 
-  it("fails closed when Redis fails, rather than letting everything through", async () => {
+  it("lets an ordinary request through when Redis fails, so an outage does not take the site down", async () => {
+    redis.incr.mockRejectedValue(new Error("redis is down"));
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    expect(await checkRateLimit("a@b.c")).toBe(true);
+    expect(log).toHaveBeenCalledWith(
+      expect.stringContaining("rate limiter skipped"),
+    );
+    log.mockRestore();
+  });
+
+  it("refuses when Redis fails and the caller asked for strict, as guessing two-factor codes needs", async () => {
     redis.incr.mockRejectedValue(new Error("redis is down"));
 
-    await expect(checkRateLimit("a@b.c")).rejects.toThrow("redis is down");
+    await expect(checkRateLimit("a@b.c", { strict: true })).rejects.toThrow(
+      "redis is down",
+    );
+  });
+
+  it("does not wait for a Redis that never answers", async () => {
+    redis.incr.mockImplementation(() => new Promise(() => {}));
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const answer = checkRateLimit("a@b.c");
+    await vi.advanceTimersByTimeAsync(1600);
+
+    expect(await answer).toBe(true);
+    expect(log).toHaveBeenCalledWith("rate limiter skipped (TIMEOUT)");
+    log.mockRestore();
+  });
+
+  it("logs a short reason that never includes the message, since a message can quote the password", async () => {
+    const secret = "rediss://default:hunter2@host.example:6379";
+    redis.incr.mockRejectedValue(
+      Object.assign(new Error(`connect failed to ${secret}`), {
+        code: "ECONNREFUSED",
+      }),
+    );
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    await checkRateLimit("a@b.c");
+
+    expect(log).toHaveBeenCalledWith("rate limiter skipped (ECONNREFUSED)");
+    expect(JSON.stringify(log.mock.calls)).not.toContain("hunter2");
+    log.mockRestore();
+  });
+});
+
+describe("describeRedisError", () => {
+  it("names the kind of failure without repeating the message", () => {
+    expect(
+      describeRedisError(Object.assign(new Error("x"), { code: "ENOTFOUND" })),
+    ).toBe("ENOTFOUND");
+    expect(
+      describeRedisError(new Error("WRONGPASS invalid username-password pair")),
+    ).toBe("WRONGPASS");
+    expect(
+      describeRedisError(
+        new Error("NOPERM this user has no permissions to run INCR"),
+      ),
+    ).toBe("NOPERM");
+    expect(describeRedisError(new Error("Connection is closed."))).toBe(
+      "TIMEOUT",
+    );
+    expect(describeRedisError("not an error object")).toBe("unknown");
   });
 });
 
@@ -161,7 +227,9 @@ describe("the Redis connection", () => {
     const logged = vi.spyOn(console, "error").mockImplementation(() => {});
     const check = await freshLimiter();
     await check("private-person@example.com");
-    const handler = redis.on.mock.calls.find(([event]) => event === "error")?.[1] as (e: Error) => void;
+    const handler = redis.on.mock.calls.find(
+      ([event]) => event === "error",
+    )?.[1] as (e: Error) => void;
 
     handler(new Error("connect ECONNREFUSED for private-person@example.com"));
 
@@ -183,7 +251,9 @@ describe("redisIsReachable", () => {
   });
 
   it("is false, and does not throw, when Redis cannot be reached", async () => {
-    redis.ping.mockRejectedValue(new Error("connect ECONNREFUSED 10.0.0.5:6379"));
+    redis.ping.mockRejectedValue(
+      new Error("connect ECONNREFUSED 10.0.0.5:6379"),
+    );
     expect(await redisIsReachable()).toBe(false);
   });
 });

@@ -12,7 +12,7 @@ import { CHECK_VALID_SECONDS, cookieOptions, DEVICE_COOKIE, DEVICE_VALID_SECONDS
 export async function POST(request: Request) {
   const email = (await auth())?.user?.email;
   if (!email) return Response.json({ error: "not signed in" }, { status: 401 });
-  if (!(await checkRateLimit(email))) return Response.json({ error: "too many requests" }, { status: 429 });
+  if (!(await checkRateLimit(email, { strict: true }))) return Response.json({ error: "too many requests" }, { status: 429 });
 
   let body: { code?: unknown; remember?: unknown };
   try {
