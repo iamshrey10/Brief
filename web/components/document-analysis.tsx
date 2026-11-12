@@ -30,7 +30,7 @@ export function DocumentAnalysis({ insights, documents }: { insights: InsightFro
             <li key={row.document_id} className={`${COLUMNS} grid grid-cols-1 gap-y-1.5 py-3 sm:items-center`}>
               <Link
                 href={`/dashboard/documents/${row.document_id}`}
-                className="min-w-0 truncate text-sm font-medium text-foreground outline-none hover:text-primary focus-visible:ring-3 focus-visible:ring-ring/50"
+                className="min-w-0 truncate text-sm font-medium text-foreground outline-none max-sm:flex max-sm:min-h-11 max-sm:items-center hover:text-primary focus-visible:ring-3 focus-visible:ring-ring/50"
               >
                 {names.get(row.document_id)}
               </Link>

@@ -113,9 +113,9 @@ export function ClauseViewer({
             setCurrent(0);
           }}
           onKeyDown={handleFindKeys}
-          className="h-9 min-w-0 flex-1 rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
+          className="h-9 min-w-0 flex-1 max-sm:h-11 max-sm:basis-full rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
         />
-        <p role="status" className="min-w-[5.5rem] text-xs text-muted-foreground">
+        <p role="status" className="min-w-[5.5rem] text-xs text-muted-foreground max-sm:flex-1">
           {searching ? (total === 0 ? "No matches" : `${current + 1} of ${total}`) : ""}
         </p>
         <button
@@ -123,7 +123,7 @@ export function ClauseViewer({
           aria-label="Previous match"
           disabled={total === 0}
           onClick={() => setCurrent((value) => stepMatch(value, total, -1))}
-          className="rounded-md border border-border px-2 py-1.5 text-sm text-foreground outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-40"
+          className="rounded-md border border-border px-2 py-1.5 text-sm text-foreground outline-none max-sm:flex max-sm:size-11 max-sm:items-center max-sm:justify-center max-sm:p-0 hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-40"
         >
           ↑
         </button>
@@ -132,7 +132,7 @@ export function ClauseViewer({
           aria-label="Next match"
           disabled={total === 0}
           onClick={() => setCurrent((value) => stepMatch(value, total, 1))}
-          className="rounded-md border border-border px-2 py-1.5 text-sm text-foreground outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-40"
+          className="rounded-md border border-border px-2 py-1.5 text-sm text-foreground outline-none max-sm:flex max-sm:size-11 max-sm:items-center max-sm:justify-center max-sm:p-0 hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-40"
         >
           ↓
         </button>

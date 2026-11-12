@@ -22,7 +22,7 @@ export function OpenQuestions({ groups }: { groups: OpenQuestionGroup[] }) {
           <li key={group.documentId}>
             <Link
               href={`/dashboard/documents/${group.documentId}`}
-              className="text-sm font-medium underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+              className="inline-flex text-sm font-medium underline-offset-4 outline-none max-sm:min-h-11 max-sm:items-center hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
             >
               {group.filename}
             </Link>
