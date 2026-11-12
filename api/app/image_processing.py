@@ -4,7 +4,7 @@ import cv2
 import numpy as np
 import pillow_heif
 import pytesseract
-from PIL import Image
+from PIL import Image, ImageOps
 
 pillow_heif.register_heif_opener()
 
@@ -21,6 +21,12 @@ MAX_DESKEW_ANGLE_DEGREES = 15.0
 # reliably estimate an angle from at all, most likely candidates are a mostly-blank
 # region or Otsu thresholding away nearly all of a small, high-contrast line of text.
 MIN_DESKEW_PIXELS = 200
+
+# The longest side a photo is shrunk to before it is read. A page photographed on a phone is 12 to 48
+# megapixels, and straightening, denoising and thresholding each keep a full-size copy, which used more
+# than the whole server's memory. At 3000 pixels an A4 page is still about 250 dots per inch, more than
+# the text needs, and a copy is under 10 MB.
+MAX_OCR_SIDE_PIXELS = 3000
 
 
 def _deskew(gray: np.ndarray) -> np.ndarray:
@@ -50,6 +56,19 @@ def _deskew(gray: np.ndarray) -> np.ndarray:
     )
 
 
+def _open_upright_and_small(image_bytes: bytes) -> Image.Image:
+    """The picture, turned the way it was held and no bigger than the reader needs.
+
+    A phone stores a photo taken upright as a sideways picture plus a tag saying how to turn it, and
+    text read sideways comes out as nothing. For a JPEG the decoder is asked for a smaller picture
+    straight away, so the full one is never held in memory."""
+    image = Image.open(io.BytesIO(image_bytes))
+    image.draft("RGB", (MAX_OCR_SIDE_PIXELS, MAX_OCR_SIDE_PIXELS))
+    image = ImageOps.exif_transpose(image)
+    image.thumbnail((MAX_OCR_SIDE_PIXELS, MAX_OCR_SIDE_PIXELS))
+    return image.convert("RGB")
+
+
 def enhance_for_ocr(image_bytes: bytes) -> np.ndarray:
     """Runs a scanned or photographed page through a basic quality pipeline before OCR.
 
@@ -58,7 +77,7 @@ def enhance_for_ocr(image_bytes: bytes) -> np.ndarray:
     photo: straighten it, reduce noise, even out lighting, and binarize it, the same way
     any document scanner app would.
     """
-    pil_image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+    pil_image = _open_upright_and_small(image_bytes)
     bgr = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
     gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
 

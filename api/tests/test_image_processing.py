@@ -54,3 +54,27 @@ def test_enhance_for_ocr_returns_a_single_channel_image_same_size():
 
     assert enhanced.ndim == 2
     assert enhanced.shape == (250, 900)
+
+
+def test_a_huge_photo_is_shrunk_before_it_is_read_so_it_cannot_exhaust_memory():
+    from app.image_processing import MAX_OCR_SIDE_PIXELS
+
+    image = Image.new("RGB", (6000, 4000), color="white")
+    buffer = io.BytesIO()
+    image.save(buffer, format="JPEG")
+
+    enhanced = enhance_for_ocr(buffer.getvalue())
+
+    assert max(enhanced.shape) <= MAX_OCR_SIDE_PIXELS
+
+
+def test_a_photo_stored_sideways_with_a_rotation_tag_is_read_upright():
+    image = Image.new("RGB", (400, 200), color="white")
+    exif = Image.Exif()
+    exif[0x0112] = 6  # "turn a quarter clockwise to see it as it was held"
+    buffer = io.BytesIO()
+    image.save(buffer, format="JPEG", exif=exif)
+
+    enhanced = enhance_for_ocr(buffer.getvalue())
+
+    assert enhanced.shape == (400, 200)
