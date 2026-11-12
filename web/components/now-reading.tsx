@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useRef } from "react";
 import { Check } from "lucide-react";
 
 import { useUploadNotifications } from "@/components/upload-notifications";
@@ -77,12 +78,27 @@ function Timeline({ entry }: { entry: TrackedDocument }) {
  */
 export function NowReading() {
   const { tracked } = useUploadNotifications();
-  if (tracked.length === 0) return null;
+  const section = useRef<HTMLElement>(null);
+  const wasEmpty = useRef(true);
+  const count = tracked.length;
+
+  // On a phone the card sits above the upload box, but the person is looking at the Upload button below it. When the first
+  // document starts being read, bring the card into view so they can see it working without scrolling to find it.
+  useEffect(() => {
+    if (count > 0 && wasEmpty.current && typeof window !== "undefined" && window.matchMedia?.("(max-width: 639px)").matches) {
+      const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      section.current?.scrollIntoView?.({ behavior: calm ? "auto" : "smooth", block: "start" });
+    }
+    wasEmpty.current = count === 0;
+  }, [count]);
+
+  if (count === 0) return null;
   const shown = tracked.slice(0, MOST_SHOWN);
   return (
     <section
+      ref={section}
       aria-labelledby="now-reading-heading"
-      className="rounded-2xl border border-primary/25 bg-card p-5 shadow-sm motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-top-2 motion-safe:duration-300"
+      className="scroll-mt-20 rounded-2xl border border-primary/25 bg-card p-5 shadow-sm max-sm:order-first motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-top-2 motion-safe:duration-300"
     >
       <h2 id="now-reading-heading" className="text-lg font-semibold tracking-tight text-foreground">
         Now reading
