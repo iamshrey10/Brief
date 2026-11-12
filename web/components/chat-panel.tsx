@@ -216,7 +216,7 @@ export function ChatPanel({
         {pending && <p className="text-sm text-muted-foreground">Reading the document...</p>}
       </div>
 
-      <form onSubmit={handleSubmit} className="sticky bottom-0 z-10 flex shrink-0 flex-col gap-2 rounded-b-lg border-t border-border bg-background p-3">
+      <form onSubmit={handleSubmit} className="sticky bottom-0 max-sm:bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-10 flex shrink-0 flex-col gap-2 rounded-b-lg border-t border-border bg-background p-3">
         <textarea
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
