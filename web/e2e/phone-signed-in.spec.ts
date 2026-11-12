@@ -177,3 +177,23 @@ test("on a laptop the sections stay beside the name and there is no bar at the b
   await expect(page.locator("nav[aria-label=Sections].fixed")).toBeHidden();
   await context.close();
 });
+
+test("on a phone the Ask box is compact: suggestions in one row that scrolls sideways, a one line question box, and asking still works", async ({ page }) => {
+  await page.goto("/dashboard/documents/doc-lease");
+  await page.getByRole("tab", { name: "Ask" }).click();
+
+  const suggestions = page.getByRole("list", { name: "Suggested questions" });
+  await expect(suggestions).toBeVisible();
+  const row = await suggestions.evaluate((el) => ({ scrolls: el.scrollWidth > el.clientWidth, height: el.getBoundingClientRect().height }));
+  expect(row.scrolls).toBe(true);
+  expect(row.height).toBeLessThan(70);
+  const panel = await page.getByRole("region", { name: "Ask about this document" }).boundingBox();
+  expect(panel!.height).toBeLessThan(300);
+  const box = await page.getByRole("textbox", { name: "Your question" }).boundingBox();
+  expect(box!.height).toBeLessThan(50);
+
+  await page.getByRole("textbox", { name: "Your question" }).fill("What is the late fee?");
+  await page.getByRole("button", { name: "Ask", exact: true }).click();
+  await expect(page.getByRole("log", { name: "Conversation" }).getByText("From the document")).toBeVisible();
+  expect(await sidewaysOverflow(page)).toBeLessThanOrEqual(0);
+});

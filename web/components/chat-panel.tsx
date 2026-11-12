@@ -145,31 +145,31 @@ export function ChatPanel({
         role="log"
         aria-live="polite"
         aria-label="Conversation"
-        className="flex flex-1 flex-col gap-3 p-4 lg:min-h-0 lg:overflow-y-auto"
+        className="flex flex-1 flex-col gap-3 p-4 max-sm:p-3 lg:min-h-0 lg:overflow-y-auto"
       >
         {messages.length === 0 && !pending && (
           <div className="my-auto px-2 text-center">
-            <p className="font-heading text-lg font-semibold text-foreground">
+            <p className="font-heading text-lg font-semibold text-foreground max-sm:text-base">
               Ask about this document
             </p>
-            <p className="mt-2 text-sm text-muted-foreground">
+            <p className="mt-2 text-sm text-muted-foreground max-sm:hidden">
               Every answer points to the exact clause it came from. If the document doesn&apos;t
               cover something, Brief will say so instead of guessing.
             </p>
-            <div className="mt-5 flex flex-col items-center gap-2">
-              <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Try asking</p>
+            <div className="mt-5 flex flex-col items-center gap-2 max-sm:mt-2 max-sm:items-stretch">
+              <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase max-sm:text-left">Try asking</p>
               {suggestions === "loading" ? (
                 <p role="status" className="text-xs text-muted-foreground">
                   Finding good questions for this document...
                 </p>
               ) : (
-                <ul aria-label="Suggested questions" className="flex flex-wrap justify-center gap-2">
+                <ul aria-label="Suggested questions" className="flex flex-wrap justify-center gap-2 max-sm:-mx-3 max-sm:flex-nowrap max-sm:justify-start max-sm:overflow-x-auto max-sm:px-3 max-sm:pb-1">
                   {(suggestions ?? suggestionsFor(docType)).map((question) => (
-                    <li key={question}>
+                    <li key={question} className="max-sm:shrink-0">
                       <button
                         type="button"
                         onClick={() => void send(question)}
-                        className="rounded-full border border-border bg-card px-3 py-1.5 text-left text-xs max-sm:min-h-11 max-sm:px-4 text-foreground transition-colors outline-none hover:border-primary/50 hover:bg-accent focus-visible:ring-3 focus-visible:ring-ring/50"
+                        className="rounded-full border border-border bg-card px-3 py-1.5 text-left text-xs max-sm:min-h-11 max-sm:px-4 max-sm:whitespace-nowrap text-foreground transition-colors outline-none hover:border-primary/50 hover:bg-accent focus-visible:ring-3 focus-visible:ring-ring/50"
                       >
                         {question}
                       </button>
@@ -216,7 +216,7 @@ export function ChatPanel({
         {pending && <p className="text-sm text-muted-foreground">Reading the document...</p>}
       </div>
 
-      <form onSubmit={handleSubmit} className="sticky bottom-0 max-sm:bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-10 flex shrink-0 flex-col gap-2 rounded-b-lg border-t border-border bg-background p-3">
+      <form onSubmit={handleSubmit} className="sticky bottom-0 max-sm:bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-10 flex shrink-0 flex-col gap-2 rounded-b-lg border-t border-border bg-background p-3 max-sm:gap-1.5 max-sm:p-2.5">
         <textarea
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
@@ -230,7 +230,7 @@ export function ChatPanel({
           rows={2}
           placeholder='Ask about this document, for example "Can I pay this off early?"'
           aria-label="Your question"
-          className="w-full resize-none rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
+          className="w-full resize-none rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none placeholder:text-muted-foreground max-sm:h-11 max-sm:py-2.5 max-sm:placeholder:truncate focus-visible:ring-3 focus-visible:ring-ring/50"
         />
         <div className="flex items-center justify-between gap-3">
           <div className="flex flex-col">
