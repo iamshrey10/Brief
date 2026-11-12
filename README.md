@@ -128,13 +128,13 @@ Brief holds private documents, so each layer limits what it can reach. What is i
   already saved is free, so reaching the limit never locks anyone out of their results. `GET /me/usage`
   reports where a person stands, and the chat box says how many questions are left once ten or fewer
   remain.
-- **Many people at once.** Calls to the model are paced for everyone together (`MODEL_CALLS_PER_MINUTE`, 14 by
-  default, just under the free tier of Gemini) and a share of each minute (`MODEL_CALLS_RESERVED_FOR_QUESTIONS`) is
+- **Many people at once.** Calls to the model are paced for everyone together (`MODEL_CALLS_PER_MINUTE`, 300 by
+  default, far under the 4,000 that Tier 1 of the paid Gemini API allows) and a share of each minute (`MODEL_CALLS_RESERVED_FOR_QUESTIONS`) is
   kept for questions, which also have a place of their own to run, so documents being read cannot make questions
   wait. One person's documents are read one after another, and a document waiting its turn says how many are ahead
   of it. When the whole site has used up the day's model work (`GLOBAL_DAILY_MODEL_CALLS`, counted from everyone's
   usage with an estimate of calls for each kind) nothing new starts until midnight UTC, and the message says it is
-  the site that is busy. After moving to a paid tier of Gemini, raise the per minute numbers to what the tier allows.
+  the site that is busy. The daily number is the real spending guard (3,000 by default), so raise it only as the prepaid credit allows. On the free tier set 14, 4, 4.
 - **Abandoned uploads.** An upload that was started and never confirmed within an hour is removed, file
   first and then its record, when its owner starts the next upload, so it cannot sit as "Uploading" for
   ever or hold a slot against the document limit. Only a pending document is ever touched.
