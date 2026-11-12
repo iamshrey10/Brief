@@ -372,7 +372,19 @@ LIMIT_NOUNS = {"ask": "questions", "read": "document reads", "analyze": "documen
 async def _spend_or_refuse(session: AsyncSession, user: User, kind: str) -> None:
     """Counts one model-backed action against the person's daily limit, or refuses with a plain
     message. Called only once the request is known to be valid and theirs, so a mistaken or
-    forbidden request never uses up the limit."""
+    forbidden request never uses up the limit.
+
+    Before a person's own limit it checks the whole site's: when everyone together has used the day's model
+    work, nothing more starts until tomorrow, and the message says it is the site that is busy."""
+    if await usage.site_is_full(session):
+        raise HTTPException(
+            status_code=429,
+            detail=(
+                "Brief has reached its limit for today because a lot of people are using it. "
+                "Please try again tomorrow."
+            ),
+            headers={"Retry-After": str(usage.seconds_until_reset())},
+        )
     if not await usage.spend(session, user.id, kind):
         raise HTTPException(
             status_code=429,
@@ -483,6 +495,9 @@ class DocumentSummary(BaseModel):
     # How far a read has got while processing: pieces done out of the total, otherwise empty.
     progress_done: int | None = None
     progress_total: int | None = None
+    # While it waits its turn to be read: how many documents, anyone's, are being read or waiting ahead of it. Empty once
+    # its own read has begun or is over. It is only set where a person looks at a document, not in every list.
+    queue_ahead: int | None = None
 
     @classmethod
     def from_document(cls, document: Document) -> "DocumentSummary":
@@ -499,6 +514,26 @@ class DocumentSummary(BaseModel):
             progress_done=document.progress_done,
             progress_total=document.progress_total,
         )
+
+
+async def _add_queue_positions(session: AsyncSession, summaries: list[DocumentSummary]) -> list[DocumentSummary]:
+    """Says, for each document that is waiting to be read, how many documents are ahead of it in the line.
+
+    Reading is paced to what the model allows, so when many people upload at once a document can wait. Telling a person
+    how many are ahead, in place of showing nothing, makes a wait look like a line and not like a stall. The line is every
+    document that was uploaded and has not finished, oldest first. One small query, and only when something is waiting."""
+    waiting = [s for s in summaries if s.status == "uploaded"]
+    if not waiting:
+        return summaries
+    rows = await session.execute(
+        select(Document.id)
+        .where(Document.status.in_(("uploaded", "processing")), Document.deleted_at.is_(None))
+        .order_by(Document.created_at, Document.id)
+    )
+    line = [str(row[0]) for row in rows.all()]
+    for summary in waiting:
+        summary.queue_ahead = line.index(summary.id) if summary.id in line else 0
+    return summaries
 
 
 async def _live_document_count(session: AsyncSession, user: User) -> int:
@@ -929,7 +964,7 @@ async def list_documents(
     )
     documents = result.scalars().all()
 
-    return [DocumentSummary.from_document(d) for d in documents]
+    return await _add_queue_positions(session, [DocumentSummary.from_document(d) for d in documents])
 
 
 class SearchRequest(BaseModel):
@@ -1067,7 +1102,8 @@ async def get_document(
 ) -> DocumentSummary:
     document = await _get_owned_document(document_id, user, session)
 
-    return DocumentSummary.from_document(document)
+    (summary,) = await _add_queue_positions(session, [DocumentSummary.from_document(document)])
+    return summary
 
 
 @app.get(

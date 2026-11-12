@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 import logging
 import re
 import threading
@@ -241,7 +242,40 @@ def embed_texts(
     return vectors
 
 
+# One person's documents are read one after another, so one person who uploads a pile of files cannot take the whole
+# model allowance for themselves and keep everyone else waiting. A document waiting its turn simply stays "uploaded".
+_user_turns: dict[uuid.UUID, asyncio.Lock] = {}
+_user_waiting: dict[uuid.UUID, int] = {}
+
+
+@contextlib.asynccontextmanager
+async def _one_read_at_a_time(user_id: uuid.UUID):
+    """Waits for this person's earlier documents to finish being read, then holds their turn until the block ends."""
+    turn = _user_turns.setdefault(user_id, asyncio.Lock())
+    _user_waiting[user_id] = _user_waiting.get(user_id, 0) + 1
+    try:
+        async with turn:
+            yield
+    finally:
+        _user_waiting[user_id] -= 1
+        if _user_waiting[user_id] == 0:
+            del _user_waiting[user_id]
+            del _user_turns[user_id]
+
+
 async def ingest_document(document_id: uuid.UUID) -> None:
+    """Reads a document, once the person's earlier ones are done."""
+    async with async_session() as session:
+        document = await session.get(Document, document_id)
+        user_id = document.user_id if document is not None else None
+    if user_id is None:
+        logger.error("ingest_document called for missing document %s", document_id)
+        return
+    async with _one_read_at_a_time(user_id):
+        await _read_document(document_id)
+
+
+async def _read_document(document_id: uuid.UUID) -> None:
     async with async_session() as session:
         document = await session.get(Document, document_id)
         if document is None:

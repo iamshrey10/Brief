@@ -210,3 +210,25 @@ def test_the_seconds_until_reset_follow_utc_not_the_local_clock():
     plus_five = datetime.timezone(datetime.timedelta(hours=5))
     # 02:00 at +05:00 is 21:00 UTC the day before, so three hours remain, not twenty two
     assert seconds_until_reset(datetime.datetime(2026, 10, 25, 2, 0, 0, tzinfo=plus_five)) == 3 * 3600
+
+
+async def test_the_whole_site_counts_as_full_once_everyones_work_adds_up_to_the_days_allowance(db_session, test_user, monkeypatch):
+    import datetime
+
+    from app import usage
+    from app.config import settings
+
+    day = datetime.date(2030, 1, 1)
+    monkeypatch.setattr(usage, "CALLS_PER_USE", {"ask": 1, "read": 4, "analyze": 15})
+    monkeypatch.setattr(settings, "global_daily_model_calls", 10)
+
+    assert await usage.site_is_full(db_session, day) is False
+    for _ in range(2):
+        assert await usage.spend(db_session, test_user.id, "read", today=day)  # 2 reads: 8 calls
+    assert await usage.model_calls_today(db_session, day) == 8
+    assert await usage.site_is_full(db_session, day) is False
+    assert await usage.spend(db_session, test_user.id, "ask", today=day)
+    assert await usage.spend(db_session, test_user.id, "ask", today=day)  # 10 calls
+    assert await usage.site_is_full(db_session, day) is True
+    # Another day starts again from nothing.
+    assert await usage.site_is_full(db_session, datetime.date(2030, 1, 2)) is False

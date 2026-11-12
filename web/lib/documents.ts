@@ -16,6 +16,8 @@ export type DocumentSummary = {
   // How far a read has got while it is processing: parts done out of the total. Otherwise empty.
   progress_done?: number | null;
   progress_total?: number | null;
+  // While it waits to be read: how many documents are ahead of it in the line. Otherwise empty.
+  queue_ahead?: number | null;
 };
 
 export type ClauseData = {

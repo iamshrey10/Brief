@@ -123,7 +123,7 @@ What each step guards against:
 
 ```mermaid
 flowchart TD
-    Q["A question"] --> Spend{"Under today's limit<br/>of 100 questions?"}
+    Q["A question"] --> Spend{"Under today's limit<br/>of 40 questions?"}
     Spend -- no --> Limit["Refused with the API's own sentence"]
     Spend -- yes --> Search["Find the 8 best clauses:<br/>keyword search and meaning search,<br/>merged by reciprocal rank fusion"]
     Search --> None{"Any clauses?"}

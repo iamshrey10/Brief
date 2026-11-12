@@ -2879,3 +2879,56 @@ async def test_insights_never_include_another_persons_documents(client, db_sessi
     await main_module.get_key_terms(db_session, theirs.id, theirs.doc_type)
 
     assert (await client.get("/me/insights")).json() == []
+
+
+# --- Many people at once: the line for reading, and the whole site's allowance ---
+
+
+async def _waiting_document(db_session, user, name, status, minutes_ago):
+    import datetime as dt
+
+    document = Document(
+        user_id=user.id,
+        filename=name,
+        doc_type="lease",
+        status=status,
+        storage_key=f"fake/{name}",
+        file_size_bytes=1024,
+        created_at=dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=minutes_ago),
+    )
+    db_session.add(document)
+    await db_session.commit()
+    await db_session.refresh(document)
+    return document
+
+
+async def test_a_document_waiting_to_be_read_says_how_many_are_ahead_of_it(client, db_session, test_user):
+    await _waiting_document(db_session, test_user, "reading.pdf", "processing", 30)
+    await _waiting_document(db_session, test_user, "second.pdf", "uploaded", 20)
+    await _waiting_document(db_session, test_user, "third.pdf", "uploaded", 10)
+    await _waiting_document(db_session, test_user, "done.pdf", "ready", 40)
+
+    rows = {row["filename"]: row for row in (await client.get("/documents")).json()}
+
+    assert rows["second.pdf"]["queue_ahead"] == 1
+    assert rows["third.pdf"]["queue_ahead"] == 2
+    # Only a document that is waiting has a place in the line.
+    assert rows["reading.pdf"]["queue_ahead"] is None
+    assert rows["done.pdf"]["queue_ahead"] is None
+    one = (await client.get(f"/documents/{(await _waiting_document(db_session, test_user, 'fourth.pdf', 'uploaded', 1)).id}")).json()
+    assert one["queue_ahead"] == 3
+
+
+async def test_nothing_new_starts_once_the_whole_site_has_used_the_days_allowance(client, db_session, test_user, monkeypatch):
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "global_daily_model_calls", 0)
+    document = await _ready_document(db_session, test_user)
+
+    upload = await client.post("/documents", json=_upload_body())
+    ask = await client.post(f"/documents/{document.id}/ask", json={"question": "Anything?"})
+
+    for response in (upload, ask):
+        assert response.status_code == 429
+        assert "a lot of people are using it" in response.json()["detail"]
+        assert int(response.headers["Retry-After"]) >= 1
