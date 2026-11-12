@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { resetFakeApi, signInAsTestReader } from "./support/session";
+import { resetFakeApi, seedDocument, signInAsTestReader } from "./support/session";
 
 test.use({ viewport: { width: 390, height: 844 } });
 
@@ -196,4 +196,62 @@ test("on a phone the Ask box is compact: suggestions in one row that scrolls sid
   await page.getByRole("button", { name: "Ask", exact: true }).click();
   await expect(page.getByRole("log", { name: "Conversation" }).getByText("From the document")).toBeVisible();
   expect(await sidewaysOverflow(page)).toBeLessThanOrEqual(0);
+});
+
+test("on a phone an answer is shown whole, its source can be tapped, and the question box stays above the bar", async ({ page }) => {
+  await page.goto("/dashboard/documents/doc-lease");
+  await page.getByRole("tab", { name: "Ask" }).click();
+  await page.getByRole("textbox", { name: "Your question" }).fill("What is the security deposit?");
+  await page.getByRole("button", { name: "Ask", exact: true }).click();
+
+  const log = page.getByRole("log", { name: "Conversation" });
+  await expect(log.getByText("From the document")).toBeVisible();
+  // Nothing in the conversation is cut off: every message ends inside the log, which has grown to hold it.
+  const cut = await log.evaluate((el) => Array.from(el.children).filter((child) => child.getBoundingClientRect().bottom > el.getBoundingClientRect().bottom + 1).length);
+  expect(cut).toBe(0);
+
+  await log.getByRole("button", { name: /^Page 1 .security deposit of \$1,450\.00/ }).click();
+  await expect(page.locator("mark")).toHaveText("security deposit of $1,450.00");
+  await expect(page.getByRole("tab", { name: "Ask" })).toHaveAttribute("aria-selected", "true");
+
+  const form = await page.getByRole("textbox", { name: "Your question" }).boundingBox();
+  const bar = await page.getByRole("navigation", { name: "Sections" }).last().boundingBox();
+  expect(form!.y + form!.height).toBeLessThanOrEqual(bar!.y);
+});
+
+test("on a phone the red number for a waiting request sits on the Shared tab of the bottom bar, and is read after the tab's name", async ({ page }) => {
+  await page.goto("/dashboard/shared#sharing");
+  await page.getByLabel(/Who is it for/).fill("Mum");
+  await page.getByRole("button", { name: "Create invitation" }).click();
+  const link = await page.getByRole("region", { name: "New invitation" }).getByLabel("Invitation link").inputValue();
+  await page.goto(new URL(link).pathname);
+  await page.getByLabel("Six digit code").fill("482913");
+  await page.getByRole("button", { name: "Ask for access" }).click();
+  await expect(page.getByRole("status")).toContainText("Your request was sent to");
+
+  await page.goto("/dashboard");
+  const bar = page.getByRole("navigation", { name: "Sections" }).last();
+  const shared = bar.getByRole("link", { name: /^Shared.*1 person is waiting for your approval/ });
+  await expect(shared).toBeVisible();
+  const tab = await shared.boundingBox();
+  const badge = await shared.locator("span[aria-hidden=true].bg-red-600").boundingBox();
+  expect(badge!.x).toBeGreaterThanOrEqual(tab!.x);
+  expect(badge!.x + badge!.width).toBeLessThanOrEqual(tab!.x + tab!.width);
+});
+
+test("a very long file name wraps instead of running off a narrow phone, on every page that shows it", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 740 });
+  const name = "final-signed-lease-agreement-for-the-apartment-at-1234-north-mill-avenue-tempe-arizona-2026-2027.pdf";
+  await seedDocument(page, { id: "doc-long", filename: name, doc_type: "lease", status: "ready", ocr_confidence: null, created_at: "2026-10-03T12:00:00Z", status_changed_at: "2026-10-03T12:01:00Z" });
+
+  for (const path of ["/dashboard", "/dashboard/documents", "/dashboard/documents/doc-long"]) {
+    await page.goto(path);
+    await expect(page.getByText(name).first()).toBeVisible();
+    expect(await sidewaysOverflow(page), path).toBeLessThanOrEqual(0);
+    const boxes = await page.getByText(name).evaluateAll((els) => els.map((el) => { const r = el.getBoundingClientRect(); return [r.left, r.right]; }));
+    for (const [left, right] of boxes) {
+      expect(left, path).toBeGreaterThanOrEqual(0);
+      expect(right, path).toBeLessThanOrEqual(360);
+    }
+  }
 });

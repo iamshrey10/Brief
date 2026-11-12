@@ -145,7 +145,7 @@ export function ChatPanel({
         role="log"
         aria-live="polite"
         aria-label="Conversation"
-        className="flex flex-1 flex-col gap-3 p-4 max-sm:p-3 lg:min-h-0 lg:overflow-y-auto"
+        className="flex flex-1 flex-col gap-3 p-4 max-sm:flex-none max-sm:p-3 max-sm:*:shrink-0 lg:min-h-0 lg:overflow-y-auto"
       >
         {messages.length === 0 && !pending && (
           <div className="my-auto px-2 text-center">

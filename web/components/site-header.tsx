@@ -9,7 +9,7 @@ export function SiteHeader({ signedIn }: { signedIn: boolean }) {
   return (
     <header className="sticky top-0 z-40 border-b border-border/70 bg-background">
       <div className="mx-auto flex h-16 w-[min(100%-3rem,1400px)] items-center justify-between gap-4">
-        <Link href="/" className="font-heading text-2xl font-semibold tracking-tight text-foreground max-sm:inline-flex max-sm:min-h-11 max-sm:items-center">
+        <Link href="/" className="font-heading text-2xl font-semibold tracking-tight text-foreground max-sm:inline-block max-sm:py-2">
           Brief<span className="text-primary">.</span>
         </Link>
         <div className="flex items-center gap-2">

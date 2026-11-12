@@ -7,7 +7,7 @@ export function RecentActivity({ items }: { items: Activity[] }) {
   if (items.length === 0) return null;
 
   return (
-    <section aria-labelledby="activity-heading" className="rounded-2xl border border-border bg-card p-5">
+    <section aria-labelledby="activity-heading" className="min-w-0 rounded-2xl border border-border bg-card p-5">
       <h2 id="activity-heading" className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
         Recent activity
       </h2>

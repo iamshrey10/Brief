@@ -36,7 +36,7 @@ export function AppHeader({
     <header className="sticky top-0 z-40 border-b border-border/70 bg-background/85 backdrop-blur print:hidden">
       <div className={`mx-auto flex flex-wrap items-center justify-between gap-x-4 ${widthClass}`}>
         <div className="flex h-14 items-center gap-6">
-          <Link href="/dashboard" className="font-heading text-xl font-semibold tracking-tight text-foreground max-sm:inline-flex max-sm:min-h-11 max-sm:items-center">
+          <Link href="/dashboard" className="font-heading text-xl font-semibold tracking-tight text-foreground max-sm:inline-block max-sm:py-2">
             Brief<span className="text-primary">.</span>
           </Link>
           <nav aria-label="Sections" className="hidden items-center gap-1 sm:flex">
@@ -76,9 +76,14 @@ export function AppHeader({
               >
                 <span className={cn("relative flex h-8 w-14 items-center justify-center rounded-2xl transition-colors", active && "bg-accent")}>
                   <Icon aria-hidden="true" className="size-5" />
-                  {(section.id === "shared" || section.id === "profile") && <PendingBadge corner />}
                 </span>
                 {section.label}
+                {/* After the label, so a screen reader says "Shared, 1 person is waiting", the way the bar at the top does. */}
+                {(section.id === "shared" || section.id === "profile") && (
+                  <span className="absolute top-1.5 left-1/2 ml-2">
+                    <PendingBadge />
+                  </span>
+                )}
               </Link>
             </li>
           );
