@@ -327,7 +327,7 @@ export function UploadNotifications({ children }: { children: ReactNode }) {
   return (
     <NotificationsContext.Provider value={value}>
       {children}
-      <section aria-label="Notifications" className="pointer-events-none fixed right-4 bottom-4 z-50 w-[min(100vw-2rem,24rem)] print:hidden">
+      <section aria-label="Notifications" className="pointer-events-none fixed right-4 bottom-4 max-sm:bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-50 w-[min(100vw-2rem,24rem)] print:hidden">
         <ul className="flex flex-col gap-2">
           {toasts.map((toast) => (
             <ToastCard key={toast.id} toast={toast} onClose={() => dismiss(toast.id)} onRetry={(documentId) => void retry(toast.id, documentId)} />

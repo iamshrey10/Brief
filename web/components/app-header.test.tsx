@@ -51,10 +51,12 @@ describe("the signed in header", () => {
     }
   });
 
-  it("shows the sections beside the name on a wide screen and on their own row on a phone", () => {
+  it("shows the sections beside the name on a wide screen and in a bar fixed to the bottom on a phone", () => {
     const html = renderToStaticMarkup(<AppHeader email="a@b.co" current="documents" />);
 
     expect(html).toMatch(/<nav aria-label="Sections" class="hidden[^"]*sm:flex"/);
-    expect(html).toMatch(/<nav aria-label="Sections" class="[^"]*w-full[^"]*sm:hidden"/);
+    expect(html).toMatch(/<nav aria-label="Sections" class="fixed inset-x-0 bottom-0[^"]*sm:hidden/);
+    // The bar across the top no longer carries a second row of sections on a phone: four links in the bar, four beside the name.
+    expect(html.match(/<a[^>]*href="\/dashboard(\/[a-z]+)?"/g)).toHaveLength(9);
   });
 });

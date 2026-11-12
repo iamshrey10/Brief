@@ -136,3 +136,44 @@ test("on a phone the Find box has a full row, and its arrows, chips and question
   for (const box of await suggestions.evaluateAll((els) => els.map((el) => el.getBoundingClientRect().height))) expect(box).toBeGreaterThanOrEqual(43.5);
   expect(await sidewaysOverflow(page)).toBeLessThanOrEqual(0);
 });
+
+test("on a phone the sections are a bar fixed to the bottom of the screen, and the end of a page is not hidden behind it", async ({ page }) => {
+  await page.goto("/dashboard/documents");
+  const bar = page.getByRole("navigation", { name: "Sections" }).last();
+  await expect(bar).toBeVisible();
+
+  const box = await bar.boundingBox();
+  expect(box!.y + box!.height).toBeCloseTo(844, 0);
+  for (const name of ["Dashboard", "Documents", "Shared", "Profile"]) {
+    const link = await bar.getByRole("link", { name }).boundingBox();
+    expect(link!.height, name).toBeGreaterThanOrEqual(43.5);
+    expect(link!.width, name).toBeGreaterThanOrEqual(43.5);
+  }
+  await expect(bar.getByRole("link", { name: "Documents" })).toHaveAttribute("aria-current", "page");
+
+  // The row of sections under the name is gone: the top bar is one row.
+  const top = await page.locator("header").first().boundingBox();
+  expect(top!.height).toBeLessThanOrEqual(60);
+
+  // Scrolled to the bottom, the last thing on the page ends above the bar.
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+  const footer = await page.getByRole("navigation", { name: "Legal" }).boundingBox();
+  expect(footer!.y + footer!.height).toBeLessThanOrEqual(box!.y);
+
+  await bar.getByRole("link", { name: "Profile" }).click();
+  await expect(page).toHaveURL(/\/dashboard\/profile$/);
+});
+
+test("on a laptop the sections stay beside the name and there is no bar at the bottom", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 800 }, baseURL: "http://localhost:3100" });
+  const page = await context.newPage();
+  await signInAsTestReader(page);
+  await page.goto("/dashboard");
+
+  // Only one bar of sections is shown (hidden ones are not found by role), and it is the one beside the name.
+  const bars = page.getByRole("navigation", { name: "Sections" });
+  await expect(bars).toHaveCount(1);
+  await expect(page.locator("header").getByRole("navigation", { name: "Sections" })).toBeVisible();
+  await expect(page.locator("nav[aria-label=Sections].fixed")).toBeHidden();
+  await context.close();
+});
