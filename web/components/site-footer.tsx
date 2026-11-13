@@ -1,8 +1,10 @@
 import Link from "next/link";
 
-export const REPOSITORY_URL = "https://github.com/iamshrey10/Brief";
+import { ContactEmail } from "@/components/contact-email";
 
-/** The strip at the bottom of the landing page: the name, the legal pages, the source, and the one thing a reader should not forget. */
+export const PORTFOLIO_URL = "https://shreyasrevankar.com";
+
+/** The strip at the bottom of the landing page: the name, the legal pages, how to reach the person who made it, and the one thing a reader should not forget. */
 export function SiteFooter() {
   return (
     <footer className="border-t border-border/70">
@@ -24,16 +26,18 @@ export function SiteFooter() {
             <Link href="/terms" className="inline-flex max-sm:min-h-11 max-sm:items-center underline-offset-4 hover:text-foreground hover:underline">
               Terms
             </Link>
+          </nav>
+          <div className="flex flex-col gap-1 text-sm text-muted-foreground md:items-end">
             <a
-              href={REPOSITORY_URL}
+              href={PORTFOLIO_URL}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex max-sm:min-h-11 max-sm:items-center underline-offset-4 hover:text-foreground hover:underline"
+              className="inline-flex font-mono text-xs tracking-wide underline-offset-4 hover:text-foreground hover:underline max-sm:min-h-11 max-sm:items-center"
             >
-              Source on GitHub
+              SHREYASREVANKAR.COM
             </a>
-          </nav>
-          <p className="font-mono text-xs tracking-wide text-muted-foreground">SHREYASREVANKAR.COM</p>
+            <ContactEmail className="inline-flex underline-offset-4 hover:text-foreground hover:underline max-sm:min-h-11 max-sm:items-center" />
+          </div>
         </div>
       </div>
     </footer>

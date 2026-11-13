@@ -63,10 +63,10 @@ export function LandingFeatures() {
       <LandingBackdrop words={FEATURES_WORDS} />
       <RevealOnView className="mx-auto w-[min(100%-3rem,1400px)] py-12 md:py-14">
         <div className="hiw-card max-w-2xl" style={{ "--i": 0 } as CSSProperties}>
-          <h2 id="features-heading" className="text-4xl font-semibold tracking-tight text-foreground md:text-5xl">
+          <h2 id="features-heading" className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl md:text-5xl">
             What you get
           </h2>
-          <p className="mt-4 text-xl text-muted-foreground">
+          <p className="mt-3 text-base text-muted-foreground sm:mt-4 sm:text-xl">
             Not a chat box you have to know what to ask. Brief reads the whole document and shows its work.
           </p>
         </div>
@@ -77,7 +77,7 @@ export function LandingFeatures() {
                 <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-accent text-accent-foreground">
                   {feature.icon}
                 </span>
-                <h3 className="text-2xl font-semibold tracking-tight text-balance text-foreground">{feature.title}</h3>
+                <h3 className="text-xl font-semibold tracking-tight text-balance text-foreground sm:text-2xl">{feature.title}</h3>
                 <p className="text-base leading-relaxed text-muted-foreground">{feature.body}</p>
               </div>
             </li>

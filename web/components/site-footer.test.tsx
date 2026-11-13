@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { REPOSITORY_URL, SiteFooter } from "./site-footer";
+import { PORTFOLIO_URL, SiteFooter } from "./site-footer";
 
 describe("the landing page footer", () => {
   const html = renderToStaticMarkup(<SiteFooter />);
@@ -11,10 +11,21 @@ describe("the landing page footer", () => {
     expect(html).toContain('href="/terms"');
   });
 
-  it("links to the source, in a new tab that cannot reach back into this one", () => {
-    expect(html).toContain(`href="${REPOSITORY_URL}"`);
+  it("links to the portfolio, in a new tab that cannot reach back into this one", () => {
+    expect(html).toContain(`href="${PORTFOLIO_URL}"`);
+    expect(html).toContain("SHREYASREVANKAR.COM");
     expect(html).toContain('target="_blank"');
     expect(html).toContain('rel="noopener noreferrer"');
+  });
+
+  it("no longer links to the source on GitHub", () => {
+    expect(html).not.toContain("github.com");
+    expect(html).not.toContain("Source on GitHub");
+  });
+
+  it("does not put the email address in the page text, where a bot that collects addresses would find it", () => {
+    expect(html).not.toContain("revankarshreyas10");
+    expect(html).not.toContain("mailto:");
   });
 
   it("says Brief is explanation and not legal advice", () => {
