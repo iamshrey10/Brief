@@ -21,9 +21,8 @@ test("a first visit asks for a first and last name before anything else, then la
   await page.getByLabel("Last name").fill("Rao");
   await page.getByRole("button", { name: "Continue" }).click();
 
-  // Next, the offer of a second lock on the account.
-  await expect(page).toHaveURL(/\/dashboard\/profile#two-step$/);
-  await expect(page.getByRole("region", { name: "Two step verification" })).toBeVisible();
+  // Straight to the dashboard.
+  await expect(page).toHaveURL(/\/dashboard$/);
   await page.goto("/dashboard/welcome");
   await expect(page).toHaveURL(/\/dashboard$/);
 });

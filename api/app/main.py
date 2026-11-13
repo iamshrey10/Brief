@@ -97,9 +97,7 @@ RECOVER_READS_AFTER_SECONDS = 90
 async def recover_reads_soon() -> None:
     await asyncio.sleep(RECOVER_READS_AFTER_SECONDS)
     try:
-        started = await recover_stranded_reads()
-        if started:
-            logger.info("started %d interrupted reads again", started)
+        await recover_stranded_reads()
     except Exception:
         logger.exception("recovering interrupted reads failed")
 

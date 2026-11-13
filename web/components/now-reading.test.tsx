@@ -14,7 +14,7 @@ vi.mock("next/link", () => ({
 }));
 vi.mock("@/lib/overview", () => ({ fetchKeyTerms: vi.fn().mockResolvedValue({ ok: true }), fetchChecklist: vi.fn().mockResolvedValue({ ok: true }) }));
 
-import type { DocumentSummary } from "@/lib/documents";
+import { POLL_INTERVAL_MS, type DocumentSummary } from "@/lib/documents";
 import { NowReading } from "./now-reading";
 import { UploadNotifications, useUploadNotifications } from "./upload-notifications";
 
@@ -90,7 +90,7 @@ describe("NowReading", () => {
     show([doc("lease", "processing")]);
 
     listIs([doc("lease", "ready")]);
-    await tick(3100);
+    await tick(POLL_INTERVAL_MS + 100);
     await tick(100);
 
     const region = screen.getByRole("region", { name: "Now reading" });
