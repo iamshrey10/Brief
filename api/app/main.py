@@ -5,6 +5,7 @@ import re
 import time
 import uuid
 from datetime import datetime, timedelta, timezone
+from typing import Literal
 
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request, Response
 from google.genai import errors as genai_errors
@@ -219,9 +220,14 @@ async def me(user: User = Depends(get_current_user)) -> Me:
     return Me(id=str(user.id), email=user.email, first_name=user.first_name, last_name=user.last_name)
 
 
+SIGNUP_REASONS = ("lease", "loan", "job_offer", "exploring")
+
+
 class NameRequest(BaseModel):
     first_name: str
     last_name: str
+    # Why they came, from the welcome page. Optional: changing a name later does not send it.
+    reason: Literal["lease", "loan", "job_offer", "exploring"] | None = None
 
     @field_validator("first_name", "last_name")
     @classmethod
@@ -239,7 +245,7 @@ class NameRequest(BaseModel):
     tags=["account"],
     summary="Set your first and last name",
     description=(
-        "Saves the signed-in person's first and last name, which other people see in place of an email address when a dashboard is shared. Each is 1 to 50 letters, with spaces, hyphens, apostrophes and full stops allowed."
+        "Saves the signed-in person's first and last name, which other people see in place of an email address when a dashboard is shared. Each is 1 to 50 letters, with spaces, hyphens, apostrophes and full stops allowed. The welcome page also sends why the person came (lease, loan, job_offer or exploring), which is only ever counted."
     ),
     responses=_errors(401),
 )
@@ -252,6 +258,8 @@ async def set_my_name(
     person = await session.get(User, user.id)
     person.first_name = body.first_name
     person.last_name = body.last_name
+    if body.reason is not None:
+        person.signup_reason = body.reason
     await session.commit()
     await session.refresh(person)
     return Me(id=str(person.id), email=person.email, first_name=person.first_name, last_name=person.last_name)

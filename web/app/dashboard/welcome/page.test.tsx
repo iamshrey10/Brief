@@ -47,6 +47,29 @@ describe("the welcome page", () => {
     expect(html).toContain("instead of your email address");
   });
 
+  it("asks why the person came, with the four choices", async () => {
+    const html = renderToStaticMarkup(await WelcomePage());
+
+    expect(html).toContain("What brings you to Brief today?");
+    for (const title of ["Check a lease", "Understand a loan", "Review a job offer", "Just looking around"]) expect(html).toContain(title);
+  });
+
+  it("says what happens next, in three steps", async () => {
+    const html = renderToStaticMarkup(await WelcomePage());
+
+    expect(html).toContain("What happens next");
+    expect(html).toContain("Add a document");
+    expect(html).toContain("Brief reads every clause");
+    expect(html).toContain("Ask, then check");
+  });
+
+  it("reassures about privacy, with a link to the privacy page", async () => {
+    const html = renderToStaticMarkup(await WelcomePage());
+
+    expect(html).toContain("stay private to you");
+    expect(html).toContain('href="/privacy"');
+  });
+
   it("is not indexed", () => {
     expect(metadata.robots).toEqual({ index: false, follow: false });
   });
