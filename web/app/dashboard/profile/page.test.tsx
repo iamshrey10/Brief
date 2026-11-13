@@ -53,6 +53,15 @@ describe("the profile page", () => {
     expect(html).toMatch(/aria-hidden="true"[^>]*>R</);
   });
 
+  it("offers the tour again, as a row that opens it", async () => {
+    authMock.mockResolvedValue({ user: { email: "reader@example.com" } });
+
+    const html = await page();
+
+    expect(html).toContain("Take the tour");
+    expect(html).toContain('href="/dashboard?tour=1"');
+  });
+
   it("has one heading, named Profile, and the Account section named by its own heading", async () => {
     authMock.mockResolvedValue({ user: { email: "reader@example.com" } });
 

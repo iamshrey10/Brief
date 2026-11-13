@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
 import { AppHeader } from "@/components/app-header";
-import { BarChart3, Lock, Palette, Trash2, Users } from "lucide-react";
+import { BarChart3, Compass, Lock, Palette, Trash2, Users } from "lucide-react";
 import { PendingBadge } from "@/components/pending-badge";
 import { ProfileRow } from "@/components/profile-row";
 import { BinList } from "@/components/bin-list";
@@ -16,6 +16,7 @@ import { asTrash } from "@/lib/trash";
 import { asTwoFactorStatus } from "@/lib/two-factor";
 import { mintServiceToken } from "@/lib/service-token";
 import { parseUsage, type Usage } from "@/lib/usage";
+import { TOUR_URL } from "@/lib/tour-steps";
 
 export const metadata = { title: "Profile", robots: { index: false, follow: false } };
 
@@ -83,6 +84,7 @@ export default async function ProfilePage() {
                 <BinList initial={trash} />
               </section>
             </ProfileRow>
+            <ProfileRow anchor="tour" href={TOUR_URL} icon={<Compass className="size-5" />} title="Take the tour" description="A short walk through everything Brief can do." />
             <ProfileRow anchor="appearance" icon={<Palette className="size-5" />} title="Appearance" description="Choose how Brief looks on this device.">
               <section id="appearance" aria-labelledby="appearance-heading">
                 <h2 id="appearance-heading" className="text-lg font-semibold tracking-tight text-foreground">

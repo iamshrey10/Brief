@@ -6,6 +6,7 @@ import { useState, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import { MAX_NAME_LENGTH, saveName } from "@/lib/name";
+import { TOUR_URL } from "@/lib/tour-steps";
 import { REASONS, type SignupReason } from "@/lib/welcome-reasons";
 
 const INPUT = "h-11 w-full rounded-lg border border-input bg-background px-3 text-base font-normal outline-none focus-visible:ring-3 focus-visible:ring-ring/50";
@@ -31,8 +32,8 @@ export function WelcomeSetup({ initialFirst, initialLast, email }: { initialFirs
     const outcome = await saveName(first, last, reason);
     setBusy(false);
     if (!outcome.ok) return setError(outcome.message);
-    // Straight to the dashboard. Two-step verification stays one tap away on the Profile page.
-    router.push("/dashboard");
+    // To the dashboard, where the short tour opens. Two-step verification is one of its steps.
+    router.push(TOUR_URL);
     router.refresh();
   }
 
