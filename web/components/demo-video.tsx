@@ -21,7 +21,7 @@ export function DemoVideoButton() {
 
   return (
     <>
-      <Button type="button" variant="outline" size="lg" className="h-12 px-6 text-lg" onClick={show}>
+      <Button type="button" variant="outline" size="lg" className="h-12 px-6 text-base max-sm:w-full sm:text-lg" onClick={show}>
         <Play aria-hidden="true" className="size-4" />
         Watch how it works
       </Button>

@@ -27,10 +27,10 @@ export function LandingSteps() {
       <LandingBackdrop words={HOW_WORDS} />
       <div className="mx-auto w-[min(100%-3rem,1400px)] py-12 md:py-14">
         <div className="max-w-2xl">
-          <h2 id="how-heading" className="text-4xl font-semibold tracking-tight text-foreground md:text-5xl">
+          <h2 id="how-heading" className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl md:text-5xl">
             How it works
           </h2>
-          <p className="mt-4 text-xl text-muted-foreground">From a file to an answer you can check, in three steps.</p>
+          <p className="mt-3 text-base text-muted-foreground sm:mt-4 sm:text-xl">From a file to an answer you can check, in three steps.</p>
         </div>
         <RevealOnView className="mt-12">
           <ol className="grid gap-10 md:grid-cols-3 md:gap-8">
@@ -41,7 +41,7 @@ export function LandingSteps() {
                   {String(index + 1).padStart(2, "0")}
                 </span>
                 <StepArt index={index} />
-                <h3 className="text-2xl font-semibold tracking-tight text-balance text-foreground">{step.title}</h3>
+                <h3 className="text-xl font-semibold tracking-tight text-balance text-foreground sm:text-2xl">{step.title}</h3>
                 <p className="text-base leading-relaxed text-muted-foreground">{step.body}</p>
               </li>
             ))}

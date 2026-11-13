@@ -39,34 +39,34 @@ function Check() {
 /** The first screen of the landing page: what Brief is, one way in, and the proof underneath. */
 export function LandingHero({ signedIn }: { signedIn: boolean }) {
   return (
-    <section className="mx-auto grid w-[min(100%-3rem,1400px)] items-center gap-10 py-10 md:py-14 lg:grid-cols-[1.1fr_0.9fr]">
-      <div className="flex flex-col items-start gap-6">
+    <section className="mx-auto grid w-[min(100%-3rem,1400px)] items-center gap-8 py-8 sm:gap-10 sm:py-10 md:py-14 lg:grid-cols-[1.1fr_0.9fr]">
+      <div className="flex flex-col items-start gap-5 sm:gap-6">
         <Rise order={0}>
-          <p className="rounded-full border border-border bg-accent px-4 py-1.5 text-sm font-medium text-accent-foreground">
+          <p className="rounded-full border border-border bg-accent px-3.5 py-1 text-xs font-medium text-accent-foreground sm:px-4 sm:py-1.5 sm:text-sm">
             For loans, leases and job offers
           </p>
         </Rise>
         <Rise order={1}>
-          <h1 className="text-6xl leading-[1.05] font-semibold tracking-tight text-foreground md:text-7xl">
+          <h1 className="text-4xl leading-[1.1] font-semibold tracking-tight text-foreground sm:text-6xl sm:leading-[1.05] md:text-7xl">
             Every clause, explained.
           </h1>
         </Rise>
         <Rise order={2}>
-          <p className="max-w-2xl text-xl text-muted-foreground md:text-2xl">
+          <p className="max-w-2xl text-base text-muted-foreground sm:text-xl md:text-2xl">
             An AI that reads your contract and shows you{" "}
             <span className="font-medium text-foreground">exactly where every answer comes from</span>, not a guess.
           </p>
         </Rise>
 
-        <Rise order={3}>
-          <div className="flex flex-wrap items-center gap-3">
+        <Rise order={3} className="max-sm:w-full">
+          <div className="flex w-full flex-col items-stretch gap-3 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
             {signedIn ? (
-              <Link href="/dashboard" className={buttonVariants({ size: "lg", className: "h-12 px-6 text-lg" })}>
+              <Link href="/dashboard" className={buttonVariants({ size: "lg", className: "h-12 px-6 text-base max-sm:w-full sm:text-lg" })}>
                 Go to dashboard
               </Link>
             ) : (
-              <form action={signInWithGoogle}>
-                <Button type="submit" size="lg" className="h-12 gap-3 px-5 text-lg">
+              <form action={signInWithGoogle} className="max-sm:contents">
+                <Button type="submit" size="lg" className="h-12 gap-3 px-5 text-base max-sm:w-full sm:text-lg">
                   <GoogleG />
                   Sign in with Google
                 </Button>
@@ -77,7 +77,7 @@ export function LandingHero({ signedIn }: { signedIn: boolean }) {
         </Rise>
 
         <Rise order={4}>
-        <ul className="mt-2 flex flex-col gap-3 text-base text-muted-foreground">
+        <ul className="mt-1 flex flex-col gap-2.5 text-sm text-muted-foreground sm:mt-2 sm:gap-3 sm:text-base">
             {HERO_PROMISES.map((promise) => (
               <li key={promise} className="flex items-start gap-2.5">
                 <Check />
