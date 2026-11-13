@@ -24,8 +24,8 @@ describe("SharedWithYou", () => {
     render(
       <SharedWithYou
         items={[
-          { id: "s1", owner_email: "mum@example.com", owner_name: "Asha Rao", status: "active" },
-          { id: "s2", owner_email: "dad@example.com", owner_name: null, status: "requested" },
+          { id: "s1", owner_email: "mum@example.com", owner_name: "Asha Rao", status: "active", access_ends_at: null },
+          { id: "s2", owner_email: "dad@example.com", owner_name: null, status: "requested", access_ends_at: null },
         ]}
       />,
     );
@@ -35,6 +35,21 @@ describe("SharedWithYou", () => {
     expect(screen.getByText("Waiting for their approval")).toBeInTheDocument();
     expect(screen.getByText(/1 waiting for their approval/)).toBeInTheDocument();
     expect(screen.getByText("Asha Rao")).toBeInTheDocument();
+  });
+
+  it("shows how long someone's access to a dashboard has left, and nothing for one still waiting", () => {
+    const inDays = new Date(Date.now() + 3 * 86_400_000 + 60_000).toISOString();
+    render(
+      <SharedWithYou
+        items={[
+          { id: "s1", owner_email: "mum@example.com", owner_name: "Asha Rao", status: "active", access_ends_at: inDays },
+          { id: "s2", owner_email: "dad@example.com", owner_name: "Dev Rao", status: "requested", access_ends_at: null },
+        ]}
+      />,
+    );
+
+    expect(screen.getByText("Access: ends in 3 days")).toBeInTheDocument();
+    expect(screen.queryByText(/Access: ends in .* days/, { selector: "li:nth-child(2) *" })).not.toBeInTheDocument();
   });
 
   it("with nothing shared, says so and keeps the place to enter a link and code closed until it is asked for", () => {

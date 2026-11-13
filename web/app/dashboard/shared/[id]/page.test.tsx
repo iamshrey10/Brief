@@ -63,6 +63,21 @@ describe("the shared dashboard page", () => {
     expect(html).toContain('href="/dashboard/shared"');
   });
 
+  it("tells a person whose time ran out that it ended, not that it was taken away", async () => {
+    getMock.mockImplementation(async (_email: string, path: string) =>
+      path.endsWith("/removed") ? { owner_email: "owner@example.com", owner_name: "Asha Rao", reason: "expired", ended_at: "2026-11-10T10:00:00Z" } : null,
+    );
+
+    const html = renderToStaticMarkup(await SharedDashboardPage(params("s1")));
+
+    expect(html).toContain("Your access has ended");
+    expect(html).toContain("that time is over");
+    expect(html).toContain("ask them to share it again");
+    expect(html).not.toContain("Your access was removed");
+    expect(html).not.toContain("has removed your access");
+    expect(html).toContain('href="/dashboard/shared"');
+  });
+
   it("uses the email when the owner has no name", async () => {
     getMock.mockImplementation(async (_email: string, path: string) => (path.endsWith("/removed") ? { owner_email: "owner@example.com", owner_name: null } : null));
 

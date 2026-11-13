@@ -6,10 +6,13 @@ import {
   asSharedDashboard,
   asSharedWithMe,
   asShares,
+  changeShareAccess,
   createShare,
   joinLink,
   joinShare,
   lastViewedText,
+  messageForApproveFailure,
+  messageForExtendFailure,
   messageForJoinFailure,
   messageForShareFailure,
   removeShare,
@@ -25,23 +28,23 @@ const reply = (status: number, body?: unknown, headers: Record<string, string> =
 
 describe("reading what the backend sends", () => {
   it("keeps well-formed shares and drops the rest", () => {
-    const good = { id: "a", label: "Mum", status: "active", viewer_email: "m@x.com", viewer_name: "Maya Rao", created_at: "2026-11-01", expires_at: null, last_viewed_at: null };
+    const good = { id: "a", label: "Mum", status: "active", viewer_email: "m@x.com", viewer_name: "Maya Rao", created_at: "2026-11-01", expires_at: null, last_viewed_at: null, access_hours: 168, access_until: null, access_ends_at: "2026-11-08T10:00:00Z" };
     expect(asShares([good, { id: "b", status: "weird", created_at: "x" }, null, { status: "active" }])).toEqual([good]);
     expect(asShares({ detail: "x" })).toEqual([]);
   });
 
   it("fills in what is missing with nothing", () => {
-    expect(asShares([{ id: "a", status: "invited", created_at: "2026-11-01" }])[0]).toMatchObject({ label: null, viewer_email: null, viewer_name: null, expires_at: null, last_viewed_at: null });
+    expect(asShares([{ id: "a", status: "invited", created_at: "2026-11-01" }])[0]).toMatchObject({ label: null, viewer_email: null, viewer_name: null, expires_at: null, last_viewed_at: null, access_hours: null, access_until: null, access_ends_at: null });
   });
 
   it("keeps only dashboards that are waiting or active", () => {
     expect(
       asSharedWithMe([
-        { id: "a", owner_email: "o@x.com", owner_name: "Olu Ade", status: "active" },
+        { id: "a", owner_email: "o@x.com", owner_name: "Olu Ade", status: "active", access_ends_at: "2026-11-08T10:00:00Z" },
         { id: "b", owner_email: "o@x.com", status: "revoked" },
         { id: "c", status: "active" },
       ]),
-    ).toEqual([{ id: "a", owner_email: "o@x.com", owner_name: "Olu Ade", status: "active" }]);
+    ).toEqual([{ id: "a", owner_email: "o@x.com", owner_name: "Olu Ade", status: "active", access_ends_at: "2026-11-08T10:00:00Z" }]);
     expect(asSharedWithMe(null)).toEqual([]);
   });
 
@@ -121,14 +124,14 @@ describe("the calls", () => {
   it("creates an invitation, sending the name, and returns what came back", async () => {
     fetchMock.mockResolvedValue(reply(201, { id: "i", token: "t", code: "123456", expires_at: "x" }));
 
-    expect(await createShare("Mum")).toEqual({ ok: true, result: { id: "i", token: "t", code: "123456", expires_at: "x" } });
-    expect(fetchMock).toHaveBeenCalledWith("/api/backend/shares", expect.objectContaining({ method: "POST", body: JSON.stringify({ label: "Mum" }) }));
+    expect(await createShare("Mum", { kind: "hours", hours: 168 })).toEqual({ ok: true, result: { id: "i", token: "t", code: "123456", expires_at: "x" } });
+    expect(fetchMock).toHaveBeenCalledWith("/api/backend/shares", expect.objectContaining({ method: "POST", body: JSON.stringify({ label: "Mum", hours: 168 }) }));
   });
 
   it("explains a refusal, with the reference that finds it in the logs", async () => {
     fetchMock.mockResolvedValue(reply(409, { detail: "x" }, { "X-Request-ID": "abcdef12-3456" }));
 
-    const outcome = await createShare("");
+    const outcome = await createShare("", { kind: "hours", hours: 24 });
 
     expect(outcome).toEqual({ ok: false, message: expect.stringContaining("up to 5 people") });
     expect(outcome.ok === false && outcome.message).toContain("Reference: abcdef12");
@@ -192,12 +195,45 @@ describe("inviteTokenFrom", () => {
 
 describe("asAccessRemoved", () => {
   it("reads whose dashboard it was, with or without a name", () => {
-    expect(asAccessRemoved({ owner_email: "mum@example.com", owner_name: "Asha Rao" })).toEqual({ ownerEmail: "mum@example.com", ownerName: "Asha Rao" });
-    expect(asAccessRemoved({ owner_email: "mum@example.com", owner_name: null })).toEqual({ ownerEmail: "mum@example.com", ownerName: null });
+    expect(asAccessRemoved({ owner_email: "mum@example.com", owner_name: "Asha Rao" })).toEqual({ ownerEmail: "mum@example.com", ownerName: "Asha Rao", reason: "removed", endedAt: null });
+    expect(asAccessRemoved({ owner_email: "mum@example.com", owner_name: null })).toEqual({ ownerEmail: "mum@example.com", ownerName: null, reason: "removed", endedAt: null });
+  });
+
+  it("tells an access that ran out from one that was taken away", () => {
+    expect(asAccessRemoved({ owner_email: "mum@example.com", reason: "expired", ended_at: "2026-11-10T10:00:00Z" })).toMatchObject({ reason: "expired", endedAt: "2026-11-10T10:00:00Z" });
+    expect(asAccessRemoved({ owner_email: "mum@example.com", reason: "something else" })).toMatchObject({ reason: "removed" });
   });
 
   it("is null for anything that is not that", () => {
     expect(asAccessRemoved(null)).toBeNull();
     expect(asAccessRemoved({ detail: "shared dashboard not found" })).toBeNull();
+  });
+});
+
+describe("how long they may look", () => {
+  it("sends a chosen end date instead of hours", async () => {
+    fetchMock.mockResolvedValue(reply(201, { id: "i", token: "t", code: "123456", expires_at: "x" }));
+
+    await createShare("Mum", { kind: "until", until: "2026-11-30T23:59:59.000Z" });
+
+    expect(fetchMock).toHaveBeenCalledWith("/api/backend/shares", expect.objectContaining({ body: JSON.stringify({ label: "Mum", until: "2026-11-30T23:59:59.000Z" }) }));
+  });
+
+  it("gives someone more time with a PATCH to their share", async () => {
+    fetchMock.mockResolvedValue(reply(200, { status: "active" }));
+
+    expect(await changeShareAccess("s 1", { kind: "hours", hours: 720 })).toEqual({ ok: true, result: null });
+    expect(fetchMock).toHaveBeenCalledWith("/api/backend/shares/s%201", expect.objectContaining({ method: "PATCH", body: JSON.stringify({ hours: 720 }) }));
+  });
+
+  it("says a share that has ended cannot be extended, and that only someone who can look can be given time", () => {
+    expect(messageForExtendFailure(404)).toContain("ended");
+    expect(messageForExtendFailure(409)).toContain("already see your dashboard");
+    expect(messageForExtendFailure(422)).toContain("choices");
+  });
+
+  it("says an invitation whose end date passed before approval needs a new invitation", () => {
+    expect(messageForApproveFailure(409)).toContain("make a new invitation");
+    expect(messageForApproveFailure(404)).toBe(messageForShareFailure(404));
   });
 });

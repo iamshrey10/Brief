@@ -131,7 +131,7 @@ async def test_a_right_code_asks_the_owner_for_approval_and_gives_nothing_yet(cl
     assert joined.json() == {"owner_email": test_user.email, "owner_name": None, "status": "requested"}
     act_as(friend)
     assert (await client.get(f"/shared/{invitation['id']}/dashboard")).status_code == 404
-    assert (await client.get("/shared")).json() == [{"id": invitation["id"], "owner_email": test_user.email, "owner_name": None, "status": "requested"}]
+    assert (await client.get("/shared")).json() == [{"id": invitation["id"], "owner_email": test_user.email, "owner_name": None, "status": "requested", "access_ends_at": None}]
 
 
 async def test_a_wrong_code_is_refused_and_three_of_them_end_the_invitation_even_for_the_right_code(client, db_session, test_user):
@@ -295,7 +295,9 @@ async def test_an_approved_person_sees_the_dashboard_and_the_owner_sees_when(cli
     act_as(test_user)
     assert (await client.get("/shares")).json()[0]["last_viewed_at"] is not None
     act_as(friend)
-    assert (await client.get("/shared")).json() == [{"id": invitation["id"], "owner_email": test_user.email, "owner_name": None, "status": "active"}]
+    listed = (await client.get("/shared")).json()
+    assert [{k: v for k, v in entry.items() if k != "access_ends_at"} for entry in listed] == [{"id": invitation["id"], "owner_email": test_user.email, "owner_name": None, "status": "active"}]
+    assert listed[0]["access_ends_at"] is not None
 
 
 async def test_what_the_viewer_gets_has_no_file_link_and_no_storage_detail(client, db_session, test_user):
@@ -334,7 +336,7 @@ async def test_after_access_is_taken_away_the_viewer_can_learn_whose_dashboard_i
     act_as(friend)
     response = await client.get(f"/shared/{invitation['id']}/removed")
     assert response.status_code == 200
-    assert response.json() == {"owner_email": test_user.email, "owner_name": "Maya Rao"}
+    assert response.json() == {"owner_email": test_user.email, "owner_name": "Maya Rao", "reason": "removed", "ended_at": None}
     assert (await client.get(f"/shared/{invitation['id']}/dashboard")).status_code == 404
 
     act_as(stranger)  # someone it was never shared with learns nothing
@@ -497,3 +499,243 @@ async def test_a_person_with_no_name_yet_has_none_to_show(client, db_session, te
     assert (await client.get(f"/shared/{invitation['id']}/dashboard")).json()["owner_name"] is None
     act_as(test_user)
     assert (await client.get("/shares")).json()[0]["viewer_name"] is None
+
+
+# --- how long they may look ---
+async def end_access_at(db_session, share_id: str, when: datetime | None) -> None:
+    """Moves an approved share's end, to stand in for time having passed."""
+    share = await db_session.get(DashboardShare, uuid.UUID(share_id))
+    share.access_ends_at = when
+    await db_session.commit()
+
+
+async def _stored(db_session, share_id: str) -> DashboardShare:
+    """The share as the database holds it now, not as this session saw it earlier."""
+    return await db_session.get(DashboardShare, uuid.UUID(share_id), populate_existing=True)
+
+
+async def test_an_invitation_with_no_choice_lasts_a_week_once_approved(client, db_session, test_user):
+    friend = await make_user(db_session)
+    invitation = await share_with(client, db_session, test_user, friend)
+
+    share = await _stored(db_session, invitation["id"])
+    assert share.access_hours == 7 * 24
+    assert abs((share.access_ends_at - (share.approved_at + timedelta(days=7))).total_seconds()) < 1
+
+
+@pytest.mark.parametrize("hours", [1, 6, 24, 168, 360, 720, 2160])
+async def test_each_of_the_listed_lengths_is_accepted_and_counted_from_approval(client, db_session, test_user, hours):
+    friend = await make_user(db_session)
+    act_as(test_user)
+    response = await client.post("/shares", json={"label": "Mum", "hours": hours})
+    assert response.status_code == 201
+    invitation = response.json()
+    assert invitation["access_hours"] == hours
+
+    created = await _stored(db_session, invitation["id"])
+    assert created.access_ends_at is None  # the clock has not started: nobody has been approved
+    assert (await join(client, friend, invitation)).status_code == 200
+    act_as(test_user)
+    assert (await client.post(f"/shares/{invitation['id']}/approve")).status_code == 200
+
+    approved = await _stored(db_session, invitation["id"])
+    assert abs((approved.access_ends_at - (approved.approved_at + timedelta(hours=hours))).total_seconds()) < 1
+
+
+@pytest.mark.parametrize("hours", [0, 2, 5, 25, 10_000, -1])
+async def test_a_length_that_is_not_on_the_list_is_refused(client, test_user, hours):
+    act_as(test_user)
+
+    response = await client.post("/shares", json={"hours": hours})
+
+    assert response.status_code == 422
+    assert "choices" in response.json()["detail"]
+
+
+async def test_a_chosen_end_date_is_kept_as_chosen(client, db_session, test_user):
+    friend = await make_user(db_session)
+    until = datetime.now(timezone.utc) + timedelta(days=12, hours=3)
+    act_as(test_user)
+    invitation = (await client.post("/shares", json={"until": until.isoformat()})).json()
+    assert (await join(client, friend, invitation)).status_code == 200
+    act_as(test_user)
+    assert (await client.post(f"/shares/{invitation['id']}/approve")).status_code == 200
+
+    approved = await _stored(db_session, invitation["id"])
+    assert approved.access_hours is None
+    assert abs((approved.access_ends_at - until).total_seconds()) < 1
+
+
+async def test_an_end_date_in_the_past_or_beyond_90_days_is_refused(client, test_user):
+    act_as(test_user)
+    past = datetime.now(timezone.utc) - timedelta(hours=1)
+    far = datetime.now(timezone.utc) + timedelta(days=120)
+
+    assert (await client.post("/shares", json={"until": past.isoformat()})).status_code == 422
+    too_far = await client.post("/shares", json={"until": far.isoformat()})
+    assert too_far.status_code == 422
+    assert "90 days" in too_far.json()["detail"]
+
+
+async def test_the_last_day_of_the_90_day_range_is_accepted_even_though_it_ends_at_midnight(client, test_user):
+    act_as(test_user)
+    end_of_day = (datetime.now(timezone.utc) + timedelta(days=90)).replace(hour=23, minute=59, second=59)
+
+    assert (await client.post("/shares", json={"until": end_of_day.isoformat()})).status_code == 201
+
+
+async def test_both_a_length_and_an_end_date_is_refused(client, test_user):
+    act_as(test_user)
+    until = datetime.now(timezone.utc) + timedelta(days=5)
+
+    response = await client.post("/shares", json={"hours": 24, "until": until.isoformat()})
+
+    assert response.status_code == 422
+
+
+async def test_an_end_date_that_passes_before_approval_cannot_be_approved(client, db_session, test_user):
+    friend = await make_user(db_session)
+    until = datetime.now(timezone.utc) + timedelta(days=2)
+    act_as(test_user)
+    invitation = (await client.post("/shares", json={"until": until.isoformat()})).json()
+    assert (await join(client, friend, invitation)).status_code == 200
+    share = await db_session.get(DashboardShare, uuid.UUID(invitation["id"]))
+    share.access_until = datetime.now(timezone.utc) - timedelta(minutes=1)
+    await db_session.commit()
+
+    act_as(test_user)
+    response = await client.post(f"/shares/{invitation['id']}/approve")
+
+    assert response.status_code == 409
+    assert "make a new invitation" in response.json()["detail"]
+
+
+async def test_access_stops_by_itself_when_its_time_runs_out(client, db_session, test_user):
+    friend = await make_user(db_session)
+    invitation = await share_with(client, db_session, test_user, friend)
+    act_as(friend)
+    assert (await client.get(f"/shared/{invitation['id']}/dashboard")).status_code == 200
+
+    await end_access_at(db_session, invitation["id"], datetime.now(timezone.utc) - timedelta(seconds=1))
+
+    act_as(friend)
+    assert (await client.get(f"/shared/{invitation['id']}/dashboard")).status_code == 404
+    assert (await client.get("/shared")).json() == []
+    act_as(test_user)
+    assert (await client.get("/shares")).json() == []
+
+
+async def test_a_viewer_whose_time_ran_out_is_told_it_ended_and_not_that_it_was_taken_away(client, db_session, test_user):
+    test_user.first_name, test_user.last_name = "Maya", "Rao"
+    await db_session.commit()
+    friend = await make_user(db_session)
+    invitation = await share_with(client, db_session, test_user, friend)
+    ended = datetime.now(timezone.utc) - timedelta(days=1)
+    await end_access_at(db_session, invitation["id"], ended)
+
+    act_as(friend)
+    response = await client.get(f"/shared/{invitation['id']}/removed")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["reason"] == "expired"
+    assert body["owner_name"] == "Maya Rao"
+    assert abs(datetime.fromisoformat(body["ended_at"].replace("Z", "+00:00")) - ended).total_seconds() < 1
+    assert (await client.get(f"/shared/{invitation['id']}/dashboard")).status_code == 404
+
+
+async def test_a_viewer_sees_when_their_access_ends(client, db_session, test_user):
+    friend = await make_user(db_session)
+    act_as(test_user)
+    invitation = (await client.post("/shares", json={"hours": 24})).json()
+    assert (await join(client, friend, invitation)).status_code == 200
+    act_as(test_user)
+    assert (await client.post(f"/shares/{invitation['id']}/approve")).status_code == 200
+
+    act_as(friend)
+    ends = datetime.fromisoformat((await client.get("/shared")).json()[0]["access_ends_at"].replace("Z", "+00:00"))
+    dashboard_ends = datetime.fromisoformat((await client.get(f"/shared/{invitation['id']}/dashboard")).json()["access_ends_at"].replace("Z", "+00:00"))
+
+    assert abs((ends - (datetime.now(timezone.utc) + timedelta(hours=24))).total_seconds()) < 30
+    assert ends == dashboard_ends
+
+
+async def test_the_owner_sees_what_they_chose_and_when_access_stops(client, db_session, test_user):
+    friend = await make_user(db_session)
+    act_as(test_user)
+    invitation = (await client.post("/shares", json={"label": "Mum", "hours": 720})).json()
+    pending = (await client.get("/shares")).json()[0]
+    assert pending["access_hours"] == 720 and pending["access_ends_at"] is None
+    assert (await join(client, friend, invitation)).status_code == 200
+    act_as(test_user)
+    assert (await client.post(f"/shares/{invitation['id']}/approve")).status_code == 200
+
+    active = (await client.get("/shares")).json()[0]
+    assert active["status"] == "active" and active["access_ends_at"] is not None
+
+
+async def test_the_owner_can_give_more_time_or_less(client, db_session, test_user):
+    friend = await make_user(db_session)
+    invitation = await share_with(client, db_session, test_user, friend)
+
+    act_as(test_user)
+    assert (await client.patch(f"/shares/{invitation['id']}", json={"hours": 2160})).status_code == 200
+    longer = await _stored(db_session, invitation["id"])
+    assert abs((longer.access_ends_at - (datetime.now(timezone.utc) + timedelta(days=90))).total_seconds()) < 30
+
+    assert (await client.patch(f"/shares/{invitation['id']}", json={"hours": 1})).status_code == 200
+    shorter = await _stored(db_session, invitation["id"])
+    assert abs((shorter.access_ends_at - (datetime.now(timezone.utc) + timedelta(hours=1))).total_seconds()) < 30
+
+
+async def test_giving_more_time_needs_exactly_one_choice_and_a_valid_one(client, db_session, test_user):
+    friend = await make_user(db_session)
+    invitation = await share_with(client, db_session, test_user, friend)
+    act_as(test_user)
+    until = datetime.now(timezone.utc) + timedelta(days=5)
+
+    assert (await client.patch(f"/shares/{invitation['id']}", json={})).status_code == 422
+    assert (await client.patch(f"/shares/{invitation['id']}", json={"hours": 24, "until": until.isoformat()})).status_code == 422
+    assert (await client.patch(f"/shares/{invitation['id']}", json={"hours": 5})).status_code == 422
+    assert (await client.patch(f"/shares/{invitation['id']}", json={"until": until.isoformat()})).status_code == 200
+
+
+async def test_a_share_that_has_ended_is_not_brought_back_by_extending_it(client, db_session, test_user):
+    friend = await make_user(db_session)
+    invitation = await share_with(client, db_session, test_user, friend)
+    await end_access_at(db_session, invitation["id"], datetime.now(timezone.utc) - timedelta(seconds=1))
+
+    act_as(test_user)
+    assert (await client.patch(f"/shares/{invitation['id']}", json={"hours": 24})).status_code == 404
+
+    act_as(friend)
+    assert (await client.get(f"/shared/{invitation['id']}/dashboard")).status_code == 404
+
+
+async def test_only_a_person_who_can_view_can_be_given_more_time(client, db_session, test_user):
+    friend = await make_user(db_session)
+    act_as(test_user)
+    invitation = (await client.post("/shares", json={})).json()  # nobody has used it yet
+    assert (await client.patch(f"/shares/{invitation['id']}", json={"hours": 24})).status_code == 409
+    assert (await join(client, friend, invitation)).status_code == 200
+    act_as(test_user)
+    assert (await client.patch(f"/shares/{invitation['id']}", json={"hours": 24})).status_code == 409  # asked, not approved
+
+
+async def test_nobody_else_can_change_someones_share(client, db_session, test_user):
+    friend, stranger = await make_user(db_session), await make_user(db_session, "stranger")
+    invitation = await share_with(client, db_session, test_user, friend)
+
+    act_as(stranger)
+    assert (await client.patch(f"/shares/{invitation['id']}", json={"hours": 2160})).status_code == 404
+    act_as(friend)  # the person looking cannot lengthen their own access
+    assert (await client.patch(f"/shares/{invitation['id']}", json={"hours": 2160})).status_code == 404
+
+
+async def test_a_share_that_was_approved_before_time_limits_and_has_no_end_is_not_cut_off(client, db_session, test_user):
+    friend = await make_user(db_session)
+    invitation = await share_with(client, db_session, test_user, friend)
+    await end_access_at(db_session, invitation["id"], None)
+
+    act_as(friend)
+    assert (await client.get(f"/shared/{invitation['id']}/dashboard")).status_code == 200

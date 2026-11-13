@@ -8,6 +8,7 @@ import { countByKind } from "@/lib/document-summary";
 import { DOC_TYPE_LABELS, formatUploaded, statusLabel } from "@/lib/documents";
 import { nextLeaseEnd } from "@/lib/lease-end";
 import { badgeLetter, personLabel } from "@/lib/profile";
+import { timeLeftText } from "@/lib/share-access";
 import { daysAwayText, importantDates, needsAttention } from "@/lib/shared-summary";
 import type { SharedDashboard } from "@/lib/sharing";
 import { cn } from "@/lib/utils";
@@ -49,6 +50,7 @@ export function SharedDashboardView({ shared, now = new Date() }: { shared: Shar
           <p className="truncate text-base font-semibold text-foreground">{personLabel(shared.owner_name, shared.owner_email)}</p>
           {shared.owner_name && <p className="truncate text-xs text-muted-foreground">{shared.owner_email}</p>}
           <p className="text-sm text-muted-foreground">shared their dashboard with you</p>
+          {shared.access_ends_at && <p className="mt-0.5 text-xs font-medium text-foreground">{timeLeftText(shared.access_ends_at, now)}</p>}
         </div>
         <span className="rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-muted-foreground">Read only</span>
       </div>

@@ -3,12 +3,14 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
+import { AccessPicker } from "@/components/access-picker";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { useUploadNotifications } from "@/components/upload-notifications";
 import { buildShareEmail, looksLikeEmail } from "@/lib/share-email";
-import { approveShare, createShare, joinLink, lastViewedText, MAX_SHARES, removeShare, shareStatusText, type Invitation, type Share } from "@/lib/sharing";
+import { chosenAccessText, DEFAULT_ACCESS_HOURS, timeLeftText, type AccessChoice } from "@/lib/share-access";
+import { approveShare, changeShareAccess, createShare, joinLink, lastViewedText, MAX_SHARES, removeShare, shareStatusText, type Invitation, type Share } from "@/lib/sharing";
 
-type Busy = { id: string; what: "approving" | "removing" };
+type Busy = { id: string; what: "approving" | "removing" | "changing" };
 
 function CopyButton({ text, label }: { text: string; label: string }) {
   const [copied, setCopied] = useState(false);
@@ -111,6 +113,11 @@ export function SharingPanel({ initial, ownerName = "" }: { initial: Share[]; ow
     router.refresh();
   }, [pendingRequests, router]);
   const [label, setLabel] = useState("");
+  // How long the new person may look once approved. Null only while a date has been asked for and not yet picked.
+  const [access, setAccess] = useState<AccessChoice | null>({ kind: "hours", hours: DEFAULT_ACCESS_HOURS });
+  // The person whose time is being changed, and what they have picked for it.
+  const [changing, setChanging] = useState<string | null>(null);
+  const [newAccess, setNewAccess] = useState<AccessChoice | null>({ kind: "hours", hours: DEFAULT_ACCESS_HOURS });
   const [creating, setCreating] = useState(false);
   const [fresh, setFresh] = useState<{ invitation: Invitation; link: string } | null>(null);
   const [sendTo, setSendTo] = useState("");
@@ -122,16 +129,29 @@ export function SharingPanel({ initial, ownerName = "" }: { initial: Share[]; ow
 
   async function create(event: FormEvent) {
     event.preventDefault();
+    if (!access) return;
     setCreating(true);
     setFormError(null);
-    const outcome = await createShare(label.trim());
+    const outcome = await createShare(label.trim(), access);
     setCreating(false);
     if (!outcome.ok) return setFormError(outcome.message);
     const invitation = outcome.result;
     setFresh({ invitation, link: joinLink(window.location.origin, invitation.token) });
     setShares((current) => [
       ...current,
-      { id: invitation.id, label: label.trim() || null, status: "invited", viewer_email: null, viewer_name: null, created_at: new Date().toISOString(), expires_at: invitation.expires_at, last_viewed_at: null },
+      {
+        id: invitation.id,
+        label: label.trim() || null,
+        status: "invited",
+        viewer_email: null,
+        viewer_name: null,
+        created_at: new Date().toISOString(),
+        expires_at: invitation.expires_at,
+        last_viewed_at: null,
+        access_hours: invitation.access_hours ?? null,
+        access_until: invitation.access_until ?? null,
+        access_ends_at: null,
+      },
     ]);
     setLabel("");
   }
@@ -142,8 +162,21 @@ export function SharingPanel({ initial, ownerName = "" }: { initial: Share[]; ow
     const outcome = await approveShare(share.id);
     setBusy(null);
     if (!outcome.ok) return setRowError({ id: share.id, message: outcome.message });
+    // The time starts counting at approval, so the end is known only to the server: ask the page for the list again.
     setShares((current) => current.map((item) => (item.id === share.id ? { ...item, status: "active", expires_at: null } : item)));
     refreshRequests();
+    router.refresh();
+  }
+
+  async function saveTime(share: Share) {
+    if (!newAccess) return;
+    setBusy({ id: share.id, what: "changing" });
+    setRowError(null);
+    const outcome = await changeShareAccess(share.id, newAccess);
+    setBusy(null);
+    if (!outcome.ok) return setRowError({ id: share.id, message: outcome.message });
+    setChanging(null);
+    router.refresh();
   }
 
   async function remove(share: Share) {
@@ -170,18 +203,22 @@ export function SharingPanel({ initial, ownerName = "" }: { initial: Share[]; ow
         cannot change anything or open your files. Up to {MAX_SHARES} people.
       </p>
 
-      <form onSubmit={create} className="flex flex-col gap-3 sm:flex-row sm:items-end">
-        <label className="flex min-w-0 flex-1 flex-col gap-1 text-sm font-medium text-foreground">
-          Who is it for? (optional)
-          <input
-            value={label}
-            onChange={(event) => setLabel(event.target.value)}
-            maxLength={100}
-            placeholder="For example, Mum"
-            className="h-11 w-full rounded-lg border border-input bg-background px-3 text-sm font-normal outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-          />
-        </label>
-        <Button type="submit" size="lg" disabled={creating || full}>
+      <form onSubmit={create} className="flex flex-col gap-4">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="flex min-w-0 flex-col gap-1 text-sm font-medium text-foreground">
+            Who is it for? (optional)
+            <input
+              value={label}
+              onChange={(event) => setLabel(event.target.value)}
+              maxLength={100}
+              placeholder="For example, Mum"
+              className="h-11 w-full rounded-lg border border-input bg-background px-3 text-sm font-normal outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+            />
+          </label>
+          <AccessPicker onChange={setAccess} stacked />
+        </div>
+        <p className="-mt-2 text-xs text-muted-foreground">The time starts when you approve them, and ends by itself. You can give them more time, or remove them, whenever you like.</p>
+        <Button type="submit" size="lg" className="max-sm:w-full sm:self-start" disabled={creating || full || !access}>
           {creating ? "Creating..." : "Create invitation"}
         </Button>
       </form>
@@ -210,7 +247,8 @@ export function SharingPanel({ initial, ownerName = "" }: { initial: Share[]; ow
           <EmailIt ownerName={ownerName} link={fresh.link} code={fresh.invitation.code} sendTo={sendTo} onSendTo={setSendTo} />
 
           <p className="mt-3 text-xs text-muted-foreground">
-            It works for 7 days. They sign in with Google, open the link and enter the code, and then you approve them here before they can see anything.
+            The link works for 7 days. They sign in with Google, open it and enter the code, and then you approve them here before they can see anything. After that they can look for{" "}
+            {chosenAccessText(fresh.invitation.access_hours ?? null, fresh.invitation.access_until ?? null).replace(" once you approve", "")}.
           </p>
           <Button type="button" variant="ghost" size="sm" className="mt-2" onClick={() => { setFresh(null); setSendTo(""); }}>
             Done
@@ -243,7 +281,18 @@ export function SharingPanel({ initial, ownerName = "" }: { initial: Share[]; ow
                         {shareStatusText(share.status)}
                         {share.status === "active" && ` · ${lastViewedText(share.last_viewed_at)}`}
                       </p>
+                      {share.status === "active" && share.access_ends_at && (
+                        <p className="mt-0.5 text-xs font-medium text-foreground">{timeLeftText(share.access_ends_at)}</p>
+                      )}
+                      {share.status !== "active" && (
+                        <p className="mt-0.5 text-xs text-muted-foreground">Can look for {chosenAccessText(share.access_hours, share.access_until)}</p>
+                      )}
                     </div>
+                    {share.status === "active" && (
+                      <Button type="button" variant="outline" size="sm" disabled={working} aria-label={`Change the time for ${nameOf(share)}`} onClick={() => setChanging(changing === share.id ? null : share.id)}>
+                        Change time
+                      </Button>
+                    )}
                     {share.status === "requested" && (
                       <Button type="button" size="sm" disabled={working} aria-label={`Approve ${nameOf(share)}`} onClick={() => approve(share)}>
                         {busy?.id === share.id && busy.what === "approving" ? "Approving..." : "Approve"}
@@ -260,6 +309,19 @@ export function SharingPanel({ initial, ownerName = "" }: { initial: Share[]; ow
                       {share.status === "active" ? "Remove access" : share.status === "requested" ? "Decline" : "Cancel invitation"}
                     </Button>
                   </div>
+                  {changing === share.id && (
+                    <div className="mt-3 flex flex-col gap-2 border-t border-border pt-3">
+                      <AccessPicker label="Give them time from now" onChange={setNewAccess} />
+                      <div className="flex gap-2">
+                        <Button type="button" size="sm" disabled={working || !newAccess} onClick={() => saveTime(share)}>
+                          {busy?.id === share.id && busy.what === "changing" ? "Saving..." : "Save time"}
+                        </Button>
+                        <Button type="button" variant="ghost" size="sm" disabled={working} onClick={() => setChanging(null)}>
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                   {failed && (
                     <p role="alert" className="mt-2 text-xs text-destructive">
                       {failed}
