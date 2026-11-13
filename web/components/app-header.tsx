@@ -1,4 +1,4 @@
-import { FileText, LayoutDashboard, UserRound, Users, type LucideIcon } from "lucide-react";
+import { ChevronLeft, FileText, LayoutDashboard, UserRound, Users, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 
 import { PendingBadge } from "@/components/pending-badge";
@@ -25,17 +25,32 @@ export type AppSection = (typeof APP_SECTIONS)[number]["id"];
 export function AppHeader({
   email,
   current,
+  back,
   widthClass = "w-[min(100%-3rem,1400px)]",
 }: {
   email: string;
   current: AppSection | null;
+  /** Where the page one level down goes back to. Shown as a small Back to the left of the name, so the page needs no row of its own for it. */
+  back?: { href: string; label: string };
   widthClass?: string;
 }) {
   return (
     <>
     <header className="sticky top-0 z-40 border-b border-border/70 bg-background/85 backdrop-blur print:hidden">
       <div className={`mx-auto flex flex-wrap items-center justify-between gap-x-4 ${widthClass}`}>
-        <div className="flex h-14 items-center gap-6">
+        <div className="flex h-14 items-center gap-3 sm:gap-6">
+          {back && (
+            <Link
+              href={back.href}
+              aria-label={back.label}
+              title={back.label}
+              className="inline-flex items-center gap-0.5 rounded-md py-1.5 pr-2 pl-1 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground max-sm:min-h-11 max-[380px]:min-w-11 max-[380px]:justify-center"
+            >
+              <ChevronLeft aria-hidden="true" className="size-4" />
+              {/* On the very narrowest phones only the arrow is drawn, so the bar still fits on one row. */}
+              <span className="max-[380px]:sr-only">Back</span>
+            </Link>
+          )}
           <Link href="/dashboard" className="font-heading text-xl font-semibold tracking-tight text-foreground max-sm:inline-block max-sm:py-2">
             Brief<span className="text-primary">.</span>
           </Link>
@@ -43,7 +58,7 @@ export function AppHeader({
             <SectionLinks current={current} />
           </nav>
         </div>
-        <div className="flex h-14 min-w-0 items-center gap-3">
+        <div className="flex h-14 min-w-0 items-center gap-2 sm:gap-3">
           <p className="hidden max-w-[12rem] truncate text-xs text-muted-foreground md:block" title={email}>
             {email}
           </p>

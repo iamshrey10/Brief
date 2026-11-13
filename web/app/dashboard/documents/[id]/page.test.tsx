@@ -87,7 +87,7 @@ describe("the document page", () => {
     expect(html).toContain("Lease");
     expect(html).toContain('data-workspace="doc-1"');
     expect(html).toContain("2 clauses");
-    expect(html).toContain("Back to your documents");
+    expect(html).toContain('aria-label="Back to your documents"');
   });
 
   it("is a not found page when the API says there is no such document", async () => {

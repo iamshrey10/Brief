@@ -40,24 +40,24 @@ export function DashboardStats({ stats, readOnly = false }: { stats: DocumentSta
 
   return (
     <section aria-label="Your documents at a glance">
-      <ul className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <ul className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4">
         {cards.map((card) => {
           const Icon = card.icon;
           return (
             <li
               key={card.label}
               className={cn(
-                "flex flex-col gap-1 rounded-2xl border p-5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md motion-reduce:transition-none motion-reduce:hover:translate-y-0",
+                "flex flex-col gap-0.5 rounded-2xl border p-5 max-sm:p-3.5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md motion-reduce:transition-none motion-reduce:hover:translate-y-0",
                 card.attention ? "border-destructive/40 bg-destructive/5" : "border-border bg-card",
               )}
             >
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">{card.label}</span>
-                <span aria-hidden="true" className={cn("flex size-8 items-center justify-center rounded-lg", card.tone)}>
+                <span aria-hidden="true" className={cn("flex size-8 items-center justify-center rounded-lg max-sm:size-7", card.tone)}>
                   <Icon className={cn("size-4", card.spin && "motion-safe:animate-spin")} />
                 </span>
               </div>
-              <span className="font-heading text-4xl font-semibold tracking-tight text-foreground">{card.value}</span>
+              <span className="font-heading text-4xl font-semibold tracking-tight text-foreground max-sm:text-3xl">{card.value}</span>
               <span className={cn("text-xs", card.attention ? "text-destructive" : "text-muted-foreground")}>{card.hint}</span>
             </li>
           );

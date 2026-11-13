@@ -27,7 +27,7 @@ export default async function SharedDashboardPage({ params }: { params: Promise<
     return (
       <div className="flex flex-1 flex-col">
         <AppHeader email={email} current="shared" />
-        <div className="mx-auto flex w-[min(100%-3rem,1400px)] flex-1 flex-col gap-5 py-6">
+        <div className="mx-auto flex w-[min(100%-3rem,1400px)] flex-1 flex-col gap-5 py-4 sm:py-6">
           <section aria-labelledby="removed-heading" className="mx-auto mt-10 w-full max-w-xl rounded-2xl border border-border bg-card p-8 text-center shadow-sm">
             <h1 id="removed-heading" className="font-heading text-2xl font-semibold tracking-tight text-foreground">
               {expired ? "Your access has ended" : "Your access was removed"}
@@ -54,10 +54,10 @@ export default async function SharedDashboardPage({ params }: { params: Promise<
 
   return (
     <div className="flex flex-1 flex-col">
-      <AppHeader email={email} current="shared" />
-      <div className="mx-auto flex w-[min(100%-3rem,1400px)] flex-1 flex-col gap-5 py-6">
+      <AppHeader email={email} current="shared" back={{ href: "/dashboard/shared", label: "Back to Shared" }} />
+      <div className="mx-auto flex w-[min(100%-3rem,1400px)] flex-1 flex-col gap-5 py-4 sm:py-6">
         <div>
-          <h1 className="font-heading text-3xl font-semibold tracking-tight text-foreground md:text-4xl">Shared dashboard</h1>
+          <h1 className="font-heading text-2xl font-semibold tracking-tight text-foreground sm:text-3xl md:text-4xl">Shared dashboard</h1>
           <p className="mt-1 text-muted-foreground">A shared view of documents, key dates, and pending questions.</p>
         </div>
         <SharedDashboardView shared={shared} />

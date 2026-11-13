@@ -12,6 +12,18 @@ describe("the signed in header", () => {
     expect(html).toMatch(/href="\/dashboard"[^>]*>Brief/);
   });
 
+  it("shows a small Back beside the name only when the page has somewhere to go back to", () => {
+    const without = renderToStaticMarkup(<AppHeader email="reader@example.com" current="documents" />);
+    const withBack = renderToStaticMarkup(
+      <AppHeader email="reader@example.com" current="documents" back={{ href: "/dashboard/documents", label: "Back to your documents" }} />,
+    );
+
+    expect(without).not.toContain("Back");
+    expect(withBack).toContain('href="/dashboard/documents"');
+    expect(withBack).toContain('aria-label="Back to your documents"');
+    expect(withBack).toContain(">Back</span>");
+  });
+
   it("shows who is signed in, in full as a tooltip for an address too long to fit", () => {
     const html = renderToStaticMarkup(<AppHeader email="a.very.long.address@example.com" current="documents" />);
 

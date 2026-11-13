@@ -35,12 +35,12 @@ export default async function Dashboard() {
   return (
     <div className="flex flex-1 flex-col">
       <AppHeader email={email} current="documents" />
-      <div className="mx-auto flex w-[min(100%-3rem,1400px)] flex-1 flex-col gap-5 py-6">
+      <div className="mx-auto flex w-[min(100%-3rem,1400px)] flex-1 flex-col gap-4 py-4 sm:gap-5 sm:py-6">
         <div>
-          <h1 className="font-heading text-3xl font-semibold tracking-tight text-foreground md:text-4xl">
+          <h1 className="font-heading text-2xl font-semibold tracking-tight text-foreground sm:text-3xl md:text-4xl">
             Your contracts
           </h1>
-          <p className="mt-2 max-w-xl text-muted-foreground">
+          <p className="mt-1 max-w-xl text-sm text-muted-foreground sm:mt-2 sm:text-base">
             Upload a loan, lease, or job offer. Brief explains it clause by clause and shows you the
             exact words behind every answer.
           </p>

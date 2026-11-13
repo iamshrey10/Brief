@@ -5,12 +5,14 @@ import { Button } from "@/components/ui/button";
 /** Phones only: on a computer Cmd or Ctrl+P does the same, so the button is hidden from the large layout up. Opens the browser print dialog, where the page prints as the Overview alone and can be saved as a PDF. */
 export function PrintButton() {
   return (
-    <Button type="button" variant="outline" size="lg" onClick={() => window.print()} className="print:hidden lg:hidden">
+    <Button type="button" variant="outline" size="lg" aria-label="Print or save as PDF" title="Print or save as PDF" onClick={() => window.print()} className="print:hidden lg:hidden">
       <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
         <path d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
         <path d="M6 14h12v7H6z" />
       </svg>
-      Print or save as PDF
+      {/* The full words on a larger phone or tablet, just "PDF" on a small one, so the button can share a row with the facts. */}
+      <span className="max-sm:hidden" aria-hidden="true">Print or save as PDF</span>
+      <span className="sm:hidden" aria-hidden="true">PDF</span>
     </Button>
   );
 }
