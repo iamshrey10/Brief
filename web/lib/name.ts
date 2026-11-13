@@ -1,5 +1,6 @@
 import type { ActionOutcome } from "@/lib/document-actions";
 import { referenceFrom, withReference } from "@/lib/reference";
+import type { SignupReason } from "@/lib/welcome-reasons";
 
 export const MAX_NAME_LENGTH = 50;
 
@@ -17,13 +18,13 @@ export function messageForNameFailure(status: number): string {
   }
 }
 
-/** Saves the person's first and last name. */
-export async function saveName(first: string, last: string): Promise<ActionOutcome<{ first_name: string; last_name: string }>> {
+/** Saves the person's first and last name. The welcome page also passes why they came; changing a name later does not. */
+export async function saveName(first: string, last: string, reason?: SignupReason): Promise<ActionOutcome<{ first_name: string; last_name: string }>> {
   try {
     const res = await fetch("/api/backend/me", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ first_name: first.trim(), last_name: last.trim() }),
+      body: JSON.stringify({ first_name: first.trim(), last_name: last.trim(), ...(reason ? { reason } : {}) }),
     });
     if (!res.ok) return { ok: false, message: withReference(messageForNameFailure(res.status), referenceFrom(res)) };
     const saved = await res.json();
