@@ -1230,6 +1230,10 @@ async def document_checklist(
 class CreateShareRequest(BaseModel):
     # Who it is for, in the owner's words, so the list of invitations can be told apart.
     label: str | None = Field(default=None, max_length=100)
+    # How long they may look once approved: a number of hours from the list (1, 6, 24, 168, 360, 720 or 2160), or a date
+    # it ends on, at most 90 days away. Neither means 7 days.
+    hours: int | None = None
+    until: datetime | None = None
 
     @field_validator("label")
     @classmethod
@@ -1243,6 +1247,9 @@ class ShareCreated(BaseModel):
     token: str
     code: str
     expires_at: datetime
+    # What the owner chose for how long they may look once approved.
+    access_hours: int | None = None
+    access_until: datetime | None = None
 
 
 class ShareInfo(BaseModel):
@@ -1255,6 +1262,10 @@ class ShareInfo(BaseModel):
     created_at: datetime
     expires_at: datetime | None
     last_viewed_at: datetime | None
+    # What the owner chose for how long they may look once approved, and, once approved, when access stops.
+    access_hours: int | None = None
+    access_until: datetime | None = None
+    access_ends_at: datetime | None = None
 
 
 @app.post(
@@ -1263,7 +1274,7 @@ class ShareInfo(BaseModel):
     tags=["sharing"],
     summary="Invite someone to view your dashboard",
     description=(
-        "Makes an invitation: a link and a six digit code, shown once. The other person signs in, opens the link and enters the code, and then you approve them. At most five people can have access, counting invitations still waiting. An invitation not approved within seven days stops working."
+        "Makes an invitation: a link and a six digit code, shown once. The other person signs in, opens the link and enters the code, and then you approve them. You choose how long they may look once approved: hours (1, 6, 24, 168, 360, 720 or 2160) or an end date at most 90 days away, and the time counts from your approval. At most five people can have access, counting invitations still waiting. An invitation not approved within seven days stops working."
     ),
     responses=_errors(401, 409),
 )
@@ -1272,14 +1283,24 @@ async def create_share(
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> ShareCreated:
-    made = await sharing.create_share(session, user, body.label)
+    try:
+        made = await sharing.create_share(session, user, body.label, body.hours, body.until)
+    except sharing.BadAccess as problem:
+        raise HTTPException(status_code=422, detail=str(problem)) from problem
     if made is None:
         raise HTTPException(
             status_code=409,
             detail=f"You can share your dashboard with up to {sharing.MAX_SHARES} people. Remove someone to invite another.",
         )
     share, token, code = made
-    return ShareCreated(id=str(share.id), token=token, code=code, expires_at=share.expires_at)
+    return ShareCreated(
+        id=str(share.id),
+        token=token,
+        code=code,
+        expires_at=share.expires_at,
+        access_hours=share.access_hours,
+        access_until=share.access_until,
+    )
 
 
 @app.get(
@@ -1311,6 +1332,9 @@ async def list_shares(
             created_at=share.created_at,
             expires_at=None if share.status == "active" else share.expires_at,
             last_viewed_at=share.last_viewed_at,
+            access_hours=share.access_hours,
+            access_until=share.access_until,
+            access_ends_at=share.access_ends_at,
         )
         for share in shares
     ]
@@ -1321,7 +1345,7 @@ async def list_shares(
     tags=["sharing"],
     summary="Approve someone who entered the code",
     description=(
-        "Lets the person who entered the code from your invitation view your dashboard, read only. Only works on a request that is waiting for you."
+        "Lets the person who entered the code from your invitation view your dashboard, read only, for the time you chose when you made the invitation, counted from now. Only works on a request that is waiting for you."
     ),
     responses=_errors(401, 404, 409),
 )
@@ -1335,6 +1359,46 @@ async def approve_share(
         raise HTTPException(status_code=404, detail="share not found")
     if outcome is sharing.Decision.NOT_NOW:
         raise HTTPException(status_code=409, detail="there is no request waiting to approve")
+    if outcome is sharing.Decision.TOO_LATE:
+        raise HTTPException(status_code=409, detail="the end date chosen for this invitation has passed, make a new invitation")
+    return {"status": "active"}
+
+
+class ChangeAccessRequest(BaseModel):
+    # The same choices as when making an invitation, but exactly one is needed here.
+    hours: int | None = None
+    until: datetime | None = None
+
+    @model_validator(mode="after")
+    def _one_choice(self) -> "ChangeAccessRequest":
+        if (self.hours is None) == (self.until is None):
+            raise ValueError("choose a length of time or an end date")
+        return self
+
+
+@app.patch(
+    "/shares/{share_id}",
+    tags=["sharing"],
+    summary="Give someone more time to look, or less",
+    description=(
+        "Moves the end of an active share, counted from now: hours from the list, or an end date at most 90 days away. Only for someone who can view your dashboard right now. A share that has ended is not extended, make a new invitation."
+    ),
+    responses=_errors(401, 404, 409),
+)
+async def change_share_access(
+    share_id: str,
+    body: ChangeAccessRequest,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, str]:
+    try:
+        outcome = await sharing.change_access(session, user, share_id, body.hours, body.until)
+    except sharing.BadAccess as problem:
+        raise HTTPException(status_code=422, detail=str(problem)) from problem
+    if outcome is sharing.Decision.MISSING:
+        raise HTTPException(status_code=404, detail="share not found")
+    if outcome is sharing.Decision.NOT_NOW:
+        raise HTTPException(status_code=409, detail="only someone who can view your dashboard can be given more time")
     return {"status": "active"}
 
 
@@ -1402,6 +1466,8 @@ class SharedWithMe(BaseModel):
     owner_name: str | None = None
     # requested (waiting for the owner) or active
     status: str
+    # When access stops, once active.
+    access_ends_at: datetime | None = None
 
 
 @app.get(
@@ -1423,6 +1489,7 @@ async def list_shared_with_me(
             owner_email=owner.email,
             owner_name=sharing.display_name(owner.first_name, owner.last_name),
             status=share.status,
+            access_ends_at=share.access_ends_at,
         )
         for share, owner in await sharing.shared_with(session, user.id)
     ]
@@ -1441,6 +1508,8 @@ class SharedDocument(DocumentSummary):
 class SharedDashboard(BaseModel):
     owner_email: str
     owner_name: str | None = None
+    # When this person's access stops.
+    access_ends_at: datetime | None = None
     documents: list[SharedDocument]
     insights: list[DocumentInsight]
     key_dates: list[KeyDate]
@@ -1449,6 +1518,10 @@ class SharedDashboard(BaseModel):
 class SharedAccessRemoved(BaseModel):
     owner_email: str
     owner_name: str | None = None
+    # removed (the owner took it away) or expired (its time ran out)
+    reason: str = "removed"
+    # When it ran out, for an expired one.
+    ended_at: datetime | None = None
 
 
 @app.get(
@@ -1456,7 +1529,7 @@ class SharedAccessRemoved(BaseModel):
     tags=["sharing"],
     summary="Find out that a dashboard shared with you was taken away",
     description=(
-        "Answers with whose dashboard it was when its owner has removed your access, so the website can say so. Returns no dashboard data. Answers 404 for anything that was not shared with you and removed."
+        "Answers with whose dashboard it was when its owner has removed your access or its time has run out, and which of the two, so the website can say so. Returns no dashboard data. Answers 404 for anything that was not shared with you and has not ended."
     ),
     responses=_errors(401, 404),
 )
@@ -1468,8 +1541,14 @@ async def shared_access_removed(
     found = await sharing.removed_share(session, user, share_id)
     if found is None:
         raise HTTPException(status_code=404, detail="shared dashboard not found")
-    _, owner = found
-    return SharedAccessRemoved(owner_email=owner.email, owner_name=sharing.display_name(owner.first_name, owner.last_name))
+    share, owner = found
+    expired = share.status == "active"
+    return SharedAccessRemoved(
+        owner_email=owner.email,
+        owner_name=sharing.display_name(owner.first_name, owner.last_name),
+        reason="expired" if expired else "removed",
+        ended_at=share.access_ends_at if expired else None,
+    )
 
 
 @app.get(
@@ -1489,7 +1568,8 @@ async def view_shared_dashboard(
     found = await sharing.viewable_share(session, user, share_id)
     if found is None:
         raise HTTPException(status_code=404, detail="shared dashboard not found")
-    _, owner = found
+    share, owner = found
+    access_ends_at = share.access_ends_at
     owner_id, owner_email = owner.id, owner.email
     owner_name = sharing.display_name(owner.first_name, owner.last_name)
     result = await session.execute(
@@ -1505,6 +1585,7 @@ async def view_shared_dashboard(
     return SharedDashboard(
         owner_email=owner_email,
         owner_name=owner_name,
+        access_ends_at=access_ends_at,
         documents=documents,
         insights=await saved_insights(session, owner_id),
         key_dates=await saved_key_dates(session, owner_id),

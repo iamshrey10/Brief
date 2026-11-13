@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { JoinByLink } from "@/components/join-by-link";
 import { personLabel } from "@/lib/profile";
+import { timeLeftText } from "@/lib/share-access";
 import type { SharedWithMe } from "@/lib/sharing";
 
 /**
@@ -38,7 +39,12 @@ export function SharedWithYou({ items, headingLevel = 2 }: { items: SharedWithMe
                 <span aria-hidden="true" className="flex size-9 shrink-0 items-center justify-center rounded-full bg-accent text-sm font-semibold text-accent-foreground">
                   {personLabel(shared.owner_name, shared.owner_email).charAt(0).toUpperCase()}
                 </span>
-                <span className="min-w-0 truncate font-medium text-foreground">{personLabel(shared.owner_name, shared.owner_email)}</span>
+                <span className="flex min-w-0 flex-col">
+                  <span className="min-w-0 truncate font-medium text-foreground">{personLabel(shared.owner_name, shared.owner_email)}</span>
+                  {shared.status === "active" && shared.access_ends_at && (
+                    <span className="text-xs text-muted-foreground">Access: {timeLeftText(shared.access_ends_at).toLowerCase()}</span>
+                  )}
+                </span>
               </span>
               {shared.status === "active" ? (
                 <Link href={`/dashboard/shared/${shared.id}`} className="shrink-0 rounded-md bg-primary px-3 py-1.5 font-medium text-primary-foreground">

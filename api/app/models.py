@@ -247,6 +247,12 @@ class DashboardShare(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_viewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # How long the owner said the other person may look once approved: a number of hours, or a date it ends on. Chosen
+    # when the invitation is made; the clock starts when it is approved.
+    access_hours: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    access_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # When access stops. Set on approval, and moved by the owner to give more time or less.
+    access_ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class TwoFactor(Base):

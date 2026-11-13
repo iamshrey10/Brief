@@ -23,18 +23,26 @@ export default async function SharedDashboardPage({ params }: { params: Promise<
     const removed = asAccessRemoved(await backendGet(email, `/shared/${encodeURIComponent(id)}/removed`));
     if (!removed) notFound();
     const owner = personLabel(removed.ownerName, removed.ownerEmail);
+    const expired = removed.reason === "expired";
     return (
       <div className="flex flex-1 flex-col">
         <AppHeader email={email} current="shared" />
         <div className="mx-auto flex w-[min(100%-3rem,1400px)] flex-1 flex-col gap-5 py-6">
           <section aria-labelledby="removed-heading" className="mx-auto mt-10 w-full max-w-xl rounded-2xl border border-border bg-card p-8 text-center shadow-sm">
             <h1 id="removed-heading" className="font-heading text-2xl font-semibold tracking-tight text-foreground">
-              Your access was removed
+              {expired ? "Your access has ended" : "Your access was removed"}
             </h1>
-            <p className="mt-3 text-muted-foreground">
-              <strong className="font-semibold text-foreground">{owner}</strong> has removed your access to their dashboard, so you can no longer see it. If you
-              think this is a mistake, ask them to send you a new link.
-            </p>
+            {expired ? (
+              <p className="mt-3 text-muted-foreground">
+                <strong className="font-semibold text-foreground">{owner}</strong> shared their dashboard with you for a set time, and that time is over, so you can no longer
+                see it. If you still need it, ask them to share it again.
+              </p>
+            ) : (
+              <p className="mt-3 text-muted-foreground">
+                <strong className="font-semibold text-foreground">{owner}</strong> has removed your access to their dashboard, so you can no longer see it. If you
+                think this is a mistake, ask them to send you a new link.
+              </p>
+            )}
             <Link href="/dashboard/shared" className="mt-6 inline-flex h-10 items-center rounded-lg bg-primary px-5 text-sm font-medium text-primary-foreground">
               Back to Shared
             </Link>

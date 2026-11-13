@@ -5,13 +5,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/sharing", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/sharing")>();
-  return { ...actual, createShare: vi.fn(), approveShare: vi.fn(), removeShare: vi.fn() };
+  return { ...actual, createShare: vi.fn(), approveShare: vi.fn(), removeShare: vi.fn(), changeShareAccess: vi.fn() };
 });
 
 const refreshMock = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: refreshMock }) }));
 
-import { approveShare, createShare, removeShare, type Share } from "@/lib/sharing";
+import { approveShare, changeShareAccess, createShare, removeShare, type Share } from "@/lib/sharing";
 import { SharingPanel } from "./sharing-panel";
 
 const createMock = vi.mocked(createShare);
@@ -27,6 +27,9 @@ const share = (over: Partial<Share>): Share => ({
   created_at: "2026-11-01T10:00:00Z",
   expires_at: "2026-11-08T10:00:00Z",
   last_viewed_at: null,
+  access_hours: 168,
+  access_until: null,
+  access_ends_at: null,
   ...over,
 });
 const INVITATION = { id: "new1", token: "T".repeat(43), code: "482913", expires_at: "2026-11-11T10:00:00Z" };
@@ -89,7 +92,7 @@ describe("making an invitation", () => {
     fireEvent.click(screen.getByRole("button", { name: "Create invitation" }));
 
     const fresh = await screen.findByRole("region", { name: "New invitation" });
-    expect(createMock).toHaveBeenCalledExactlyOnceWith("Mum");
+    expect(createMock).toHaveBeenCalledExactlyOnceWith("Mum", { kind: "hours", hours: 168 });
     expect(within(fresh).getByLabelText("Invitation link")).toHaveValue(`${window.location.origin}/shared/join/${INVITATION.token}`);
     expect(within(fresh).getByLabelText("Invitation code")).toHaveTextContent("482913");
     expect(fresh).toHaveTextContent("works for 7 days");
@@ -293,5 +296,92 @@ describe("emailing the invitation", () => {
     const fresh = await open("");
 
     expect(new URL(fresh.getByRole("link", { name: "Email it with Gmail" }).getAttribute("href")!).searchParams.get("su")).toBe("A Brief dashboard shared with you");
+  });
+});
+
+describe("how long they may look", () => {
+  const changeMock = vi.mocked(changeShareAccess);
+  const inDays = (days: number) => new Date(Date.now() + days * 86_400_000 + 60_000).toISOString();
+
+  beforeEach(() => changeMock.mockReset());
+
+  it("asks how long, with a week chosen, before the invitation is made", () => {
+    render(<SharingPanel initial={[]} />);
+
+    expect((screen.getByLabelText("How long can they look?") as HTMLSelectElement).value).toBe("168");
+    expect(screen.getByText(/The time starts when you approve them/)).toBeInTheDocument();
+  });
+
+  it("sends the length that was picked with the invitation", async () => {
+    createMock.mockResolvedValue({ ok: true, result: { ...INVITATION, access_hours: 24 } });
+    render(<SharingPanel initial={[]} />);
+
+    fireEvent.change(screen.getByLabelText("How long can they look?"), { target: { value: "24" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create invitation" }));
+
+    await screen.findByRole("region", { name: "New invitation" });
+    expect(createMock).toHaveBeenCalledExactlyOnceWith("", { kind: "hours", hours: 24 });
+    expect(screen.getByRole("region", { name: "New invitation" })).toHaveTextContent("they can look for 1 day");
+  });
+
+  it("waits for a day to be picked when a date was asked for", () => {
+    render(<SharingPanel initial={[]} />);
+
+    fireEvent.change(screen.getByLabelText("How long can they look?"), { target: { value: "date" } });
+
+    expect(screen.getByRole("button", { name: "Create invitation" })).toBeDisabled();
+  });
+
+  it("shows how long someone who is not approved yet will be able to look", () => {
+    render(<SharingPanel initial={[share({ status: "requested", viewer_email: "a@x.com", access_hours: 720 })]} />);
+
+    expect(screen.getByText("Can look for 30 days once you approve")).toBeInTheDocument();
+  });
+
+  it("shows how long is left for someone who can look now", () => {
+    render(<SharingPanel initial={[share({ status: "active", viewer_email: "a@x.com", expires_at: null, access_ends_at: inDays(3) })]} />);
+
+    expect(screen.getByText("Ends in 3 days")).toBeInTheDocument();
+    expect(screen.queryByText(/once you approve/)).not.toBeInTheDocument();
+  });
+
+  it("lets the owner change the time, and saves it", async () => {
+    changeMock.mockResolvedValue({ ok: true, result: null });
+    render(<SharingPanel initial={[share({ status: "active", viewer_email: "a@x.com", expires_at: null, access_ends_at: inDays(1) })]} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /Change the time for/ }));
+    fireEvent.change(screen.getByLabelText("Give them time from now"), { target: { value: "2160" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save time" }));
+
+    await waitFor(() => expect(changeMock).toHaveBeenCalledExactlyOnceWith("s1", { kind: "hours", hours: 2160 }));
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Save time" })).not.toBeInTheDocument());
+    expect(refreshMock).toHaveBeenCalled();
+  });
+
+  it("says why when the time could not be changed, and keeps the picker open", async () => {
+    changeMock.mockResolvedValue({ ok: false, message: "That share has ended. Make a new invitation to share again." });
+    render(<SharingPanel initial={[share({ status: "active", viewer_email: "a@x.com", expires_at: null, access_ends_at: inDays(1) })]} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /Change the time for/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Save time" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("That share has ended");
+    expect(screen.getByRole("button", { name: "Save time" })).toBeInTheDocument();
+  });
+
+  it("can close the picker without changing anything", () => {
+    render(<SharingPanel initial={[share({ status: "active", viewer_email: "a@x.com", expires_at: null, access_ends_at: inDays(1) })]} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /Change the time for/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(screen.queryByRole("button", { name: "Save time" })).not.toBeInTheDocument();
+    expect(changeMock).not.toHaveBeenCalled();
+  });
+
+  it("offers no time change for someone who is not approved yet", () => {
+    render(<SharingPanel initial={[share({ status: "requested", viewer_email: "a@x.com" })]} />);
+
+    expect(screen.queryByRole("button", { name: /Change the time for/ })).not.toBeInTheDocument();
   });
 });
