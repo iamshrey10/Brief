@@ -28,4 +28,44 @@ describe("the terms page", () => {
   it("uses no em dash", () => {
     expect(html()).not.toContain("—");
   });
+
+  it("is dated today", () => {
+    expect(html()).toContain("Last updated November 12, 2026");
+  });
+
+  it("says who runs it", () => {
+    expect(html()).toContain("Shreyas Revankar");
+  });
+
+  it("states the daily limits and the whole-site cap", () => {
+    expect(html()).toContain("today 40, 10 and 20");
+    expect(html()).toContain("busy until tomorrow");
+  });
+
+  it("asks for fair use, including no extra accounts to get around the limits", () => {
+    expect(html()).toContain("Using Brief fairly");
+    expect(html()).toContain("including by making extra accounts");
+    expect(html()).toContain("overload the service");
+  });
+
+  it("covers sharing: who to trust, how long, and that the person is responsible", () => {
+    expect(html()).toContain("Sharing your dashboard");
+    expect(html()).toContain("up to 90 days");
+    expect(html()).toContain("You are");
+  });
+
+  it("says terms can change and an account that breaks them can be removed", () => {
+    expect(html()).toContain("Changes to these terms");
+    expect(html()).toContain("suspended or removed");
+  });
+
+  it("names the file types, and that a blurry photo may be refused", () => {
+    expect(html()).toContain("PDF, JPG, PNG or HEIC");
+    expect(html()).toContain("too");
+    expect(html()).toContain("blurry");
+  });
+
+  it("does not print the email address in the page text", () => {
+    expect(html()).not.toContain("revankarshreyas10");
+  });
 });

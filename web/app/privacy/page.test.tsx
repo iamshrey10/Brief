@@ -30,4 +30,50 @@ describe("the privacy page", () => {
   it("uses no em dash", () => {
     expect(html()).not.toContain("—");
   });
+
+  it("is dated today", () => {
+    expect(html()).toContain("Last updated November 12, 2026");
+  });
+
+  it("names every service that handles the data, and says where", () => {
+    for (const company of ["Google", "Cloudflare", "Neon", "Render", "Vercel", "Upstash"]) expect(html()).toContain(`<strong>${company}</strong>`);
+    expect(html()).toContain("United");
+    expect(html()).toContain("North America");
+    expect(html()).toContain("does not sell data");
+  });
+
+  it("lists what was missing before: the name, why you came, time in Brief, shares and two-step data", () => {
+    expect(html()).toContain("first and last name");
+    expect(html()).toContain("Why you said you came");
+    expect(html()).toContain("How long Brief is open and in use");
+    expect(html()).toContain("If you share your dashboard");
+    expect(html()).toContain("two-step verification");
+  });
+
+  it("says a deleted document waits in the Bin for 7 days, which the old page left out", () => {
+    expect(html()).toContain("Bin");
+    expect(html()).toContain("7 days");
+    expect(html()).toContain("removed after an hour");
+  });
+
+  it("explains sharing, and what the owner of Brief can and cannot see", () => {
+    expect(html()).toContain("When you share your dashboard");
+    expect(html()).toContain("up to 90 days");
+    expect(html()).toContain("What the owner of Brief can see");
+    expect(html()).toContain("does not show anyone&#x27;s name or email address");
+  });
+
+  it("mentions the browser cookie for a trusted device, and that there is no tracking", () => {
+    expect(html()).toContain("30 days");
+    expect(html()).toContain("no advertising or tracking cookies");
+  });
+
+  it("gives an email way to ask, and no longer points to GitHub", () => {
+    expect(html()).toContain("write to");
+    expect(html()).not.toContain("github.com");
+  });
+
+  it("does not print the email address in the page text, where a bot that collects addresses would find it", () => {
+    expect(html()).not.toContain("revankarshreyas10");
+  });
 });
