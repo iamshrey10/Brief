@@ -69,7 +69,7 @@ describe("WelcomeSetup", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
-    await waitFor(() => expect(push).toHaveBeenCalledWith("/dashboard"));
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/dashboard?tour=1"));
     expect(refresh).toHaveBeenCalled();
   });
 
