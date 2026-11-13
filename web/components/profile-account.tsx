@@ -13,7 +13,7 @@ export function ProfileAccount({ email, firstName, lastName }: { email: string; 
   const full = [name.first, name.last].filter(Boolean).join(" ");
 
   return (
-    <section aria-labelledby="account-heading" className="rounded-2xl border border-border bg-card p-6">
+    <section aria-labelledby="account-heading" className="rounded-2xl border border-border bg-card p-6 max-sm:p-4">
       <h2 id="account-heading" className="text-lg font-semibold tracking-tight text-foreground">
         Account
       </h2>

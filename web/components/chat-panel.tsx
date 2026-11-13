@@ -163,7 +163,7 @@ export function ChatPanel({
                   Finding good questions for this document...
                 </p>
               ) : (
-                <ul aria-label="Suggested questions" className="flex flex-wrap justify-center gap-2 max-sm:-mx-3 max-sm:flex-nowrap max-sm:justify-start max-sm:overflow-x-auto max-sm:px-3 max-sm:pb-1">
+                <ul aria-label="Suggested questions" className="flex flex-wrap justify-center gap-2 max-sm:-mx-3 max-sm:flex-nowrap max-sm:justify-start max-sm:overflow-x-auto max-sm:px-3 max-sm:pb-1 max-sm:[mask-image:linear-gradient(to_right,black_calc(100%-0.75rem),transparent)]">
                   {(suggestions ?? suggestionsFor(docType)).map((question) => (
                     <li key={question} className="max-sm:shrink-0">
                       <button
@@ -216,7 +216,7 @@ export function ChatPanel({
         {pending && <p className="text-sm text-muted-foreground">Reading the document...</p>}
       </div>
 
-      <form onSubmit={handleSubmit} className="sticky bottom-0 max-sm:bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-10 flex shrink-0 flex-col gap-2 rounded-b-lg border-t border-border bg-background p-3 max-sm:gap-1.5 max-sm:p-2.5">
+      <form onSubmit={handleSubmit} className="sticky bottom-0 max-sm:bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-10 flex shrink-0 flex-col gap-2 rounded-b-lg border-t border-border bg-background p-3 max-sm:grid max-sm:grid-cols-[1fr_auto] max-sm:gap-x-2 max-sm:gap-y-1 max-sm:p-2.5">
         <textarea
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
@@ -232,14 +232,15 @@ export function ChatPanel({
           aria-label="Your question"
           className="w-full resize-none rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none placeholder:text-muted-foreground max-sm:h-11 max-sm:py-2.5 max-sm:placeholder:truncate focus-visible:ring-3 focus-visible:ring-ring/50"
         />
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex flex-col">
+        {/* On a phone the question box and Ask share one row, and the note sits under them. */}
+        <div className="flex items-center justify-between gap-3 max-sm:contents">
+          <div className="flex flex-col max-sm:col-span-2 max-sm:row-start-2">
             <p className="text-xs text-muted-foreground">
               Explains what the document says. Not legal advice.
             </p>
             {limitNote && <p className="text-xs font-medium text-foreground">{limitNote}</p>}
           </div>
-          <Button type="submit" disabled={!draft.trim() || pending}>
+          <Button type="submit" disabled={!draft.trim() || pending} className="max-sm:col-start-2 max-sm:row-start-1 max-sm:h-11">
             {pending ? "Asking..." : "Ask"}
           </Button>
         </div>

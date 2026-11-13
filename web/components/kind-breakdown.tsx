@@ -7,11 +7,11 @@ export function KindBreakdown({ documents }: { documents: { doc_type: string }[]
   const most = Math.max(...kinds.map((kind) => kind.count));
 
   return (
-    <section aria-labelledby="kinds-heading" className="rounded-2xl border border-border bg-card p-5">
+    <section aria-labelledby="kinds-heading" className="rounded-2xl border border-border bg-card p-5 max-sm:p-4">
       <h2 id="kinds-heading" className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
         By kind
       </h2>
-      <ul className="mt-4 flex flex-col gap-3">
+      <ul className="mt-4 flex flex-col gap-3 max-sm:mt-3 max-sm:gap-2.5">
         {kinds.map(({ kind, label, count }) => (
           <li key={kind}>
             <div className="flex items-baseline justify-between gap-3 text-sm">

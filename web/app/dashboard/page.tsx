@@ -46,14 +46,14 @@ export default async function DashboardHome() {
   return (
     <div className="flex flex-1 flex-col">
       <AppHeader email={email} current="dashboard" />
-      <div className="mx-auto flex w-[min(100%-3rem,1400px)] flex-1 flex-col gap-5 py-5">
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary to-primary/80 px-7 py-5 text-primary-foreground shadow-lg shadow-primary/20 md:px-8 md:py-6">
+      <div className="mx-auto flex w-[min(100%-3rem,1400px)] flex-1 flex-col gap-4 py-3 sm:gap-5 sm:py-5">
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary to-primary/80 px-7 py-5 text-primary-foreground shadow-lg shadow-primary/20 max-sm:px-5 max-sm:py-4 md:px-8 md:py-6">
           <div aria-hidden="true" className="pointer-events-none absolute -top-16 -right-10 size-56 rounded-full bg-white/10" />
           <div aria-hidden="true" className="pointer-events-none absolute -bottom-20 right-24 size-44 rounded-full bg-white/5" />
-          <div className="relative flex flex-wrap items-end justify-between gap-6">
+          <div className="relative flex flex-wrap items-end justify-between gap-4 sm:gap-6">
             <div>
-              <h1 className="font-heading text-3xl font-semibold tracking-tight md:text-4xl">Dashboard</h1>
-              <p className="mt-1.5 max-w-xl text-sm text-primary-foreground md:text-base">Where your documents stand, and what needs doing next.</p>
+              <h1 className="font-heading text-2xl font-semibold tracking-tight sm:text-3xl md:text-4xl">Dashboard</h1>
+              <p className="mt-1 max-w-xl text-sm text-primary-foreground sm:mt-1.5 md:text-base">Where your documents stand, and what needs doing next.</p>
             </div>
             <Link href="/dashboard/shared#sharing" className={buttonVariants({ variant: "secondary", size: "lg" })}>
               Share dashboard

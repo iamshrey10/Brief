@@ -45,7 +45,7 @@ test("the Documents section is unchanged: it still has the upload and the list, 
 test("a document's page leads back to the documents list", async ({ page }) => {
   await page.goto("/dashboard/documents/doc-lease");
 
-  await page.getByRole("link", { name: "← Back to your documents" }).click();
+  await page.getByRole("link", { name: "Back to your documents" }).click();
 
   await expect(page).toHaveURL(/\/dashboard\/documents$/);
 });
@@ -157,4 +157,24 @@ test("the bell on the lease reminder hands the date to a calendar file, says it 
   await card.getByRole("button", { name: "Added to your calendar" }).click();
   await expect(page.getByRole("status").filter({ hasText: "Added to your calendar" })).toBeVisible();
   await expect(page.getByRole("button", { name: /Download calendar file/ })).toHaveCount(0);
+});
+
+test.describe("on a phone", () => {
+  for (const width of [360, 390]) {
+    test(`the top bar keeps Back beside the name on one row at ${width} px wide`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 800 });
+      await page.goto("/dashboard/documents/doc-lease");
+
+      const header = page.locator("header");
+      await expect(header.getByRole("link", { name: "Back to your documents" })).toBeVisible();
+      // One row of the bar, not two: it stays as tall as it is with no Back button.
+      expect((await header.boundingBox())?.height ?? 999).toBeLessThanOrEqual(58);
+      // The old row under the bar is gone, so the document's name starts right below it.
+      await expect(page.getByText("← Back to your documents")).toHaveCount(0);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+
+      await header.getByRole("link", { name: "Back to your documents" }).click();
+      await expect(page).toHaveURL(/\/dashboard\/documents$/);
+    });
+  }
 });

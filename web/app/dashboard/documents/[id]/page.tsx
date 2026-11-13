@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { AppHeader } from "@/components/app-header";
@@ -60,12 +59,12 @@ function StatusNotice({ document }: { document: DocumentSummary }) {
 function PageShell({ email, children, fill = false }: { email: string; children: React.ReactNode; fill?: boolean }) {
   return (
     <div className="flex flex-1 flex-col">
-      <AppHeader email={email} current="documents" />
+      <AppHeader email={email} current="documents" back={{ href: "/dashboard/documents", label: "Back to your documents" }} />
       <div
         className={
           fill
-            ? "mx-auto flex w-[min(100%-3rem,1400px)] flex-1 flex-col gap-4 py-5 lg:h-[calc(100vh-3.5rem)] lg:flex-none lg:overflow-hidden print:h-auto print:overflow-visible"
-            : "mx-auto flex w-[min(100%-3rem,1400px)] flex-1 flex-col gap-6 py-8"
+            ? "mx-auto flex w-[min(100%-3rem,1400px)] flex-1 flex-col gap-4 py-3 sm:py-5 lg:h-[calc(100vh-3.5rem)] lg:flex-none lg:overflow-hidden print:h-auto print:overflow-visible"
+            : "mx-auto flex w-[min(100%-3rem,1400px)] flex-1 flex-col gap-5 py-4 sm:gap-6 sm:py-8"
         }
       >
         {children}
@@ -112,18 +111,17 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
   return (
     <PageShell email={email} fill={isReadable(document.status) && clauses.length > 0}>
       <div className="flex flex-col gap-1.5">
-        <Link href="/dashboard/documents" className="inline-flex self-start text-sm text-muted-foreground max-sm:min-h-11 max-sm:items-center underline-offset-4 hover:text-foreground hover:underline print:hidden">
-          ← Back to your documents
-        </Link>
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 sm:gap-y-2">
         <h1 className="font-heading text-xl font-semibold tracking-tight break-all text-foreground md:text-2xl">
           {document.filename}
         </h1>
         <span className="rounded-full border border-border bg-accent px-2.5 py-0.5 text-xs font-medium text-accent-foreground">
           {DOC_TYPE_LABELS[document.doc_type] ?? document.doc_type}
         </span>
+        {/* On a phone the facts and the Print button share one row under the name. From a tablet up they join the row above. */}
+        <div className="flex w-full items-center justify-between gap-3 sm:contents">
         {documentFacts(clauses, document.created_at).length > 0 && (
-          <dl aria-label="About this document" className="flex flex-wrap gap-x-5 gap-y-1 text-sm text-muted-foreground">
+          <dl aria-label="About this document" className="flex min-w-0 flex-wrap gap-x-3 gap-y-1 text-[0.8125rem] text-muted-foreground sm:gap-x-5 sm:text-sm">
             {documentFacts(clauses, document.created_at).map((fact) => (
               <div key={fact.label} className="flex gap-1.5">
                 <dt className="sr-only">{fact.label}</dt>
@@ -141,10 +139,11 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
           </dl>
         )}
         {isReadable(document.status) && clauses.length > 0 && (
-          <div className="ml-auto">
+          <div className="ml-auto shrink-0">
             <PrintButton />
           </div>
         )}
+        </div>
         </div>
       </div>
 
