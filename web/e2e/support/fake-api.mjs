@@ -47,6 +47,8 @@ const LONG_CLAUSES = Array.from({ length: 40 }, (_, index) => ({
 }));
 
 const fresh = () => ({
+  admin: false,
+  signals: 0,
   trash: [],
   twoFactor: { enabled: false, pending: null, secret: null, recovery: [], devices: [], wrong: 0 },
   name: { first_name: "Test", last_name: "Reader" },
@@ -212,10 +214,20 @@ const server = createServer(async (request, response) => {
     }
   }
   if (path === "/__uploads") return send(response, 200, state.uploads);
+  if (path === "/__signals") return send(response, 200, { count: state.signals });
+  if (path === "/__seed-admin" && method === "POST") {
+    state.admin = true;
+    return send(response, 204);
+  }
 
   // Like the real API, nothing else is answered without a signed token.
   const reader = readerFrom(request.headers.authorization);
   if (!reader) return send(response, 401, { detail: "not signed in" });
+  // The "still here" signal is counted on its own, so the tests of what a page asks for are not disturbed by it.
+  if (method === "POST" && path === "/me/activity") {
+    state.signals += 1;
+    return send(response, 204);
+  }
   state.requests.push({ method, path, requestId: request.headers["x-request-id"] ?? null });
 
   if (method === "GET" && path === "/documents") {
@@ -262,7 +274,26 @@ const server = createServer(async (request, response) => {
       { document_id: "doc-loan", field: "repayment_start", label: "Repayments start", value: "six months after graduation" },
     ]);
   }
-  if (method === "GET" && path === "/me") return send(response, 200, { id: "e2e-reader", email: "e2e-reader@example.invalid", ...state.name });
+  if (method === "GET" && path === "/admin/stats") {
+    if (!state.admin) return send(response, 404, { detail: "not found" });
+    return send(response, 200, {
+      generated_at: new Date().toISOString(),
+      people: { total: 12, new_7_days: 5, new_30_days: 11, active_today: 3, active_7_days: 7, active_30_days: 10 },
+      time_in_brief: { average_minutes_per_person_per_day_7_days: 6.5, average_minutes_per_visit_7_days: 3.2, visits_7_days: 40 },
+      documents: { stored: 30, uploaded_7_days: 9, uploaded_30_days: 28, by_kind: { lease: 20, loan: 10 }, by_status: { ready: 28, failed: 2 }, photos: 4, pdfs_and_other: 26 },
+      questions: { asked_total: 210, asked_today: 14, asked_7_days: 96 },
+      reads: { total: 40, today: 3 },
+      overviews: { total: 31, today: 2 },
+      reasons: { lease: 6, loan: 3, not_said: 3 },
+      sharing: { waiting_or_active: 3, active: 1 },
+      site: { model_calls_today: 120, daily_limit: 3000 },
+      by_day: Array.from({ length: 30 }, (_, index) => {
+        const day = new Date(Date.UTC(2026, 10, 12 - (29 - index)));
+        return { day: day.toISOString().slice(0, 10), signed_up: index % 7 === 0 ? 2 : 0, people: (index * 3) % 9, minutes: (index * 7) % 40 };
+      }),
+    });
+  }
+  if (method === "GET" && path === "/me") return send(response, 200, { id: "e2e-reader", email: "e2e-reader@example.invalid", is_admin: state.admin, ...state.name });
   if (method === "PATCH" && path === "/me") {
     const { first_name: first, last_name: last } = await readJson(request);
     if (!/^[\p{L} '.-]{1,50}$/u.test(first ?? "") || !/^[\p{L} '.-]{1,50}$/u.test(last ?? "")) return send(response, 422, { detail: "a name has letters only" });

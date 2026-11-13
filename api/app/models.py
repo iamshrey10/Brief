@@ -199,6 +199,22 @@ class Usage(Base):
     count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
 
 
+class Activity(Base):
+    """How long one person had Brief open on one day, and how many visits that was, to show how it is used. It holds
+    no page names and no content, only seconds and a count, and the time of the last signal so a visit can be told
+    from a new one. It goes when the account goes."""
+
+    __tablename__ = "activity"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    day: Mapped[dt.date] = mapped_column(Date, primary_key=True)
+    seconds: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    visits: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    last_signal_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class AnswerTrace(Base):
     """What one answer used, so a failure or a surprising answer can be traced later from the reference code
     a person was shown. It holds ids, counts and times only, never the question, the answer or any text of

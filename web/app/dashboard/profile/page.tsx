@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
 import { AppHeader } from "@/components/app-header";
-import { Lock, Palette, Trash2, Users } from "lucide-react";
+import { BarChart3, Lock, Palette, Trash2, Users } from "lucide-react";
 import { PendingBadge } from "@/components/pending-badge";
 import { ProfileRow } from "@/components/profile-row";
 import { BinList } from "@/components/bin-list";
@@ -44,7 +44,7 @@ export default async function ProfilePage() {
     backendGet(email, "/me/2fa"),
   ]);
   const twoFactor = asTwoFactorStatus(twoFactorBody);
-  const me = (meBody && typeof meBody === "object" ? meBody : null) as { first_name?: string | null; last_name?: string | null } | null;
+  const me = (meBody && typeof meBody === "object" ? meBody : null) as { first_name?: string | null; last_name?: string | null; is_admin?: boolean } | null;
   const trash = asTrash(trashBody);
 
   return (
@@ -67,6 +67,9 @@ export default async function ProfilePage() {
               <ProfileRow anchor="two-step" icon={<Lock className="size-5" />} title="Two-step verification" description="Add a second lock to your account.">
                 <TwoFactorPanel initialEnabled={twoFactor.enabled} initialCodesLeft={twoFactor.recovery_codes_left} />
               </ProfileRow>
+            )}
+            {me?.is_admin === true && (
+              <ProfileRow anchor="admin" href="/dashboard/admin" icon={<BarChart3 className="size-5" />} title="Admin" description="How Brief is being used. Counts only." />
             )}
             <ProfileRow anchor="sharing" href="/dashboard/shared#sharing" badge={<PendingBadge />} icon={<Users className="size-5" />} title="Share your dashboard" description="Let family or friends view your documents." />
             <ProfileRow anchor="bin" icon={<Trash2 className="size-5" />} title="Bin" description="Deleted documents stay for 7 days.">
