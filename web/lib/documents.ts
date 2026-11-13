@@ -109,7 +109,7 @@ export function statusLabel(status: string): string {
 
 // While something is still processing the dashboard re-checks on this interval, and stops
 // after the cap, so a document stuck in processing can't make a tab poll forever.
-export const POLL_INTERVAL_MS = 3000;
+export const POLL_INTERVAL_MS = 5000;
 export const MAX_POLL_DURATION_MS = 5 * 60 * 1000;
 
 export type PageGroup = { pageNumber: number; clauses: ClauseData[] };

@@ -13,7 +13,7 @@ from botocore.exceptions import BotoCoreError, ClientError
 from google import genai
 from google.genai import errors as genai_errors
 from google.genai import types
-from sqlalchemy import update
+from sqlalchemy import delete, select, update
 from sqlalchemy.orm.attributes import flag_modified
 
 from app.clause_segmentation import segment_page_into_clauses
@@ -263,8 +263,41 @@ async def _one_read_at_a_time(user_id: uuid.UUID):
             del _user_turns[user_id]
 
 
+# Documents this server process is reading or has queued right now, so a recovery pass never starts a second read of one.
+_in_flight: set[uuid.UUID] = set()
+
+
 async def ingest_document(document_id: uuid.UUID) -> None:
     """Reads a document, once the person's earlier ones are done."""
+    _in_flight.add(document_id)
+    try:
+        await _ingest_when_its_turn(document_id)
+    finally:
+        _in_flight.discard(document_id)
+
+
+async def recover_stranded_reads() -> int:
+    """Starts again the reads a restart cut short. Reads live in this server's memory, so a restart leaves their documents
+    showing "uploaded" or "processing" with nothing working on them. Run it a little after startup, once any older server
+    has finished its own reads. Returns how many were started again."""
+    async with async_session() as session:
+        rows = await session.execute(
+            select(Document.id).where(
+                Document.status.in_(("uploaded", "processing")), Document.deleted_at.is_(None)
+            )
+        )
+        stranded = [document_id for (document_id,) in rows.all() if document_id not in _in_flight]
+        for document_id in stranded:
+            await session.execute(delete(Clause).where(Clause.document_id == document_id))
+            _in_flight.add(document_id)
+        await session.commit()
+    for document_id in stranded:
+        logger.info("starting a read again that a restart cut short: document %s", document_id)
+        asyncio.create_task(ingest_document(document_id))
+    return len(stranded)
+
+
+async def _ingest_when_its_turn(document_id: uuid.UUID) -> None:
     async with async_session() as session:
         document = await session.get(Document, document_id)
         user_id = document.user_id if document is not None else None

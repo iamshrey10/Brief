@@ -1034,3 +1034,56 @@ async def test_one_persons_documents_are_read_one_after_another_but_two_people_r
     assert log.index("b1 starts") < log.index("a1 ends")
     # Nothing is kept once nobody is waiting.
     assert ingestion._user_turns == {} and ingestion._user_waiting == {}
+
+
+# --- recovering reads that a restart cut short ---
+
+
+async def test_a_read_cut_short_by_a_restart_is_started_again(db_session, test_user, monkeypatch):
+    document = _make_document(test_user)
+    document.status = "processing"
+    db_session.add(document)
+    await db_session.commit()
+    await db_session.refresh(document)
+
+    pdf_bytes = _make_pdf_bytes(["Page one clause text."])
+    monkeypatch.setattr("app.ingestion.download_file", lambda storage_key: pdf_bytes)
+    monkeypatch.setattr(
+        "app.ingestion.embed_texts",
+        lambda texts, on_progress=None: [[0.1] * EMBEDDING_DIM for _ in texts],
+    )
+
+    started = await ingestion_module.recover_stranded_reads()
+    assert started == 1
+    for _ in range(100):
+        await asyncio.sleep(0.1)
+        await db_session.refresh(document)
+        if document.status == "ready":
+            break
+    assert document.status == "ready"
+
+
+async def test_recovery_leaves_alone_a_document_this_server_is_reading(db_session, test_user):
+    document = _make_document(test_user)
+    document.status = "processing"
+    db_session.add(document)
+    await db_session.commit()
+    await db_session.refresh(document)
+
+    ingestion_module._in_flight.add(document.id)
+    try:
+        assert await ingestion_module.recover_stranded_reads() == 0
+    finally:
+        ingestion_module._in_flight.discard(document.id)
+
+
+async def test_recovery_ignores_finished_and_binned_documents(db_session, test_user):
+    for status, binned in (("ready", False), ("failed", False), ("processing", True)):
+        document = _make_document(test_user)
+        document.status = status
+        if binned:
+            document.deleted_at = datetime.now(timezone.utc)
+        db_session.add(document)
+    await db_session.commit()
+
+    assert await ingestion_module.recover_stranded_reads() == 0

@@ -69,7 +69,7 @@ describe("WelcomeSetup", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
-    await waitFor(() => expect(push).toHaveBeenCalledWith("/dashboard/profile#two-step"));
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/dashboard"));
     expect(refresh).toHaveBeenCalled();
   });
 
