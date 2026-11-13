@@ -32,7 +32,7 @@ from app import request_id
 from app.insights import DocumentInsight, saved_insights
 from app.key_dates import KeyDate, saved_key_dates
 from app.key_terms import KeyTermsGenerationError, KeyTermsResult, get_key_terms, load_key_terms
-from app import sharing, two_factor
+from app import admin, sharing, two_factor
 from app.filing import FilingError, file_document
 from app.folders import FOLDERS, folder_for
 from app.models import ChecklistAnswerRow, Clause, Document, Extraction, User
@@ -115,6 +115,7 @@ app = FastAPI(
         {"name": "documents", "description": "Uploading, reading, renaming and deleting documents."},
         {"name": "answers", "description": "Questions, search, key terms and the questions to ask before signing."},
         {"name": "sharing", "description": "Letting someone else look at your dashboard, read only, and looking at one shared with you."},
+        {"name": "admin", "description": "For the owner of the site only: counts of how Brief is used, never a document, a name or an address."},
     ],
     **docs_urls(settings.environment),
 )
@@ -205,6 +206,8 @@ class Me(BaseModel):
     # What the person told us after their first sign in. None until they have.
     first_name: str | None = None
     last_name: str | None = None
+    # Whether this person may open the admin page, so the website can offer the way in to them and nobody else.
+    is_admin: bool = False
 
 
 @app.get(
@@ -217,7 +220,7 @@ class Me(BaseModel):
     responses=_errors(401),
 )
 async def me(user: User = Depends(get_current_user)) -> Me:
-    return Me(id=str(user.id), email=user.email, first_name=user.first_name, last_name=user.last_name)
+    return Me(id=str(user.id), email=user.email, first_name=user.first_name, last_name=user.last_name, is_admin=admin.is_admin(user))
 
 
 SIGNUP_REASONS = ("lease", "loan", "job_offer", "exploring")
@@ -262,7 +265,45 @@ async def set_my_name(
         person.signup_reason = body.reason
     await session.commit()
     await session.refresh(person)
-    return Me(id=str(person.id), email=person.email, first_name=person.first_name, last_name=person.last_name)
+    return Me(id=str(person.id), email=person.email, first_name=person.first_name, last_name=person.last_name, is_admin=admin.is_admin(person))
+
+
+@app.post(
+    "/me/activity",
+    status_code=204,
+    tags=["account"],
+    summary="Say that Brief is open and being used",
+    description=(
+        "The website sends this about every 30 seconds while a signed-in person has Brief open and is using it, so the admin page can show how long people stay. It records seconds and a count per day, nothing about what the person is looking at."
+    ),
+    responses=_errors(401),
+)
+async def signal_activity(
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> Response:
+    await admin.record_signal(session, user.id)
+    return Response(status_code=204)
+
+
+@app.get(
+    "/admin/stats",
+    tags=["admin"],
+    summary="Counts of how Brief is used",
+    description=(
+        "For the owner only. Returns totals: how many people signed up and were active, how long they stay, how many documents, questions, reads and overviews, why people came, and today's use of the model. Counts only: no address, name, file name or document text is ever included."
+    ),
+    responses=_errors(401, 404),
+)
+async def admin_stats(
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    # Only the people named in ADMIN_EMAILS. Anyone else is told it is not there, as it is not for them.
+    if not admin.is_admin(user):
+        raise HTTPException(status_code=404, detail="not found")
+    logger.info("admin page viewed")
+    return await admin.collect(session)
 
 
 @app.get(

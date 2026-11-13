@@ -69,6 +69,10 @@ class Settings(BaseSettings):
     # spending guard: raise it only as the prepaid credit allows. Tier 1 itself allows 150,000 a day.
     global_daily_model_calls: int = 3000
 
+    # The addresses of the people who may open the admin page, separated by commas. Empty means nobody can: the
+    # page then answers as if it did not exist. The admin page shows counts only, never a document or an address.
+    admin_emails: str = ""
+
     # A failed check must name the setting, never print its value, so a secret cannot end up in a log.
     model_config = SettingsConfigDict(env_file=".env", extra="ignore", hide_input_in_errors=True)
 

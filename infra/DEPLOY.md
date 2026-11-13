@@ -37,6 +37,8 @@ it drifts from what the server reads.
 - `SERVICE_JWT_SECRET`: at least 32 random characters, the same value the website has.
 - `DATABASE_URL`, `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_ENDPOINT_URL`,
   `GEMINI_API_KEY`.
+- `ADMIN_EMAILS` (optional): the Google account address of whoever may open the admin page at `/dashboard/admin`, separated by commas
+  if more than one. Leave it empty and nobody can. The page shows counts only, and anyone else is told it is not there.
 
 ## 3. The database
 

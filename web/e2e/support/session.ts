@@ -37,6 +37,16 @@ export async function callsMade(page: Page): Promise<{ method: string; path: str
   return (await page.request.get(`${FAKE_API}/__requests`)).json();
 }
 
+/** Makes the reader the owner of the site, so the admin page opens for them. */
+export async function seedAdmin(page: Page): Promise<void> {
+  expect((await page.request.post(`${FAKE_API}/__seed-admin`)).status()).toBe(204);
+}
+
+/** How many "still here" signals the fake API has received. */
+export async function signalsReceived(page: Page): Promise<number> {
+  return ((await (await page.request.get(`${FAKE_API}/__signals`)).json()) as { count: number }).count;
+}
+
 /** Adds a document whose read failed, so the failure message and Try again can be tested. */
 export async function seedFailedDocument(page: Page): Promise<void> {
   expect((await page.request.post(`${FAKE_API}/__seed-failed`)).status()).toBe(204);

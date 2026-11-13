@@ -3,7 +3,7 @@ from pathlib import Path
 
 from app.main import app
 
-TAGS = {"health", "account", "documents", "answers", "sharing"}
+TAGS = {"health", "account", "documents", "answers", "sharing", "admin"}
 
 
 def _operations() -> list[tuple[str, str, dict]]:

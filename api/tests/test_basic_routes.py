@@ -60,7 +60,7 @@ async def test_me_returns_the_id_and_email_of_the_person_signed_in(signed_in, te
     response = await signed_in.get("/me")
 
     assert response.status_code == 200
-    assert response.json() == {"id": str(test_user.id), "email": test_user.email, "first_name": None, "last_name": None}
+    assert response.json() == {"id": str(test_user.id), "email": test_user.email, "first_name": None, "last_name": None, "is_admin": False}
 
 
 @pytest.mark.parametrize("header", [None, "Bearer not-a-token", "Basic abc"])
