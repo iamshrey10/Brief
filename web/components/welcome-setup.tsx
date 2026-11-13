@@ -31,8 +31,8 @@ export function WelcomeSetup({ initialFirst, initialLast, email }: { initialFirs
     const outcome = await saveName(first, last, reason);
     setBusy(false);
     if (!outcome.ok) return setError(outcome.message);
-    // Next, the offer of a second lock on the account.
-    router.push("/dashboard/profile#two-step");
+    // Straight to the dashboard. Two-step verification stays one tap away on the Profile page.
+    router.push("/dashboard");
     router.refresh();
   }
 

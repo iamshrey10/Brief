@@ -25,7 +25,7 @@ from app.housekeeping import (
     remove_old_traces,
     trash_days_left,
 )
-from app.ingestion import ingest_document
+from app.ingestion import ingest_document, recover_stranded_reads
 from app.logging_setup import configure_logging
 from app.readiness import check_ready
 from app import request_id
@@ -89,15 +89,32 @@ async def sweep_trash_forever() -> None:
         await asyncio.sleep(TRASH_SWEEP_EVERY_SECONDS)
 
 
+# How long after startup to look for reads a restart cut short. A deploy overlaps the old server with the new one for a
+# short while, and this leaves the old one time to finish or stop before its documents are taken over.
+RECOVER_READS_AFTER_SECONDS = 90
+
+
+async def recover_reads_soon() -> None:
+    await asyncio.sleep(RECOVER_READS_AFTER_SECONDS)
+    try:
+        started = await recover_stranded_reads()
+        if started:
+            logger.info("started %d interrupted reads again", started)
+    except Exception:
+        logger.exception("recovering interrupted reads failed")
+
+
 @contextlib.asynccontextmanager
 async def lifespan(_app: FastAPI):
     sweeper = asyncio.create_task(sweep_trash_forever())
+    recovery = asyncio.create_task(recover_reads_soon())
     try:
         yield
     finally:
-        sweeper.cancel()
-        with contextlib.suppress(asyncio.CancelledError):
-            await sweeper
+        for task in (sweeper, recovery):
+            task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await task
 
 
 app = FastAPI(

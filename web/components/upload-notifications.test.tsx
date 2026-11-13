@@ -3,7 +3,7 @@ import "@testing-library/jest-dom/vitest";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { DocumentSummary } from "@/lib/documents";
+import { POLL_INTERVAL_MS, type DocumentSummary } from "@/lib/documents";
 import { UploadNotifications, useUploadNotifications } from "./upload-notifications";
 import { stepOf } from "@/lib/tracking";
 
@@ -81,7 +81,7 @@ describe("UploadNotifications", () => {
     expect(screen.getByRole("status")).toHaveTextContent("Added offer.pdf");
     expect(screen.getByRole("status")).toHaveTextContent("Short files take seconds, long ones a minute or two.");
 
-    await tick(7100);
+    await tick(POLL_INTERVAL_MS + 4100);
     expect(screen.queryByText("Added offer.pdf")).not.toBeInTheDocument();
   });
 
@@ -97,7 +97,7 @@ describe("UploadNotifications", () => {
     listIs([doc("offer", "processing")]);
     renderWith([doc("offer", "processing")]);
 
-    await tick(3100);
+    await tick(POLL_INTERVAL_MS + 100);
 
     expect(screen.queryByText(/is ready/)).not.toBeInTheDocument();
     expect(refresh).not.toHaveBeenCalled();
@@ -107,8 +107,8 @@ describe("UploadNotifications", () => {
     listIs([doc("offer", "ready")]);
     renderWith([doc("offer", "processing")]);
 
-    await tick(3100); // read, summary being prepared
-    await tick(3100); // prepared, so now it is ready
+    await tick(POLL_INTERVAL_MS + 100); // read, summary being prepared
+    await tick(POLL_INTERVAL_MS + 100); // prepared, so now it is ready
 
     expect(screen.getByText("offer.pdf is ready")).toBeInTheDocument();
     expect(screen.queryByText("Added offer.pdf")).not.toBeInTheDocument();
@@ -123,8 +123,8 @@ describe("UploadNotifications", () => {
     listIs([doc("a", "ready"), doc("b", "ready"), doc("c", "ready")]);
     renderWith([doc("a", "processing"), doc("b", "processing"), doc("c", "processing")]);
 
-    await tick(3100);
-    await tick(3100);
+    await tick(POLL_INTERVAL_MS + 100);
+    await tick(POLL_INTERVAL_MS + 100);
 
     expect(screen.getByText("3 documents are ready")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "View documents" })).toHaveAttribute("href", "/dashboard/documents");
@@ -134,7 +134,7 @@ describe("UploadNotifications", () => {
     listIs([doc("offer", "failed", { failure_reason: "no_text" })]);
     renderWith([doc("offer", "processing")]);
 
-    await tick(3100);
+    await tick(POLL_INTERVAL_MS + 100);
     await tick(60000);
 
     const alert = screen.getByRole("alert");
@@ -148,7 +148,7 @@ describe("UploadNotifications", () => {
     listIs([doc("offer", "failed")]);
     retryMock.mockResolvedValue({ ok: true, document: doc("offer", "processing") });
     renderWith([doc("offer", "processing")]);
-    await tick(3100);
+    await tick(POLL_INTERVAL_MS + 100);
 
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Try again" }));
@@ -159,8 +159,8 @@ describe("UploadNotifications", () => {
     expect(screen.getByText("Reading offer.pdf again")).toBeInTheDocument();
 
     listIs([doc("offer", "ready")]);
-    await tick(3100);
-    await tick(3100);
+    await tick(POLL_INTERVAL_MS + 100);
+    await tick(POLL_INTERVAL_MS + 100);
     expect(screen.getByText("offer.pdf is ready")).toBeInTheDocument();
   });
 
@@ -170,7 +170,7 @@ describe("UploadNotifications", () => {
     listIs([doc("offer", "ready")]);
     renderWith([doc("offer", "processing")]);
 
-    await tick(3100);
+    await tick(POLL_INTERVAL_MS + 100);
     await tick(30000);
 
     expect(screen.getByText("Preparing offer.pdf")).toBeInTheDocument();
@@ -179,7 +179,7 @@ describe("UploadNotifications", () => {
     expect(checklistMock).toHaveBeenCalledWith("offer");
 
     await act(async () => finish({ ok: true }));
-    await tick(3100);
+    await tick(POLL_INTERVAL_MS + 100);
 
     expect(screen.getByText("offer.pdf is ready")).toBeInTheDocument();
     expect(screen.queryByText("Preparing offer.pdf")).not.toBeInTheDocument();
@@ -189,7 +189,7 @@ describe("UploadNotifications", () => {
     listIs([doc("offer", "failed")]);
     retryMock.mockResolvedValue({ ok: false, message: "Too many requests at once. Wait a few seconds and try again." });
     renderWith([doc("offer", "processing")]);
-    await tick(3100);
+    await tick(POLL_INTERVAL_MS + 100);
 
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Try again" }));
@@ -208,7 +208,7 @@ describe("UploadNotifications", () => {
     expect(screen.getByText("Added offer.pdf")).toBeInTheDocument();
 
     fireEvent.mouseLeave(note);
-    await tick(7100);
+    await tick(POLL_INTERVAL_MS + 4100);
     expect(screen.queryByText("Added offer.pdf")).not.toBeInTheDocument();
   });
 
@@ -218,8 +218,8 @@ describe("UploadNotifications", () => {
     Object.defineProperty(document, "hidden", { value: true, configurable: true });
     renderWith([doc("offer", "processing")]);
 
-    await tick(3100);
-    await tick(3100);
+    await tick(POLL_INTERVAL_MS + 100);
+    await tick(POLL_INTERVAL_MS + 100);
     expect(document.title).toBe("(1) Ready | Dashboard | Brief");
 
     Object.defineProperty(document, "hidden", { value: false, configurable: true });
@@ -247,14 +247,14 @@ describe("UploadNotifications", () => {
     expect(screen.getByText("Added offer.pdf")).toBeInTheDocument();
 
     fireEvent.blur(note);
-    await tick(7100);
+    await tick(POLL_INTERVAL_MS + 4100);
     expect(screen.queryByText("Added offer.pdf")).not.toBeInTheDocument();
   });
 
   it("stops looking at a document that is still being read after five minutes", async () => {
     listIs([doc("offer", "processing")]);
     renderWith([doc("offer", "processing")]);
-    await tick(3100);
+    await tick(POLL_INTERVAL_MS + 100);
     const fetchMock = fetch as unknown as ReturnType<typeof vi.fn>;
 
     const documentCalls = () => fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/documents")).length;
@@ -268,7 +268,7 @@ describe("UploadNotifications", () => {
   it("says nothing when the list cannot be fetched, and tries again on the next look", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce({ ok: false, json: async () => [] }));
     renderWith([doc("offer", "processing")]);
-    await tick(3100);
+    await tick(POLL_INTERVAL_MS + 100);
 
     expect(screen.queryByText(/is ready|couldn't read/)).not.toBeInTheDocument();
     expect(refresh).not.toHaveBeenCalled();
@@ -279,8 +279,8 @@ describe("UploadNotifications", () => {
     listIs([doc("offer", "ready")]);
     Object.defineProperty(document, "hidden", { value: true, configurable: true });
     renderWith([doc("offer", "processing")]);
-    await tick(3100);
-    await tick(3100);
+    await tick(POLL_INTERVAL_MS + 100);
+    await tick(POLL_INTERVAL_MS + 100);
     const counted = document.title;
 
     act(() => {
@@ -297,8 +297,8 @@ describe("UploadNotifications", () => {
     Object.defineProperty(document, "hidden", { value: true, configurable: true });
     renderWith([doc("a", "processing"), doc("b", "processing")]);
 
-    await tick(3100);
-    await tick(3100);
+    await tick(POLL_INTERVAL_MS + 100);
+    await tick(POLL_INTERVAL_MS + 100);
 
     expect(document.title).toBe("(2) Ready | Dashboard | Brief");
     Object.defineProperty(document, "hidden", { value: false, configurable: true });
@@ -320,9 +320,9 @@ describe("UploadNotifications", () => {
     expect(screen.getByTestId("timeline")).toHaveTextContent("offer:1");
 
     listIs([doc("offer", "ready")]);
-    await tick(3100); // read, being prepared
+    await tick(POLL_INTERVAL_MS + 100); // read, being prepared
     expect(screen.getByTestId("timeline")).toHaveTextContent("offer:3"); // prepared at once in this test, so it is done
-    await tick(12100);
+    await tick(POLL_INTERVAL_MS + 9100);
 
     expect(screen.getByTestId("timeline")).toBeEmptyDOMElement();
   });

@@ -95,7 +95,7 @@ describe("DocumentUpload polling", () => {
     const callsAtTheLimit = fetchMock.mock.calls.length;
     await tick(POLL_INTERVAL_MS * 20);
 
-    expect(callsAtTheLimit).toBeGreaterThan(90);
+    expect(callsAtTheLimit).toBeGreaterThan(50);
     expect(callsAtTheLimit).toBeLessThanOrEqual(MAX_POLL_DURATION_MS / POLL_INTERVAL_MS);
     expect(fetchMock.mock.calls.length).toBe(callsAtTheLimit);
   });
