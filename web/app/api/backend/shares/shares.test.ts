@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/lib/proxy", () => ({ proxyGet: vi.fn(), proxyPost: vi.fn(), proxyDelete: vi.fn() }));
+vi.mock("@/lib/proxy", () => ({ proxyGet: vi.fn(), proxyPost: vi.fn(), proxyDelete: vi.fn(), proxyPatch: vi.fn() }));
 
-import { proxyDelete, proxyGet, proxyPost } from "@/lib/proxy";
-import { DELETE } from "./[id]/route";
+import { proxyDelete, proxyGet, proxyPatch, proxyPost } from "@/lib/proxy";
+import { DELETE, PATCH } from "./[id]/route";
 import { POST as approve } from "./[id]/approve/route";
 import { POST as join } from "./join/route";
 import { GET, POST } from "./route";
@@ -11,11 +11,12 @@ import { GET, POST } from "./route";
 const getMock = vi.mocked(proxyGet);
 const postMock = vi.mocked(proxyPost);
 const deleteMock = vi.mocked(proxyDelete);
+const patchMock = vi.mocked(proxyPatch);
 const context = (id: string) => ({ params: Promise.resolve({ id }) });
 const json = (body: string) => new Request("http://localhost/x", { method: "POST", headers: { "Content-Type": "application/json" }, body });
 
 beforeEach(() => {
-  for (const mock of [getMock, postMock, deleteMock]) {
+  for (const mock of [getMock, postMock, deleteMock, patchMock]) {
     mock.mockReset();
     mock.mockResolvedValue(Response.json({ ok: true }));
   }
@@ -52,5 +53,16 @@ describe("the sharing routes", () => {
   it("remove one share, naming it safely", async () => {
     await DELETE(new Request("http://localhost/x", { method: "DELETE" }), context("s 1"));
     expect(deleteMock).toHaveBeenCalledExactlyOnceWith("/shares/s%201");
+  });
+
+  it("give one share more time, passing the choice on and naming it safely", async () => {
+    await PATCH(new Request("http://localhost/x", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: '{"hours":720}' }), context("a/b"));
+    expect(patchMock).toHaveBeenCalledExactlyOnceWith("/shares/a%2Fb", { hours: 720 });
+  });
+
+  it("refuse a change that is not JSON, without asking the backend", async () => {
+    const response = await PATCH(new Request("http://localhost/x", { method: "PATCH", body: "not json" }), context("s1"));
+    expect(response.status).toBe(400);
+    expect(patchMock).not.toHaveBeenCalled();
   });
 });

@@ -337,14 +337,18 @@ const server = createServer(async (request, response) => {
 
   // Sharing. The fake has one reader, so it lets that reader use their own invitation to show the viewer's side.
   const MAX_SHARES = 5;
-  if (path === "/shares" && method === "GET") return send(response, 200, state.shares.map((share) => ({ id: share.id, label: share.label, status: share.status, viewer_email: share.viewer_email, viewer_name: share.viewer_name ?? null, created_at: share.created_at, expires_at: share.expires_at, last_viewed_at: share.last_viewed_at })));
+  const ACCESS_HOURS = [1, 6, 24, 168, 360, 720, 2160];
+  if (path === "/shares" && method === "GET") return send(response, 200, state.shares.map((share) => ({ id: share.id, label: share.label, status: share.status, viewer_email: share.viewer_email, viewer_name: share.viewer_name ?? null, created_at: share.created_at, expires_at: share.expires_at, last_viewed_at: share.last_viewed_at, access_hours: share.access_hours ?? null, access_until: share.access_until ?? null, access_ends_at: share.access_ends_at ?? null })));
   if (path === "/shares" && method === "POST") {
-    const { label } = await readJson(request);
+    const { label, hours = null, until = null } = await readJson(request);
+    if (hours !== null && until !== null) return send(response, 422, { detail: "choose a length of time or an end date, not both" });
+    if (hours !== null && !ACCESS_HOURS.includes(hours)) return send(response, 422, { detail: "that length of time is not one of the choices" });
+    if (until !== null && new Date(until).getTime() <= Date.now()) return send(response, 422, { detail: "that end date has already passed" });
     if (state.shares.length >= MAX_SHARES) return send(response, 409, { detail: "You can share your dashboard with up to 5 people. Remove someone to invite another." });
     const id = `share-${state.shares.length + 1}-${Date.now()}`;
-    const made = { id, label: label || null, status: "invited", viewer_email: null, created_at: new Date().toISOString(), expires_at: new Date(Date.now() + 7 * 86_400_000).toISOString(), last_viewed_at: null, token: `E2E${"x".repeat(40)}`, code: "482913" };
+    const made = { id, label: label || null, status: "invited", viewer_email: null, created_at: new Date().toISOString(), expires_at: new Date(Date.now() + 7 * 86_400_000).toISOString(), last_viewed_at: null, token: `E2E${"x".repeat(40)}`, code: "482913", access_hours: until === null ? (hours ?? 168) : null, access_until: until, access_ends_at: null };
     state.shares.push(made);
-    return send(response, 201, { id, token: made.token, code: made.code, expires_at: made.expires_at });
+    return send(response, 201, { id, token: made.token, code: made.code, expires_at: made.expires_at, access_hours: made.access_hours, access_until: made.access_until });
   }
   if (path === "/shares/join" && method === "POST") {
     const { token, code } = await readJson(request);
@@ -364,6 +368,15 @@ const server = createServer(async (request, response) => {
       if (share.status !== "requested") return send(response, 409, { detail: "there is no request waiting to approve" });
       share.status = "active";
       share.expires_at = null;
+      share.access_ends_at = share.access_until ?? new Date(Date.now() + (share.access_hours ?? 720) * 3_600_000).toISOString();
+      return send(response, 200, { status: "active" });
+    }
+    if (!action && method === "PATCH") {
+      const { hours = null, until = null } = await readJson(request);
+      if ((hours === null) === (until === null)) return send(response, 422, { detail: "choose a length of time or an end date" });
+      if (hours !== null && !ACCESS_HOURS.includes(hours)) return send(response, 422, { detail: "that length of time is not one of the choices" });
+      if (share.status !== "active") return send(response, 409, { detail: "only someone who can view your dashboard can be given more time" });
+      share.access_ends_at = until ?? new Date(Date.now() + hours * 3_600_000).toISOString();
       return send(response, 200, { status: "active" });
     }
     if (!action && method === "DELETE") {
@@ -371,16 +384,16 @@ const server = createServer(async (request, response) => {
       return send(response, 204);
     }
   }
-  if (path === "/shared" && method === "GET") return send(response, 200, state.sharedWithMe.filter((entry) => entry.status !== "removed").map(({ id, owner_email, owner_name = null, status }) => ({ id, owner_email, owner_name, status })));
+  if (path === "/shared" && method === "GET") return send(response, 200, state.sharedWithMe.filter((entry) => entry.status !== "removed").map(({ id, owner_email, owner_name = null, status, access_ends_at = null }) => ({ id, owner_email, owner_name, status, access_ends_at })));
   const removedShare = /^\/shared\/([^/]+)\/removed$/.exec(path);
   if (removedShare && method === "GET") {
     const gone = state.sharedWithMe.find((candidate) => candidate.id === removedShare[1] && candidate.status === "removed");
-    return gone ? send(response, 200, { owner_email: gone.owner_email, owner_name: gone.owner_name ?? null }) : send(response, 404, { detail: "shared dashboard not found" });
+    return gone ? send(response, 200, { owner_email: gone.owner_email, owner_name: gone.owner_name ?? null, reason: gone.reason ?? "removed", ended_at: gone.ended_at ?? null }) : send(response, 404, { detail: "shared dashboard not found" });
   }
   const shared = /^\/shared\/([^/]+)\/dashboard$/.exec(path);
   if (shared && method === "GET") {
     const found = state.sharedWithMe.find((candidate) => candidate.id === shared[1] && candidate.status === "active");
-    return found ? send(response, 200, found.dashboard) : send(response, 404, { detail: "shared dashboard not found" });
+    return found ? send(response, 200, { access_ends_at: found.access_ends_at ?? null, ...found.dashboard }) : send(response, 404, { detail: "shared dashboard not found" });
   }
 
   // The bin: deleted documents wait here for 7 days. Restoring puts one back; deleting for good removes it.

@@ -21,6 +21,22 @@ MAX_WRONG_CODES = 3
 
 OPEN_STATES = ("invited", "requested", "active")
 
+# The lengths of time an owner can pick for how long the other person may look once approved, in hours:
+# 1 hour, 6 hours, 1 day, 7 days, 15 days, 30 days and 90 days. Or a date it ends on.
+ACCESS_CHOICES_HOURS = (1, 6, 24, 24 * 7, 24 * 15, 24 * 30, 24 * 90)
+# What is used when the owner picks nothing.
+DEFAULT_ACCESS_HOURS = 24 * 7
+# An invitation made before time limits existed and approved after they did gets this.
+LEGACY_ACCESS_HOURS = 24 * 30
+# No share lasts longer than this. A chosen end date may fall up to a day past it, so "90 days from today" picked as
+# a calendar day, which ends at the close of that day, is not refused.
+MAX_ACCESS = timedelta(days=90)
+END_DATE_SLACK = timedelta(days=1)
+
+
+class BadAccess(ValueError):
+    """The owner's choice of how long is not one that is allowed. The message says why, in plain words."""
+
 
 def _digest(value: str) -> str:
     """A keyed hash. The link and the code are never stored, and a stolen copy of the table cannot be used to
@@ -40,10 +56,36 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def resolve_access(hours: int | None, until: datetime | None, now: datetime) -> tuple[int | None, datetime | None]:
+    """The owner's choice of how long, checked: a number of hours from the list, or an end date between now and 90 days
+    away. Neither gives the default, and both is refused. Returns (hours, until), one of them None."""
+    if hours is not None and until is not None:
+        raise BadAccess("choose a length of time or an end date, not both")
+    if hours is None and until is None:
+        return DEFAULT_ACCESS_HOURS, None
+    if hours is not None:
+        if hours not in ACCESS_CHOICES_HOURS:
+            raise BadAccess("that length of time is not one of the choices")
+        return hours, None
+    if until.tzinfo is None:
+        until = until.replace(tzinfo=timezone.utc)
+    if until <= now:
+        raise BadAccess("that end date has already passed")
+    if until - now > MAX_ACCESS + END_DATE_SLACK:
+        raise BadAccess("access can last at most 90 days")
+    return None, until
+
+
+def access_has_ended(share: DashboardShare, now: datetime) -> bool:
+    """An approved share whose time has run out. It is no longer revoked or active in the owner's sense: nobody removed
+    it, it simply ended."""
+    return share.status == "active" and share.access_ends_at is not None and share.access_ends_at <= now
+
+
 def is_live(share: DashboardShare, now: datetime) -> bool:
-    """Whether the share can still be used: approved and not revoked, or an invitation not yet past its time."""
+    """Whether the share can still be used: approved, not revoked and not past its end, or an invitation not yet past its time."""
     if share.status == "active":
-        return True
+        return not access_has_ended(share, now)
     return share.status in ("invited", "requested") and share.expires_at > now
 
 
@@ -59,13 +101,19 @@ async def owner_shares(session: AsyncSession, owner_id: uuid.UUID, now: datetime
 
 
 async def create_share(
-    session: AsyncSession, owner: User, label: str | None, now: datetime | None = None
+    session: AsyncSession,
+    owner: User,
+    label: str | None,
+    hours: int | None = None,
+    until: datetime | None = None,
+    now: datetime | None = None,
 ) -> tuple[DashboardShare, str, str] | None:
     """A new invitation, with the link's secret and the code, which are returned only here. None when the owner is at the limit."""
     now = now or _now()
     if len(await owner_shares(session, owner.id, now)) >= MAX_SHARES:
         return None
     token, code = new_token(), new_code()
+    access_hours, access_until = resolve_access(hours, until, now)
     share = DashboardShare(
         owner_id=owner.id,
         label=label,
@@ -73,6 +121,8 @@ async def create_share(
         code_hash=_digest(code),
         status="invited",
         expires_at=now + INVITE_VALID_FOR,
+        access_hours=access_hours,
+        access_until=access_until,
     )
     session.add(share)
     await session.commit()
@@ -126,6 +176,8 @@ class Decision(enum.Enum):
     DONE = "done"
     MISSING = "missing"
     NOT_NOW = "not now"
+    # The end date the owner chose for this invitation has passed before they approved it.
+    TOO_LATE = "too late"
 
 
 async def _owned(session: AsyncSession, owner: User, share_id: str) -> DashboardShare | None:
@@ -146,8 +198,35 @@ async def approve_share(session: AsyncSession, owner: User, share_id: str, now: 
         return Decision.MISSING
     if share.status != "requested":
         return Decision.NOT_NOW
+    # The clock starts now for "a number of hours", and a chosen end date is kept as it is.
+    ends_at = share.access_until or now + timedelta(hours=share.access_hours or LEGACY_ACCESS_HOURS)
+    if ends_at <= now:
+        return Decision.TOO_LATE
     share.status = "active"
     share.approved_at = now
+    share.access_ends_at = ends_at
+    await session.commit()
+    return Decision.DONE
+
+
+async def change_access(
+    session: AsyncSession,
+    owner: User,
+    share_id: str,
+    hours: int | None,
+    until: datetime | None,
+    now: datetime | None = None,
+) -> Decision:
+    """Gives someone who can view the dashboard more time, or less, counted from now. Only for a share that is active and
+    has not ended: one that has run out is not extended, a new invitation is made instead."""
+    now = now or _now()
+    share = await _owned(session, owner, share_id)
+    if share is None or not is_live(share, now):
+        return Decision.MISSING
+    if share.status != "active":
+        return Decision.NOT_NOW
+    chosen_hours, chosen_until = resolve_access(hours, until, now)
+    share.access_ends_at = chosen_until or now + timedelta(hours=chosen_hours)
     await session.commit()
     return Decision.DONE
 
@@ -191,16 +270,23 @@ async def viewable_share(
     if row is None:
         return None
     share, owner = row
-    share.last_viewed_at = now or _now()
+    when = now or _now()
+    if access_has_ended(share, when):
+        return None
+    share.last_viewed_at = when
     await session.commit()
     await session.refresh(share)
     await session.refresh(owner)
     return share, owner
 
 
-async def removed_share(session: AsyncSession, viewer: User, share_id: str) -> tuple[DashboardShare, User] | None:
-    """A share this person was given and whose owner has since taken it away, with the owner, so they can be told
-    plainly instead of being shown a missing page. Nothing else opens, and no dashboard data is returned with it."""
+async def removed_share(
+    session: AsyncSession, viewer: User, share_id: str, now: datetime | None = None
+) -> tuple[DashboardShare, User] | None:
+    """A share this person was given and that has since ended, because the owner took it away or because its time ran
+    out, with the owner, so they can be told plainly instead of being shown a missing page. Nothing else opens, and no
+    dashboard data is returned with it."""
+    now = now or _now()
     try:
         key = uuid.UUID(share_id)
     except ValueError:
@@ -208,10 +294,19 @@ async def removed_share(session: AsyncSession, viewer: User, share_id: str) -> t
     result = await session.execute(
         select(DashboardShare, User)
         .join(User, User.id == DashboardShare.owner_id)
-        .where(DashboardShare.id == key, DashboardShare.viewer_id == viewer.id, DashboardShare.status == "revoked")
+        .where(
+            DashboardShare.id == key,
+            DashboardShare.viewer_id == viewer.id,
+            DashboardShare.status.in_(("revoked", "active")),
+        )
     )
     row = result.first()
-    return (row[0], row[1]) if row else None
+    if row is None:
+        return None
+    share, owner = row
+    if share.status == "active" and not access_has_ended(share, now):
+        return None
+    return share, owner
 
 
 def display_name(first_name: str | None, last_name: str | None) -> str | None:

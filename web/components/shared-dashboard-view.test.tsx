@@ -12,6 +12,7 @@ const NOW = new Date(2026, 10, 3, 12);
 const shared: SharedDashboard = {
   owner_email: "owner@example.com",
   owner_name: null,
+  access_ends_at: null,
   documents: [
     { id: "d1", filename: "maple-lease.pdf", doc_type: "lease", status: "ready", ocr_confidence: null, created_at: "2026-10-30T10:00:00Z", status_changed_at: "2026-10-30T10:01:00Z", key_terms: [{ label: "Monthly rent", value: "$1,800 a month" }, { label: "Security deposit", value: "One month's rent" }] },
     { id: "d2", filename: "loan.pdf", doc_type: "loan", status: "failed", ocr_confidence: null, created_at: "2026-10-31T10:00:00Z", status_changed_at: "2026-10-31T10:01:00Z", key_terms: [] },
@@ -21,6 +22,20 @@ const shared: SharedDashboard = {
 };
 
 describe("a shared dashboard", () => {
+  it("shows how long the person has left to look", () => {
+    const ends = new Date(NOW.getTime() + 5 * 86_400_000 + 60_000).toISOString();
+
+    render(<SharedDashboardView shared={{ ...shared, access_ends_at: ends }} now={NOW} />);
+
+    expect(screen.getByText("Ends in 5 days")).toBeInTheDocument();
+  });
+
+  it("shows nothing about time when there is no end", () => {
+    render(<SharedDashboardView shared={shared} now={NOW} />);
+
+    expect(screen.queryByText(/^Ends in/)).not.toBeInTheDocument();
+  });
+
   it("says whose it is and that it is read only", () => {
     render(<SharedDashboardView shared={shared} now={NOW} />);
 
@@ -110,7 +125,7 @@ describe("a shared dashboard", () => {
   });
 
   it("says there are no documents, and shows no lease card, when there is nothing", () => {
-    render(<SharedDashboardView shared={{ owner_email: "o@x.com", owner_name: null, documents: [], insights: [], key_dates: [] }} now={NOW} />);
+    render(<SharedDashboardView shared={{ owner_email: "o@x.com", owner_name: null, access_ends_at: null, documents: [], insights: [], key_dates: [] }} now={NOW} />);
 
     expect(screen.getByText("No documents yet.")).toBeInTheDocument();
     expect(screen.getByText("No dates found yet.")).toBeInTheDocument();
