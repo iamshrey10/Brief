@@ -25,7 +25,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
   {
     id: "add",
     title: "Add a document",
-    body: "Drop in a PDF, or take a photo of the pages on your phone. Say what kind of document it is and press Upload.",
+    body: "Drop in a PDF, or take photos of the pages on your phone. Up to five photos make one document. Say what kind of document it is and press Upload.",
     path: "/dashboard/documents",
     target: "upload",
   },

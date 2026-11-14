@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, type DragEvent, type FormEvent } from "react";
-import { Camera, CloudUpload, FileText } from "lucide-react";
+import { useEffect, useState, type DragEvent, type FormEvent } from "react";
+import { ArrowDown, ArrowUp, Camera, CloudUpload, FileText, ImagePlus } from "lucide-react";
 import { FOLDERS } from "@/lib/folders";
 import { DocTypeIcon } from "@/components/doc-type-icon";
 import { Button } from "@/components/ui/button";
@@ -17,15 +17,17 @@ import {
 import { cn } from "@/lib/utils";
 import { startFailureMessage } from "@/lib/upload";
 import { guessDocKind } from "@/lib/guess-kind";
+import { buildPhotosPdf, combinedName, MAX_PHOTOS, photoToPage } from "@/lib/photos-pdf";
 
 const DOC_TYPES = Object.entries(DOC_TYPE_LABELS).map(([value, label]) => ({ value, label }));
 
 type Status = "idle" | "uploading" | "error";
 
 /** What an upload is doing right now, in words, so a slow moment does not look like a freeze. */
-export type UploadStage = "sample" | "preparing" | "sending" | "checking";
+export type UploadStage = "sample" | "combining" | "preparing" | "sending" | "checking";
 export const STAGE_TEXT: Record<UploadStage, string> = {
   sample: "Loading the sample lease...",
+  combining: "Putting your photos together...",
   preparing: "Getting ready...",
   sending: "Sending your file...",
   checking: "Checking your file...",
@@ -35,14 +37,62 @@ export const STAGE_TEXT: Record<UploadStage, string> = {
 export const SAMPLE_LEASE_URL = "/samples/sample-lease.pdf";
 
 
+/** Whether a file is a photo (JPG, PNG or HEIC) rather than a PDF. */
+function isPhoto(file: File): boolean {
+  return (contentTypeFor(file) ?? "").startsWith("image/");
+}
+
+/** The width and height of the small picture shown for a photo, in pixels. Twice the size it is shown at, so it stays sharp on a phone screen. */
+const THUMB_SIZE = 96;
+
 /**
- * The upload form: choose or drop a file, say what kind it is, send it, or try the sample lease. It is used on the
+ * A small picture of a photo, made by drawing it small, so five full size photos never sit in the page as pictures. The photo is opened the
+ * right way up, and what it shows is cropped to a square. An icon stands in until it is ready, and for a PDF or a photo the browser cannot open
+ * (a HEIC photo outside Safari).
+ */
+function Thumb({ file }: { file: File }) {
+  const [picture, setPicture] = useState<{ file: File; src: string } | null>(null);
+  useEffect(() => {
+    if (!isPhoto(file)) return;
+    let current = true;
+    (async () => {
+      try {
+        const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+        const canvas = document.createElement("canvas");
+        canvas.width = THUMB_SIZE;
+        canvas.height = THUMB_SIZE;
+        const side = Math.min(bitmap.width, bitmap.height);
+        canvas.getContext("2d")?.drawImage(bitmap, (bitmap.width - side) / 2, (bitmap.height - side) / 2, side, side, 0, 0, THUMB_SIZE, THUMB_SIZE);
+        bitmap.close();
+        if (current) setPicture({ file, src: canvas.toDataURL("image/jpeg", 0.7) });
+      } catch {
+        // The icon stays.
+      }
+    })();
+    return () => {
+      current = false;
+    };
+  }, [file]);
+  return picture?.file === file ? (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={picture.src} alt="" className="size-10 shrink-0 rounded-md border border-border object-cover" />
+  ) : (
+    <span aria-hidden className="flex size-10 shrink-0 items-center justify-center rounded-md bg-secondary text-secondary-foreground">
+      <FileText className="size-4.5" />
+    </span>
+  );
+}
+
+/**
+ * The upload form: choose or drop a file, say what kind it is, send it, or try the sample lease. Up to five photos can be added, one
+ * after another with the camera or several at once from the gallery, and they are put together into one document with a page for each
+ * photo. It is used on the
  * Documents page and on the Dashboard, and tells whoever shows it, through `onUploaded`, when a document has been
  * accepted, so each can do what it needs to (add it to its list, or refresh its numbers).
  */
 export function UploadPanel({ onUploaded }: { onUploaded: (document: DocumentSummary) => void }) {
   const notifications = useUploadNotifications();
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   // Nothing is chosen until the file name says what it is, or the person chooses. A wrong default would label a document wrongly.
   const [docType, setDocType] = useState("");
   // Whether the kind shown was guessed from the file name, so it can be said, and replaced by the next file's guess.
@@ -53,29 +103,53 @@ export function UploadPanel({ onUploaded }: { onUploaded: (document: DocumentSum
   const [stage, setStage] = useState<UploadStage>("preparing");
   const [errorMessage, setErrorMessage] = useState("");
   const [dragging, setDragging] = useState(false);
+  // A line that is not an error, such as saying that a sixth photo was left out.
+  const [notice, setNotice] = useState("");
+  const photosOnly = files.length > 0 && files.every(isPhoto);
 
-  // Checked as soon as a file is chosen or dropped, so a wrong file is turned away on the spot
-  // rather than after a click on Upload. The file picker's own filter does not apply to a drop.
-  function chooseFile(candidate: File | null | undefined) {
-    if (!candidate) return;
+  // Checked as soon as files are chosen or dropped, so a wrong file is turned away on the spot rather than after a click on Upload.
+  // The file picker's own filter does not apply to a drop. Photos are added to the ones already chosen, up to five, and anything
+  // else replaces what was there, because a PDF is uploaded on its own.
+  function chooseFiles(list: FileList | File[] | null | undefined) {
+    const picked = Array.from(list ?? []);
+    if (picked.length === 0) return;
+    setNotice("");
 
-    if (contentTypeFor(candidate) === null) {
+    for (const candidate of picked) {
+      if (contentTypeFor(candidate) === null) {
+        setStatus("error");
+        setErrorMessage("That kind of file isn't supported. Use a PDF, JPG, PNG, or HEIC.");
+        return;
+      }
+      if (candidate.size > MAX_FILE_SIZE_BYTES) {
+        setStatus("error");
+        setErrorMessage("That file is larger than the 50 MB limit.");
+        return;
+      }
+    }
+    if (picked.length > 1 && !picked.every(isPhoto)) {
       setStatus("error");
-      setErrorMessage("That kind of file isn't supported. Use a PDF, JPG, PNG, or HEIC.");
+      setErrorMessage("Several files at once can only be photos. A PDF is uploaded on its own.");
       return;
     }
-    if (candidate.size > MAX_FILE_SIZE_BYTES) {
+
+    let next = photosOnly && picked.every(isPhoto) ? [...files, ...picked] : picked;
+    if (next.length > MAX_PHOTOS) {
+      next = next.slice(0, MAX_PHOTOS);
+      setNotice(`Up to ${MAX_PHOTOS} photos make one document, so the rest were left out.`);
+    }
+    if (next.reduce((total, f) => total + f.size, 0) > MAX_FILE_SIZE_BYTES) {
       setStatus("error");
-      setErrorMessage("That file is larger than the 50 MB limit.");
+      setErrorMessage("Those photos together are larger than the 50 MB limit.");
       return;
     }
 
-    setFile(candidate);
+    setFiles(next);
     setStatus("idle");
     setErrorMessage("");
-    // A kind the person chose themselves is kept. Otherwise the name of this file decides, or nothing does.
+    // A kind the person chose themselves is kept. Otherwise the name of a single file decides, or nothing does.
     if (!docType || guessed) {
-      const guess = guessDocKind(candidate.name);
+      const guess = next.length === 1 ? guessDocKind(next[0].name) : null;
       setDocType(guess ?? "");
       setGuessed(guess !== null);
     }
@@ -86,12 +160,22 @@ export function UploadPanel({ onUploaded }: { onUploaded: (document: DocumentSum
     setGuessed(false);
   }
 
-  function removeFile() {
-    setFile(null);
-    if (guessed) {
+  function removeFile(index: number) {
+    const remaining = files.filter((_, i) => i !== index);
+    setFiles(remaining);
+    setNotice("");
+    if (remaining.length === 0 && guessed) {
       setDocType("");
       setGuessed(false);
     }
+  }
+
+  function movePage(index: number, by: -1 | 1) {
+    const to = index + by;
+    if (to < 0 || to >= files.length) return;
+    const reordered = [...files];
+    [reordered[index], reordered[to]] = [reordered[to], reordered[index]];
+    setFiles(reordered);
   }
 
   function handleDragOver(event: DragEvent) {
@@ -102,13 +186,36 @@ export function UploadPanel({ onUploaded }: { onUploaded: (document: DocumentSum
   function handleDrop(event: DragEvent) {
     event.preventDefault();
     setDragging(false);
-    chooseFile(event.dataTransfer.files?.[0]);
+    chooseFiles(event.dataTransfer.files);
   }
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    if (!file || !docType) return;
-    await upload(file, docType);
+    if (files.length === 0 || !docType) return;
+    if (files.length === 1) {
+      await upload(files[0], docType);
+      return;
+    }
+    // Several photos become one PDF with a page for each, in the order shown.
+    setStatus("uploading");
+    setStage("combining");
+    setErrorMessage("");
+    let combined: File;
+    try {
+      const pages = [];
+      for (const photo of files) pages.push(await photoToPage(photo));
+      combined = new File([buildPhotosPdf(pages) as BlobPart], combinedName(files.length), { type: "application/pdf" });
+    } catch {
+      setStatus("error");
+      setErrorMessage("One of those photos could not be opened here. Take it again, or upload that photo on its own.");
+      return;
+    }
+    if (combined.size > MAX_FILE_SIZE_BYTES) {
+      setStatus("error");
+      setErrorMessage("Those photos together are larger than the 50 MB limit.");
+      return;
+    }
+    await upload(combined, docType);
   }
 
   // Loads the made up lease that ships with the site and sends it through the very same upload as a chosen file.
@@ -168,7 +275,8 @@ export function UploadPanel({ onUploaded }: { onUploaded: (document: DocumentSum
       }
       const confirmed: DocumentSummary = await confirmRes.json();
 
-      setFile(null);
+      setFiles([]);
+      setNotice("");
       setDocType("");
       setGuessed(false);
       setStatus("idle");
@@ -188,28 +296,85 @@ export function UploadPanel({ onUploaded }: { onUploaded: (document: DocumentSum
       data-tour="upload"
       className="flex flex-col gap-4 rounded-xl border border-border bg-card p-4"
     >
-      {file ? (
-        <div className="flex items-center gap-3 rounded-lg border border-border bg-background px-4 py-3">
-          <span
-            aria-hidden
-            className="flex size-9 shrink-0 items-center justify-center rounded-md bg-secondary text-secondary-foreground"
-          >
-            <FileText className="size-4.5" />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-sm font-medium text-foreground">{file.name}</span>
-            <span className="block text-xs text-muted-foreground">{formatFileSize(file.size)}</span>
-          </span>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            disabled={uploading}
-            aria-label={`Remove ${file.name}`}
-            onClick={removeFile}
-          >
-            Remove
-          </Button>
+      {files.length > 0 ? (
+        <div className="flex flex-col gap-2">
+          <ul aria-label={files.length > 1 ? `Pages, ${files.length} of ${MAX_PHOTOS}` : "Chosen file"} className="flex flex-col gap-2">
+            {files.map((chosen, index) => (
+              <li key={`${index}-${chosen.name}-${chosen.size}`} className="flex items-center gap-3 rounded-lg border border-border bg-background px-3 py-2.5">
+                <Thumb file={chosen} />
+                <span className="min-w-0 flex-1">
+                  {files.length > 1 && <span className="block text-xs font-medium text-primary">Page {index + 1}</span>}
+                  <span className="block truncate text-sm font-medium text-foreground">{chosen.name}</span>
+                  <span className="block text-xs text-muted-foreground">{formatFileSize(chosen.size)}</span>
+                </span>
+                {files.length > 1 && (
+                  <span className="flex shrink-0 items-center">
+                    <Button type="button" variant="ghost" size="icon-sm" disabled={uploading || index === 0} aria-label={`Move page ${index + 1} earlier`} onClick={() => movePage(index, -1)}>
+                      <ArrowUp aria-hidden className="size-4" />
+                    </Button>
+                    <Button type="button" variant="ghost" size="icon-sm" disabled={uploading || index === files.length - 1} aria-label={`Move page ${index + 1} later`} onClick={() => movePage(index, 1)}>
+                      <ArrowDown aria-hidden className="size-4" />
+                    </Button>
+                  </span>
+                )}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={uploading}
+                  aria-label={files.length > 1 ? `Remove page ${index + 1}, ${chosen.name}` : `Remove ${chosen.name}`}
+                  onClick={() => removeFile(index)}
+                >
+                  Remove
+                </Button>
+              </li>
+            ))}
+          </ul>
+          {photosOnly && files.length < MAX_PHOTOS && !uploading && (
+            <div className="flex flex-col gap-2 sm:flex-row">
+              {/* A phone, or any touch screen: the camera again, for the next page. */}
+              <label className="hidden h-11 flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border border-border bg-background text-sm font-medium text-foreground transition-colors hover:bg-accent/50 focus-within:ring-3 focus-within:ring-ring/50 max-sm:flex pointer-coarse:flex">
+                <Camera aria-hidden className="size-4" />
+                Add another page
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  aria-label="Add another page with the camera"
+                  onChange={(event) => {
+                    chooseFiles(event.target.files);
+                    event.target.value = "";
+                  }}
+                  className="sr-only"
+                />
+              </label>
+              <label className="flex h-11 flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border border-border bg-background text-sm font-medium text-foreground transition-colors hover:bg-accent/50 focus-within:ring-3 focus-within:ring-ring/50">
+                <ImagePlus aria-hidden className="size-4" />
+                Add photos ({files.length} of {MAX_PHOTOS})
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/heic,image/heif"
+                  multiple
+                  aria-label="Add more photos"
+                  onChange={(event) => {
+                    chooseFiles(event.target.files);
+                    event.target.value = "";
+                  }}
+                  className="sr-only"
+                />
+              </label>
+            </div>
+          )}
+          {files.length > 1 && (
+            <p className="text-xs text-muted-foreground">
+              These {files.length} photos become one document, with a page for each, in this order.
+            </p>
+          )}
+          {notice && (
+            <p role="status" className="text-xs text-muted-foreground">
+              {notice}
+            </p>
+          )}
         </div>
       ) : (
         <label
@@ -229,17 +394,21 @@ export function UploadPanel({ onUploaded }: { onUploaded: (document: DocumentSum
               <span className="hidden sm:inline">choose a file</span>
             </span>
           </span>
-          <span className="text-xs text-muted-foreground">PDF, JPG, PNG, or HEIC, up to 50 MB</span>
+          <span className="text-xs text-muted-foreground">PDF, JPG, PNG, or HEIC, up to 50 MB. Up to {MAX_PHOTOS} photos make one document.</span>
           <input
             type="file"
             accept={ACCEPTED_FILE_TYPES.join(",")}
+            multiple
             aria-label="Choose a file to upload"
-            onChange={(event) => chooseFile(event.target.files?.[0])}
+            onChange={(event) => {
+              chooseFiles(event.target.files);
+              event.target.value = "";
+            }}
             className="sr-only"
           />
         </label>
       )}
-      {!file && (
+      {files.length === 0 && (
         // For a phone: opens the camera at once, so a paper contract can be photographed. Shown on a small screen and on any
         // touch screen, so a phone held sideways or a tablet has it too. A computer with a mouse has no use for it.
         <label className="hidden h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-border bg-background text-sm font-medium text-foreground transition-colors hover:bg-accent/50 focus-within:ring-3 focus-within:ring-ring/50 max-sm:flex pointer-coarse:flex">
@@ -250,7 +419,10 @@ export function UploadPanel({ onUploaded }: { onUploaded: (document: DocumentSum
             accept="image/*"
             capture="environment"
             aria-label="Take a photo of a paper contract"
-            onChange={(event) => chooseFile(event.target.files?.[0])}
+            onChange={(event) => {
+              chooseFiles(event.target.files);
+              event.target.value = "";
+            }}
             className="sr-only"
           />
         </label>
@@ -278,7 +450,7 @@ export function UploadPanel({ onUploaded }: { onUploaded: (document: DocumentSum
             </label>
           ))}
         </div>
-        {file && !uploading && (guessed || !docType) && (
+        {files.length > 0 && !uploading && (guessed || !docType) && (
           <p id="doc-kind-hint" role="status" className="text-xs text-muted-foreground">
             {guessed ? "Guessed from the file name. Change it if it is wrong." : "Choose what kind of document it is, so Brief reads it the right way."}
           </p>
@@ -309,7 +481,7 @@ export function UploadPanel({ onUploaded }: { onUploaded: (document: DocumentSum
         )}
       </div>
 
-      <Button type="submit" size="lg" disabled={!file || !docType || uploading} className="md:w-48">
+      <Button type="submit" size="lg" disabled={files.length === 0 || !docType || uploading} className="md:w-48">
         {uploading ? "Uploading..." : "Upload"}
       </Button>
       </div>
