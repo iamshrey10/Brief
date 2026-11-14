@@ -172,6 +172,60 @@ html.theme-fade *::after {
     fill 200ms ease,
     stroke 200ms ease !important;
 }
+/*
+ * The bar across the top while another page is on its way (see components/navigation-progress.tsx). It rushes out and then
+ * slows as it nears the end, so it never looks finished before the page has come. A reader who prefers less motion gets it
+ * at a fixed length.
+ */
+.nav-progress-bar {
+  animation: nav-progress 8s cubic-bezier(0.1, 0.7, 0.2, 1) forwards;
+}
+@keyframes nav-progress {
+  from {
+    transform: scaleX(0.02);
+  }
+  to {
+    transform: scaleX(0.92);
+  }
+}
+
+/*
+ * A tap on a phone answers at once: no pause while the browser waits to see if it is a double tap, and no grey flash over what
+ * was pressed. Buttons, links and tabs also press in a little (the Button component does the same), so every tap is felt.
+ */
+a,
+button,
+summary,
+[role="tab"],
+[role="button"],
+label,
+select,
+input,
+textarea {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+a:not(.no-press):active,
+[role="tab"]:active,
+summary:active {
+  transform: scale(0.985);
+}
+a,
+[role="tab"],
+summary {
+  transition-property: color, background-color, border-color, transform;
+}
+@media (prefers-reduced-motion: reduce) {
+  .nav-progress-bar {
+    animation: none;
+    transform: scaleX(0.6);
+  }
+  a:not(.no-press):active,
+  [role="tab"]:active,
+  summary:active {
+    transform: none;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   a,
   summary,

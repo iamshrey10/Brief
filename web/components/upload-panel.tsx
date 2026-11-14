@@ -185,6 +185,7 @@ export function UploadPanel({ onUploaded }: { onUploaded: (document: DocumentSum
   return (
     <form
       onSubmit={handleSubmit}
+      data-tour="upload"
       className="flex flex-col gap-4 rounded-xl border border-border bg-card p-4"
     >
       {file ? (
@@ -326,6 +327,7 @@ export function UploadPanel({ onUploaded }: { onUploaded: (document: DocumentSum
         No contract handy?{" "}
         <button
           type="button"
+          data-tour="sample"
           onClick={() => void trySample()}
           disabled={uploading}
           className="inline-flex font-medium text-primary underline-offset-4 outline-none max-sm:min-h-11 max-sm:items-center hover:underline focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50"

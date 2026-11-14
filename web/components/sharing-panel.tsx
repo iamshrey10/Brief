@@ -194,7 +194,7 @@ export function SharingPanel({ initial, ownerName = "" }: { initial: Share[]; ow
   const ordered = [...shares].sort((a, b) => Number(b.status === "requested") - Number(a.status === "requested"));
 
   return (
-    <section id="sharing" aria-labelledby="sharing-heading" className="scroll-mt-6 rounded-2xl border border-border bg-card p-6 shadow-sm">
+    <section id="sharing" data-tour="sharing" aria-labelledby="sharing-heading" className="scroll-mt-6 rounded-2xl border border-border bg-card p-6 shadow-sm">
       <h2 id="sharing-heading" className="text-xl font-semibold tracking-tight text-foreground">
         Share your dashboard
       </h2>

@@ -12,6 +12,24 @@ import { buildPdf } from "@/lib/pdf";
 import { buildSummary, summaryBlocks } from "@/lib/summary-text";
 
 /**
+ * What stands where the row of actions will be while the key terms are still being read. The row needs them, so it arrives last, and
+ * without something holding its place everything under it would jump down the moment it appeared. The blocks are about the size of
+ * the real buttons and wrap the same way, so the page barely moves.
+ */
+export function SummaryActionsPlaceholder() {
+  return (
+    <div aria-hidden="true" data-summary-actions-placeholder="" className="flex flex-col gap-2 print:hidden">
+      <div className="flex flex-wrap items-center gap-2">
+        {["w-36", "w-52", "w-40", "w-64"].map((width) => (
+          <div key={width} className={`h-9 max-sm:h-11 ${width} max-w-full rounded-lg bg-muted motion-safe:animate-pulse`} />
+        ))}
+      </div>
+      <div className="h-4 w-2/3 rounded bg-muted/70" />
+    </div>
+  );
+}
+
+/**
  * The one row of actions that take what is on the Overview away with you: copy it as plain text, save it as a
  * PDF, add its clear dates to a calendar, and email the questions it leaves open. All of it is built in the
  * browser from what is already loaded, so nothing is sent anywhere and the AI is not asked again. A button with

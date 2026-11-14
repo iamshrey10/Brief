@@ -22,9 +22,10 @@ test("a first visit asks for a first and last name before anything else, then la
   await page.getByRole("button", { name: "Continue" }).click();
 
   // To the dashboard, where the tour opens. Skipping it leaves the dashboard.
-  await expect(page).toHaveURL(/\/dashboard\?tour=1$/);
-  await page.getByRole("button", { name: "Skip tour" }).click();
+  await expect(page.getByRole("dialog").getByRole("heading", { name: "Welcome to Brief" })).toBeVisible();
   await expect(page).toHaveURL(/\/dashboard$/);
+  await page.getByRole("button", { name: "Skip tour" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
   await page.goto("/dashboard/welcome");
   await expect(page).toHaveURL(/\/dashboard$/);
 });

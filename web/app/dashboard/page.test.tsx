@@ -30,15 +30,6 @@ async function page() {
 }
 
 describe("the dashboard home", () => {
-  it("opens the first-time tour only when the address asks for it", async () => {
-    const without = renderToStaticMarkup(await DashboardHome({ searchParams: Promise.resolve({}) }));
-    const withTour = renderToStaticMarkup(await DashboardHome({ searchParams: Promise.resolve({ tour: "1" }) }));
-
-    expect(without).not.toContain('role="dialog"');
-    expect(withTour).toContain('role="dialog"');
-    expect(withTour).toContain("Welcome to Brief");
-  });
-
   it.each([
     ["nobody is signed in", null],
     ["the session has no user", {}],

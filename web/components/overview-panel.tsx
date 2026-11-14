@@ -1,6 +1,6 @@
 "use client";
 
-import { SummaryActions } from "@/components/summary-actions";
+import { SummaryActions, SummaryActionsPlaceholder } from "@/components/summary-actions";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Check, Copy, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -65,12 +65,13 @@ function SectionHeader({ title, subtitle }: { title: string; subtitle?: string }
   );
 }
 
-function LoadingBlock({ label }: { label: string }) {
+/** Stands in for a part of the Overview while it is read. `rows` is about how many a typical document fills, so the page does not jump when they arrive. */
+function LoadingBlock({ label, rows = 3 }: { label: string; rows?: number }) {
   return (
     <div role="status" className="flex flex-col gap-2">
       <p className="text-sm text-muted-foreground">{label}</p>
       <div aria-hidden className="flex flex-col gap-2">
-        {[0, 1, 2].map((row) => (
+        {Array.from({ length: rows }, (_, row) => (
           <div key={row} className="h-14 rounded-lg bg-muted motion-safe:animate-pulse" />
         ))}
       </div>
@@ -258,7 +259,7 @@ function KeyTermsSection({
       )}
 
       {state.status === "loading" && (
-        <LoadingBlock label="Reading your document. The first time takes a few seconds." />
+        <LoadingBlock label="Reading your document. The first time takes a few seconds." rows={5} />
       )}
       {state.status === "error" && <ErrorBlock message={state.message} reference={state.reference} onRetry={retry} />}
       {state.status === "ready" && <KeyTermsBody result={state.result} onSelect={onSelect} />}
@@ -487,6 +488,7 @@ export function OverviewPanel({
       className="min-h-0 flex-1 overflow-y-auto rounded-lg border border-border bg-background p-4 print:overflow-visible print:border-0 print:p-0"
     >
       <div className="flex flex-col gap-8">
+        {keyTerms.state.status !== "ready" && keyTerms.state.status !== "error" && <SummaryActionsPlaceholder />}
         {keyTerms.state.status === "ready" && (
           <SummaryActions
             documentId={documentId}
