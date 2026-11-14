@@ -1,88 +1,67 @@
 WEBVTT
 
-00:00:00.250 --> 00:00:02.038
-You are about to sign a lease.
+00:00:00.250 --> 00:00:04.826
+Before you sign a lease, a loan, or a job offer, do you understand every clause?
 
-00:00:02.038 --> 00:00:03.646
-Have you read every clause?
+00:00:04.826 --> 00:00:05.455
+Brief does.
 
-00:00:03.646 --> 00:00:04.779
-Almost nobody does.
+00:00:05.960 --> 00:00:08.584
+Sign in with Google, and a short tour shows you around.
 
-00:00:04.779 --> 00:00:05.434
-Meet Brief.
+00:00:15.125 --> 00:00:15.613
+No file?
 
-00:00:06.245 --> 00:00:13.776
-Drop in a lease, a loan, or a job offer, and Brief explains it clause by clause, with the exact words behind every answer.
+00:00:15.613 --> 00:00:18.359
+Snap up to five photos of the paper contract.
 
-00:00:14.580 --> 00:00:18.057
-Sign in with Google, tell Brief what brings you here, and you are in.
+00:00:18.359 --> 00:00:21.226
+Brief makes them one document, a page for each.
 
-00:00:20.738 --> 00:00:25.047
-A friendly tour points out every part, and it follows you from page to page.
+00:00:25.548 --> 00:00:29.821
+Brief splits it into numbered clauses and lists every key term with its quote.
 
-00:00:28.206 --> 00:00:29.299
-No contract handy?
+00:00:29.821 --> 00:00:32.012
+Click one, and the exact words light up.
 
-00:00:29.299 --> 00:00:30.574
-Try the sample lease.
+00:00:32.520 --> 00:00:36.360
+It flags the questions people forget to ask, with wording you can send.
 
-00:00:33.072 --> 00:00:35.888
-Or take photos of the pages with your phone.
+00:00:36.870 --> 00:00:37.954
+Ask in plain words.
 
-00:00:35.888 --> 00:00:41.136
-Up to five photos become one document, one page for each, in the order you choose.
+00:00:37.954 --> 00:00:42.459
+Every answer cites its clause, and if the document does not say, Brief says so.
 
-00:00:49.317 --> 00:00:53.434
-Brief reads it into numbered clauses, then builds the overview for you.
+00:00:47.032 --> 00:00:51.939
+Share your dashboard with someone you trust, for a time you choose, and take it back whenever you like.
 
-00:00:53.434 --> 00:00:55.521
-Every key term comes with its quote.
+00:00:53.011 --> 00:00:54.159
+Deleted by mistake?
 
-00:00:55.521 --> 00:00:58.768
-Click one, and the exact words light up in the document.
-
-00:00:59.574 --> 00:01:04.694
-Then it lists the questions people forget to ask, with wording you can send to the other side.
-
-00:01:05.506 --> 00:01:07.081
-Ask anything in plain words.
-
-00:01:07.081 --> 00:01:13.719
-Every answer points to the clause it came from, and if the document does not say, Brief tells you instead of guessing.
-
-00:01:14.821 --> 00:01:19.386
-Back on your dashboard, one tap on Ready to open takes you straight to your documents.
-
-00:01:20.198 --> 00:01:21.748
-Need a second pair of eyes?
-
-00:01:21.748 --> 00:01:25.940
-Share your dashboard for a time you choose, from one hour to ninety days.
-
-00:01:25.940 --> 00:01:29.844
-Brief writes the invitation, with the link and code, ready to email.
-
-00:01:29.844 --> 00:01:31.739
-You can take it back at any time.
-
-00:01:32.547 --> 00:01:34.363
-Deleted something by mistake?
-
-00:01:34.363 --> 00:01:36.366
+00:00:54.159 --> 00:00:56.092
 The Bin keeps it for seven days.
 
-00:01:36.366 --> 00:01:41.187
-Turn on two-step verification, and pick light, dark, or follow your computer.
+00:00:56.092 --> 00:00:58.750
+Two-step sign-in and dark mode are built in.
 
-00:01:45.631 --> 00:01:47.953
-Brief explains what a document says.
+00:01:01.466 --> 00:01:02.888
+Under the hood, a Next.
 
-00:01:47.953 --> 00:01:49.436
-It is not legal advice.
+00:01:02.888 --> 00:01:06.351
+js website signs you in and keeps every request private.
 
-00:01:49.436 --> 00:01:50.468
-Understand more.
+00:01:06.751 --> 00:01:12.597
+A FastAPI service reads your document, and Postgres with pgvector finds the right clauses.
 
-00:01:50.468 --> 00:01:51.242
-Search less.
+00:01:12.997 --> 00:01:17.754
+Gemini writes the answer, and Brief checks every quote word for word before you see it.
+
+00:01:18.904 --> 00:01:19.250
+Brief.
+
+00:01:19.250 --> 00:01:20.635
+Every clause, explained.
+
+00:01:20.635 --> 00:01:22.424
+Not legal advice, just clarity.

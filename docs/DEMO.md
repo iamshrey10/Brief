@@ -1,15 +1,16 @@
 # Recording a demo of Brief
 
-**The video on the site** (`web/public/demo/brief-demo.mp4`, 1 minute 53 seconds, 1920 by 1080, light theme) was recorded on November 13, 2026
+**The video on the site** (`web/public/demo/brief-demo.mp4`, 1 minute 23 seconds, 1920 by 1080, light theme) was recorded on November 13, 2026
 from the website running locally against the test API (`web/e2e/support/fake-api.mjs`), so it shows a made up lease and made up numbers,
 not a live model reading a file. The interface is the real website. It covers the landing page, signing in and the Welcome page, the guided tour,
 photos of a paper contract put together into one document (on a phone), the key terms and "Before you sign", asking a question and
 clicking its source, the Dashboard tile that leads to the documents, sharing with a time limit and the invitation, the Bin, two-step
-verification and Appearance, and ends on a card with the address.
+verification and Appearance, then a short stack scene (Next.js, FastAPI, Postgres with pgvector, Gemini, the quote check, Redis and
+Cloudflare R2), and ends on a card with the address. Small labels name each scene, and each part fades in and out.
 
 How it was made, so it can be done again: the picture is captured frame by frame from the browser at 1.5 times its pixel density (a true
 1080p), with a drawn cursor, because the built in video recording cannot capture more than the normal size. The narration is the Kokoro
-voice `am_fenrir` at 1.06 times normal speed, one clip for each scene, placed where its scene starts. The phone part is a touch screen at
+voice `am_fenrir` at 1.14 times normal speed, one clip for each scene, placed where its scene starts. The phone part is a touch screen at
 390 by 844 on a plain background. The test address is replaced in the page, the lease end date and the daily limits shown were set to
 realistic values for the recording, and the invitation link shows the real address. It shows no browser address bar, because a screen
 capture of the page holds the page only. It does not claim more than the product does, and it says out loud that Brief is not legal advice.
