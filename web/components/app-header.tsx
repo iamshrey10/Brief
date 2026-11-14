@@ -2,7 +2,6 @@ import { ChevronLeft, FileText, LayoutDashboard, UserRound, Users, type LucideIc
 import Link from "next/link";
 
 import { PendingBadge } from "@/components/pending-badge";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { signOutToHome } from "@/lib/auth-actions";
 import { cn } from "@/lib/utils";
@@ -19,8 +18,8 @@ export type AppSection = (typeof APP_SECTIONS)[number]["id"];
 
 /**
  * The bar across the top of every signed in page: the name on the left, the sections beside it, who is signed in,
- * the theme and Sign out on the right. On a phone the sections move to a bar fixed at the bottom of the screen, where a thumb
- * reaches, and the bar across the top keeps only the name, the theme and Sign out. Pages leave room for it (see the dashboard layout).
+ * and Sign out on the right. The theme is chosen under Appearance on the Profile page, and the light and dark button lives only on the landing page. On a phone the sections move to a bar fixed at the bottom of the screen, where a thumb
+ * reaches, and the bar across the top keeps only the name and Sign out. Pages leave room for it (see the dashboard layout).
  */
 export function AppHeader({
   email,
@@ -62,7 +61,6 @@ export function AppHeader({
           <p className="hidden max-w-[12rem] truncate text-xs text-muted-foreground md:block" title={email}>
             {email}
           </p>
-          <ThemeToggle />
           <form action={signOutToHome}>
             <Button type="submit" variant="outline" size="lg">
               Sign out

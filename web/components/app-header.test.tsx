@@ -31,12 +31,13 @@ describe("the signed in header", () => {
     expect(html).toContain(">a.very.long.address@example.com<");
   });
 
-  it("hides the address on a phone, where there is no room, but keeps Sign out and the theme button", () => {
+  it("hides the address on a phone, where there is no room, but keeps Sign out, and has no theme button because that lives under Appearance on Profile", () => {
     const html = renderToStaticMarkup(<AppHeader email="reader@example.com" current="documents" />);
 
     expect(html).toMatch(/<p class="hidden[^"]*md:block"/);
     expect(html).toContain("Sign out");
-    expect(html).toContain("h-9 w-24");
+    expect(html).not.toContain("h-9 w-24");
+    expect(html).not.toMatch(/Light mode|Dark mode/);
   });
 
   it("takes its width from the page, so the bar lines up with the content under it", () => {

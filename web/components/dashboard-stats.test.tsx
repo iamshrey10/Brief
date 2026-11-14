@@ -19,16 +19,30 @@ describe("the dashboard numbers", () => {
     const html = render({ total: 2, ready: 1, needsAttention: 1, reading: 0 });
 
     expect(html).toContain("border-destructive/40");
-    expect(html).toContain('href="/dashboard/documents"');
+    expect(html).toContain('href="/dashboard/documents#your-documents"');
     expect(html).toContain("Could not be read well");
   });
 
-  it("is calm, with no tint and no link, when nothing needs fixing", () => {
+  it("is calm, with no tint and no extra sentence, when nothing needs fixing", () => {
     const html = render({ total: 2, ready: 2, needsAttention: 0, reading: 0 });
 
     expect(html).not.toContain("border-destructive");
-    expect(html).not.toContain('href="/dashboard/documents"');
+    expect(html).not.toContain("Open your documents");
     expect(html).toContain("Nothing to fix");
+  });
+
+  it("makes every card a link straight to the list of documents, below the upload form", () => {
+    const html = render({ total: 3, ready: 2, needsAttention: 0, reading: 1 });
+
+    expect(html.match(/href="\/dashboard\/documents#your-documents"/g)).toHaveLength(4);
+    expect(html).toMatch(/<a [^>]*href="\/dashboard\/documents#your-documents"[^>]*>[\s\S]*?Ready to open/);
+  });
+
+  it("shows the cards as plain boxes, not links, in a shared view that cannot open anything", () => {
+    const html = renderToStaticMarkup(<DashboardStats stats={{ total: 3, ready: 2, needsAttention: 1, reading: 0 }} readOnly />);
+
+    expect(html).not.toContain("<a ");
+    expect(html).toContain("Ready to open");
   });
 
   it("says there are none yet, instead of a bare zero, for a new account", () => {

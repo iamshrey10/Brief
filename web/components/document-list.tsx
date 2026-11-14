@@ -586,8 +586,9 @@ export function DocumentList({
   if (documents.length === 0) {
     return (
       <section
+        id="your-documents"
         aria-label="No documents yet"
-        className="rounded-2xl border border-dashed border-border bg-card/60 px-6 py-10 text-center"
+        className="scroll-mt-20 rounded-2xl border border-dashed border-border bg-card/60 px-6 py-10 text-center"
       >
         <span
           aria-hidden="true"
@@ -615,7 +616,7 @@ export function DocumentList({
   }
 
   return (
-    <section aria-label="Your documents" className="flex flex-col gap-3">
+    <section id="your-documents" aria-label="Your documents" className="scroll-mt-20 flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="font-heading text-lg font-semibold text-foreground">Your documents</h2>
         {documents.length > 1 && (
