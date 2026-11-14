@@ -70,7 +70,12 @@ function withinTime<T>(work: Promise<T>): Promise<T> {
   });
 }
 
-const LIMIT_PER_WINDOW = 30;
+/**
+ * How many requests one person may make in a minute. The pages make several calls of their own as they open and while they wait (the
+ * list of documents, who is signed in, the "still here" signal, a look at a document being read), so a person simply moving around
+ * Brief makes dozens a minute. 30 was too tight and showed them "Too Many Requests"; this leaves room for that and still stops a flood.
+ */
+const LIMIT_PER_WINDOW = 120;
 
 /**
  * A simple fixed window counter per user, kept in Redis so it's shared across every

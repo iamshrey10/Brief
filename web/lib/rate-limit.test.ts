@@ -58,27 +58,27 @@ async function use(identifier: string, times: number): Promise<boolean[]> {
 }
 
 describe("checkRateLimit", () => {
-  it("allows 30 requests a minute and refuses the 31st", async () => {
-    const results = await use("a@b.c", 31);
+  it("allows 120 requests a minute and refuses the 121st", async () => {
+    const results = await use("a@b.c", 121);
 
-    expect(results.slice(0, 30).every(Boolean)).toBe(true);
-    expect(results[30]).toBe(false);
+    expect(results.slice(0, 120).every(Boolean)).toBe(true);
+    expect(results[120]).toBe(false);
   });
 
   it("keeps refusing for the rest of the minute", async () => {
-    const results = await use("a@b.c", 40);
+    const results = await use("a@b.c", 130);
 
-    expect(results.slice(30).every((allowed) => allowed === false)).toBe(true);
+    expect(results.slice(120).every((allowed) => allowed === false)).toBe(true);
   });
 
   it("counts each person separately", async () => {
-    await use("busy@b.c", 31);
+    await use("busy@b.c", 121);
 
     expect(await checkRateLimit("quiet@b.c")).toBe(true);
   });
 
   it("starts a fresh count when the minute rolls over", async () => {
-    await use("a@b.c", 31);
+    await use("a@b.c", 121);
     expect(await checkRateLimit("a@b.c")).toBe(false);
 
     vi.setSystemTime(new Date("2026-10-10T12:01:00Z"));
@@ -87,7 +87,7 @@ describe("checkRateLimit", () => {
   });
 
   it("does not start a fresh count in the middle of a minute", async () => {
-    await use("a@b.c", 31);
+    await use("a@b.c", 121);
 
     vi.setSystemTime(new Date("2026-10-10T12:00:59Z"));
 
