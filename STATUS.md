@@ -19,9 +19,9 @@ no outside person has tried it, so expect surprises. What is left is small and l
 | | |
 |---|---|
 | Commits | about 590 |
-| Tests | 3,336 (1,265 backend, 1,783 frontend, 288 in a real browser), run on every pull request |
-| API routes | 45 |
-| Database tables | 13 |
+| Tests | about 3,490 (1,291 backend, 1,875 frontend, 319 in a real browser), run on every pull request |
+| API routes | 47 |
+| Database tables | 14 |
 | Evaluations | 5 (search, question answering on three documents, key terms, must-ask checklist, steadiness) |
 | Documents it can read | PDFs (including scanned ones, read by OCR), and phone photos or scans (JPG, PNG, HEIC) |
 | Limits | 50 MB a file, 25 documents a person, 100 pages a document |
@@ -63,7 +63,7 @@ no outside person has tried it, so expect surprises. What is left is small and l
 
 | Piece | Status |
 |---|---|
-| Re-record the demo video with the final screens | Not started |
+| The demo video | Re-recorded on November 13 with the final screens, in light theme at 1080p, just under two minutes |
 | An alert that tells me when the site is down | Not set up yet |
 | The per-minute request limit in the website | Built, but on the live site it cannot reach its Redis and lets requests through. The setting is now cleaned up on read and the log says what looks wrong; I still need to confirm the value in Upstash. The daily limits and the site-wide cap are enforced by the API and work |
 | Build and test tools | 32 open dependency alerts, all in development tools (vite, hono, undici and similar). None ships to a user, and the scan of what ships passes. I will update them in a separate careful change |
@@ -112,6 +112,6 @@ no outside person has tried it, so expect surprises. What is left is small and l
 | Oct 28 | The landing page was rebuilt (top bar, hero, what you get, how it works, footer) and the signed in screens got one shared top bar; the Overview and Ask tabs are clearer. A third question set (an education loan) was added and the answering instruction gained a rule for "which one" questions, measured on all three before it was kept (a second rule for simple arithmetic was tried and removed because it cost an answer). The website file `middleware` was renamed to `proxy`, and a check, run in CI too, now refuses any commit message that credits a tool. 404 commits, 1,853 tests. About 85 percent, and the finish moved from about November 3 to about November 7 for the reason given above. |
 | Nov 2 | A Dashboard became the first screen, with a place to add a document, counts, dates, the questions still to ask and what Brief found in each document. Scanned PDFs are now read by OCR after a real scan failed. A document has one row of actions (copy or download the summary as a PDF, calendar, email, print) and a find box. Real files of each kind were run through the real services: PDF, photos of a lease, a job offer and a loan, and a deliberately smeared photo, which was refused with a clear reason. Work now goes in through short branches and pull requests, and main is protected. 471 commits, 2,230 tests. About 88 percent, and the finish moved from about November 7 to about November 11 for the reason given above. |
 | Nov 3 to 12 | The signed in pages got sections along the top (and along the bottom on a phone), a Bin that keeps deleted documents for 7 days, folders, sharing, and optional two-step verification. It went online: the website on Vercel, the API on Render, the database on Neon, Redis on Upstash, files on Cloudflare R2, with Google sign-in in production. A Welcome page asks for a name and why you came, an owner page shows totals only, and the Privacy and Terms pages were rewritten to say what Brief really does. |
-| Nov 13 | The site moved to briefcontracts.com. Sharing got a time limit (1 hour up to 90 days) with a countdown. A read cut short by a server restart now starts again by itself. A first-time tour points at the real parts of the page and stays open as you move around. Taps feel quicker: a bar appears at once when a page is on its way, buttons press in, and a document page that jumped about while it loaded (a layout shift of 1.8 on a phone, where under 0.1 is good) now sits still. The README was rewritten. |
+| Nov 13 | The site moved to briefcontracts.com. Sharing got a time limit (1 hour up to 90 days) with a countdown. A read cut short by a server restart now starts again by itself. A first-time tour points at the real parts of the page and stays open as you move around. Up to five photos make one document, with a page for each. The owner page now has charts, comparisons with the period before, a funnel, counts of how often the demo video is opened and finished, and daily and monthly reports to download. The website's per-person request limit went from 30 to 120 a minute, because moving around Brief used to hit it. The theme button left the signed in pages (it is under Appearance on Profile), and the Dashboard tiles lead to the list of documents. Taps feel quicker: a bar appears at once when a page is on its way, buttons press in, and a document page that jumped about while it loaded (a layout shift of 1.8 on a phone, where under 0.1 is good) now sits still. The README was rewritten. |
 
 Thanks for reading. If something here looks wrong or unclear, please open an issue.
