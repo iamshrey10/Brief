@@ -240,8 +240,9 @@ export function UploadPanel({ onUploaded }: { onUploaded: (document: DocumentSum
         </label>
       )}
       {!file && (
-        // For a phone: opens the camera at once, so a paper contract can be photographed. A computer has no use for it.
-        <label className="flex h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-border bg-background text-sm font-medium text-foreground transition-colors hover:bg-accent/50 focus-within:ring-3 focus-within:ring-ring/50 sm:hidden">
+        // For a phone: opens the camera at once, so a paper contract can be photographed. Shown on a small screen and on any
+        // touch screen, so a phone held sideways or a tablet has it too. A computer with a mouse has no use for it.
+        <label className="hidden h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-border bg-background text-sm font-medium text-foreground transition-colors hover:bg-accent/50 focus-within:ring-3 focus-within:ring-ring/50 max-sm:flex pointer-coarse:flex">
           <Camera aria-hidden className="size-4" />
           Take a photo of a paper contract
           <input

@@ -171,6 +171,14 @@ describe("contentTypeFor", () => {
     expect(contentTypeFor({ name, type: "" })).toBe(expected);
   });
 
+  it.each(["image/heif", "image/heic-sequence", "image/heif-sequence"])("sends a photo the phone calls %s as HEIC, which the server reads the same way", (type) => {
+    expect(contentTypeFor({ name: "IMG_0042.heif", type })).toBe("image/heic");
+  });
+
+  it("falls back to the extension for a .heif photo with no type", () => {
+    expect(contentTypeFor({ name: "IMG_0042.HEIF", type: "" })).toBe("image/heic");
+  });
+
   it("does not guess that an unknown file is a PDF", () => {
     expect(contentTypeFor({ name: "notes.txt", type: "" })).toBeNull();
     expect(contentTypeFor({ name: "no-extension", type: "" })).toBeNull();

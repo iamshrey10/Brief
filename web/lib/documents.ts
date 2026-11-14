@@ -163,6 +163,7 @@ const CONTENT_TYPE_BY_EXTENSION: Record<string, string> = {
   jpeg: "image/jpeg",
   png: "image/png",
   heic: "image/heic",
+  heif: "image/heic",
 };
 
 export const ACCEPTED_FILE_TYPES = Array.from(new Set(Object.values(CONTENT_TYPE_BY_EXTENSION)));
@@ -174,6 +175,8 @@ export const ACCEPTED_FILE_TYPES = Array.from(new Set(Object.values(CONTENT_TYPE
  */
 export function contentTypeFor(file: { name: string; type: string }): string | null {
   if (ACCEPTED_FILE_TYPES.includes(file.type)) return file.type;
+  // Some phones label the same photo format HEIF. The server reads both the same way and checks the file's own bytes, so it goes up as HEIC.
+  if (file.type === "image/heif" || file.type === "image/heic-sequence" || file.type === "image/heif-sequence") return "image/heic";
   if (file.type !== "") return null;
   const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
   return CONTENT_TYPE_BY_EXTENSION[extension] ?? null;
