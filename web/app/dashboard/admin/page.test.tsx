@@ -38,7 +38,7 @@ describe("the admin page", () => {
     getMock.mockResolvedValue(null);
 
     await expect(AdminPage()).rejects.toThrow("NEXT_NOT_FOUND");
-    expect(getMock).toHaveBeenCalledExactlyOnceWith("owner@example.com", "/admin/stats");
+    expect(getMock).toHaveBeenCalledExactlyOnceWith("owner@example.com", "/admin/stats?days=30");
   });
 
   it("is not found when the answer is not the numbers", async () => {
@@ -56,6 +56,14 @@ describe("the admin page", () => {
     expect(html).toContain("Admin");
     expect(html).toContain("counts only");
     expect(html).toContain("Signed up");
+  });
+
+  it.each([["7", 7], ["30", 30], ["90", 90], ["45", 30], ["abc", 30], [undefined, 30], [["7", "90"], 30]])("asks for the stretch in the address, %j, as %j days, and for 30 when it is not one of the three", async (asked, days) => {
+    getMock.mockResolvedValue({ generated_at: "2026-11-12T22:00:00Z" });
+
+    renderToStaticMarkup(await AdminPage({ searchParams: Promise.resolve({ days: asked as string | undefined }) }));
+
+    expect(getMock).toHaveBeenCalledExactlyOnceWith("owner@example.com", `/admin/stats?days=${days}`);
   });
 
   it("asks search engines not to index it", () => {

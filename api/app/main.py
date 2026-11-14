@@ -4,16 +4,17 @@ import logging
 import re
 import time
 import uuid
+import datetime as dt
 from datetime import datetime, timedelta, timezone
 from typing import Literal
 
-from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request, Response
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Query, Request, Response
 from google.genai import errors as genai_errors
 from pydantic import BaseModel, Field, field_validator, model_validator
 from sqlalchemy import delete, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth import get_current_user
+from app.auth import get_current_user, verify_visitor_token
 from app.config import settings
 from app.docs_urls import docs_urls
 from app.checklist import ChecklistGenerationError, ChecklistResult, get_checklist, load_checklist
@@ -130,6 +131,7 @@ app = FastAPI(
         {"name": "documents", "description": "Uploading, reading, renaming and deleting documents."},
         {"name": "answers", "description": "Questions, search, key terms and the questions to ask before signing."},
         {"name": "sharing", "description": "Letting someone else look at your dashboard, read only, and looking at one shared with you."},
+        {"name": "events", "description": "Counts of things that happen on the site with nobody attached, such as the demo video being opened. Only the website's own server can add to them."},
         {"name": "admin", "description": "For the owner of the site only: counts of how Brief is used, never a document, a name or an address."},
     ],
     **docs_urls(settings.environment),
@@ -308,17 +310,61 @@ async def signal_activity(
     description=(
         "For the owner only. Returns totals: how many people signed up and were active, how long they stay, how many documents, questions, reads and overviews, why people came, and today's use of the model. Counts only: no address, name, file name or document text is ever included."
     ),
-    responses=_errors(401, 404),
+    responses=_errors(400, 401, 404),
 )
 async def admin_stats(
+    days: int = Query(30, description="How many days the charts reach back, and the stretch compared with the one before it: 7, 30 or 90."),
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
     # Only the people named in ADMIN_EMAILS. Anyone else is told it is not there, as it is not for them.
     if not admin.is_admin(user):
         raise HTTPException(status_code=404, detail="not found")
+    if days not in admin.RANGES:
+        raise HTTPException(status_code=400, detail="days must be 7, 30 or 90")
     logger.info("admin page viewed")
-    return await admin.collect(session)
+    return await admin.collect(session, days=days)
+
+
+@app.get(
+    "/admin/report",
+    tags=["admin"],
+    summary="Counts for one day or one month, to download",
+    description=(
+        "For the owner only. Returns the counts for a single day, or for the whole month that holds the date given (a month not over yet runs to today): people who signed up and were active, visits, minutes in Brief, documents, questions, reads, overviews and the demo video, with a row for each day. Counts only: no address, name, file name or document text is ever included."
+    ),
+    responses=_errors(401, 404),
+)
+async def admin_report(
+    period: Literal["day", "month"] = Query("day", description="One day, or the month that holds the date."),
+    date: dt.date = Query(..., description="The day, or any day of the month, as YYYY-MM-DD."),
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    if not admin.is_admin(user):
+        raise HTTPException(status_code=404, detail="not found")
+    logger.info("admin report downloaded")
+    return await admin.report(session, period, date)
+
+
+@app.post(
+    "/events/{name}",
+    status_code=204,
+    tags=["events"],
+    summary="Count something that happened on the site",
+    description=(
+        "Adds one to the day's count for the named event, such as demo_opened or demo_finished, with nobody attached: no person, address or other identifier is read or kept. Only the website's own server may call it, with the token it makes for a visitor who is not signed in. A name that is not on the list is refused."
+    ),
+    responses=_errors(401, 404),
+)
+async def count_event(
+    name: str,
+    _visitor: None = Depends(verify_visitor_token),
+    session: AsyncSession = Depends(get_session),
+) -> Response:
+    if not await admin.record_event(session, name):
+        raise HTTPException(status_code=404, detail="not found")
+    return Response(status_code=204)
 
 
 @app.get(

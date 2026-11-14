@@ -75,4 +75,61 @@ describe("DemoVideoButton", () => {
 
     expect(document.querySelector("video")).not.toBeNull();
   });
+
+  describe("counting, with nobody identified", () => {
+    const counted = () => (fetch as unknown as { mock: { calls: [string, RequestInit][] } }).mock.calls.map(([url]) => url);
+
+    beforeEach(() => {
+      vi.stubGlobal("fetch", vi.fn(async () => new Response(null, { status: 204 })));
+    });
+    afterEach(() => vi.unstubAllGlobals());
+
+    it("counts that it was opened, once for each time it is opened, with a POST that carries nothing", () => {
+      render(<DemoVideoButton />);
+
+      fireEvent.click(screen.getByRole("button", { name: /watch how it works/i }));
+
+      expect(counted()).toEqual(["/api/events/demo_opened"]);
+      const [, init] = (fetch as unknown as { mock: { calls: [string, RequestInit][] } }).mock.calls[0];
+      expect(init).toEqual({ method: "POST", keepalive: true });
+    });
+
+    it("counts that the video was watched to the end, once, however often it is replayed", () => {
+      const { container } = render(<DemoVideoButton />);
+      fireEvent.click(screen.getByRole("button", { name: /watch how it works/i }));
+      const video = container.querySelector("video")!;
+
+      fireEvent.ended(video);
+      fireEvent.ended(video);
+
+      expect(counted()).toEqual(["/api/events/demo_opened", "/api/events/demo_finished"]);
+    });
+
+    it("counts the end again when it is opened and watched a second time", () => {
+      const { container } = render(<DemoVideoButton />);
+      fireEvent.click(screen.getByRole("button", { name: /watch how it works/i }));
+      fireEvent.ended(container.querySelector("video")!);
+      fireEvent.click(screen.getByRole("button", { name: "Close" }));
+      fireEvent.click(screen.getByRole("button", { name: /watch how it works/i }));
+      fireEvent.ended(container.querySelector("video")!);
+
+      expect(counted()).toEqual(["/api/events/demo_opened", "/api/events/demo_finished", "/api/events/demo_opened", "/api/events/demo_finished"]);
+    });
+
+    it("does not count an end that never came, because the window was closed part way", () => {
+      render(<DemoVideoButton />);
+      fireEvent.click(screen.getByRole("button", { name: /watch how it works/i }));
+      fireEvent.click(screen.getByRole("button", { name: "Close" }));
+
+      expect(counted()).toEqual(["/api/events/demo_opened"]);
+    });
+
+    it("carries on when counting fails, because the video matters more than the count", () => {
+      vi.stubGlobal("fetch", vi.fn(async () => Promise.reject(new Error("offline"))));
+      render(<DemoVideoButton />);
+
+      expect(() => fireEvent.click(screen.getByRole("button", { name: /watch how it works/i }))).not.toThrow();
+      expect(screen.getByLabelText(/^Brief in 90 seconds$/)).toBeInTheDocument();
+    });
+  });
 });

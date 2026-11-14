@@ -300,7 +300,7 @@ async def test_the_charts_cover_thirty_days_oldest_first_with_gaps_as_zero(db_se
     yesterday = next(row for row in by_day if row["day"] == "2026-11-11")
     assert yesterday["people"] == 1 and yesterday["minutes"] == 0.8
     assert next(row for row in by_day if row["day"] == "2026-11-10")["signed_up"] == 1
-    assert next(row for row in by_day if row["day"] == "2026-11-05") == {"day": "2026-11-05", "signed_up": 0, "people": 0, "minutes": 0.0}
+    assert next(row for row in by_day if row["day"] == "2026-11-05") == {"day": "2026-11-05", **{field: 0 for field in admin.DAILY_FIELDS}, "minutes": 0.0}
 
 
 async def test_with_nothing_yet_every_number_is_zero_and_nothing_breaks(db_session):

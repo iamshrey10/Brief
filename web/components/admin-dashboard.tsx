@@ -1,6 +1,10 @@
+import { ArrowDownRight, ArrowUpRight, Minus } from "lucide-react";
+import Link from "next/link";
 import type { ReactNode } from "react";
 
-import { kindLabel, minutesText, ranked, reasonLabel, shortDay, statusLabel, type AdminDay, type AdminStats } from "@/lib/admin";
+import { AdminReports } from "@/components/admin-reports";
+import { Funnel, LineChart, Sparkline } from "@/components/charts";
+import { change, kindLabel, minutesText, percentText, ranked, RANGES, reasonLabel, statusLabel, type AdminDay, type AdminStats } from "@/lib/admin";
 import { cn } from "@/lib/utils";
 
 function Section({ id, title, note, children }: { id: string; title: string; note?: string; children: ReactNode }) {
@@ -33,53 +37,6 @@ function Stats({ children, label }: { children: ReactNode; label: string }) {
   );
 }
 
-/** A bar for every day, the tallest as high as the box. Each bar is also in a table for a screen reader. */
-function DayChart({ title, days, pick, unit }: { title: string; days: AdminDay[]; pick: (day: AdminDay) => number; unit: string }) {
-  const values = days.map(pick);
-  const tallest = Math.max(1, ...values);
-  const total = values.reduce((sum, value) => sum + value, 0);
-  return (
-    <figure className="min-w-0">
-      <figcaption className="text-sm font-medium text-foreground">
-        {title} <span className="font-normal text-muted-foreground">({total} in {days.length} days)</span>
-      </figcaption>
-      <div aria-hidden="true" className="mt-3 flex h-28 items-end gap-0.5 border-b border-border">
-        {days.map((day, index) => (
-          <div key={day.day} title={`${shortDay(day.day)}: ${values[index]} ${unit}`} className="flex h-full min-w-0 flex-1 items-end">
-            <div
-              className={cn("w-full rounded-t-sm", values[index] > 0 ? "bg-primary" : "bg-border")}
-              style={{ height: values[index] > 0 ? `${Math.max(6, (values[index] / tallest) * 100)}%` : "2px" }}
-            />
-          </div>
-        ))}
-      </div>
-      {days.length > 0 && (
-        <div aria-hidden="true" className="mt-1 flex justify-between text-xs text-muted-foreground">
-          <span>{shortDay(days[0].day)}</span>
-          <span>{shortDay(days[days.length - 1].day)}</span>
-        </div>
-      )}
-      <table className="sr-only">
-        <caption>{title}</caption>
-        <thead>
-          <tr>
-            <th scope="col">Day</th>
-            <th scope="col">{unit}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {days.map((day, index) => (
-            <tr key={day.day}>
-              <th scope="row">{shortDay(day.day)}</th>
-              <td>{values[index]}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </figure>
-  );
-}
-
 /** A count by name as bars, the biggest first, each with its number and its share of the whole. */
 function BarList({ label, counts, name, empty }: { label: string; counts: Record<string, number>; name: (key: string) => string; empty: string }) {
   const rows = ranked(counts);
@@ -103,15 +60,129 @@ function BarList({ label, counts, name, empty }: { label: string; counts: Record
   );
 }
 
+/** A number for the chosen stretch of days, how it changed from the stretch before, and its shape over the days. */
+function Kpi({ label, value, current, previous, days, pick, days_label }: { label: string; value: ReactNode; current: number; previous: number; days: AdminDay[]; pick: (day: AdminDay) => number; days_label: string }) {
+  const moved = change(current, previous);
+  const Icon = moved.direction === "up" || moved.direction === "new" ? ArrowUpRight : moved.direction === "down" ? ArrowDownRight : Minus;
+  return (
+    <div className="flex flex-col rounded-2xl border border-border bg-card p-4 shadow-sm">
+      <dt className="text-xs font-medium tracking-wide text-muted-foreground uppercase">{label}</dt>
+      <dd className="mt-1 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">{value}</dd>
+      <dd className="mt-1 flex items-center gap-1 text-xs">
+        <span
+          className={cn(
+            "inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 font-medium",
+            moved.direction === "up" || moved.direction === "new" ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300" : moved.direction === "down" ? "bg-destructive/10 text-destructive" : "bg-muted text-muted-foreground",
+          )}
+        >
+          <Icon aria-hidden="true" className="size-3" />
+          {moved.text}
+        </span>
+        <span className="text-muted-foreground">vs the {days_label} before</span>
+      </dd>
+      <dd className="mt-2">
+        <Sparkline values={days.map(pick)} />
+      </dd>
+    </div>
+  );
+}
+
+/** Which stretch of days the page shows: three links, so the choice is in the address and can be shared or bookmarked. */
+function RangePicker({ current }: { current: number }) {
+  return (
+    <nav aria-label="How far back to look" className="inline-flex rounded-xl border border-border bg-card p-1">
+      {RANGES.map((days) => (
+        <Link
+          key={days}
+          href={`/dashboard/admin?days=${days}`}
+          aria-current={days === current ? "page" : undefined}
+          className={cn(
+            "rounded-lg px-3 py-1.5 text-sm font-medium outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/50 max-sm:flex max-sm:min-h-11 max-sm:items-center",
+            days === current ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground",
+          )}
+        >
+          {days} days
+        </Link>
+      ))}
+    </nav>
+  );
+}
+
 /**
  * The owner's page: how Brief is being used, as counts. It never shows a document, a question or an answer, and never a name or an
- * address. Every number on it is a total.
+ * address. Every number on it is a total. The top shows the chosen stretch (7, 30 or 90 days) against the one before it, then how people
+ * move through Brief, the demo video, what is stored, and reports to download.
  */
 export function AdminDashboard({ stats }: { stats: AdminStats }) {
-  const { people, time_in_brief: time, documents, questions, reads, overviews, sharing, site } = stats;
+  const { people, time_in_brief: time, documents, questions, reads, overviews, sharing, site, funnel, demo, period } = stats;
   const used = site.daily_limit > 0 ? Math.min(100, Math.round((site.model_calls_today / site.daily_limit) * 100)) : 0;
+  const days = stats.by_day;
+  const range = stats.range_days;
+  const word = `${range} days`;
+  const { current, previous } = period;
+  const finishRate = percentText(demo.finished_total, demo.opened_total);
   return (
     <div className="flex flex-col gap-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <RangePicker current={range} />
+        <p className="text-xs text-muted-foreground">
+          Counted in UTC days. Updated {new Date(stats.generated_at).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" })} UTC.
+        </p>
+      </div>
+
+      <section aria-labelledby="admin-summary">
+        <h2 id="admin-summary" className="sr-only">
+          The last {word} at a glance
+        </h2>
+        <dl aria-label={`The last ${word}`} className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+          <Kpi label="New people" value={current.signed_up} current={current.signed_up} previous={previous.signed_up} days={days} pick={(d) => d.signed_up} days_label={word} />
+          <Kpi label="Active people" value={current.people} current={current.people} previous={previous.people} days={days} pick={(d) => d.people} days_label={word} />
+          <Kpi label="Documents uploaded" value={current.documents} current={current.documents} previous={previous.documents} days={days} pick={(d) => d.documents} days_label={word} />
+          <Kpi label="Questions asked" value={current.questions} current={current.questions} previous={previous.questions} days={days} pick={(d) => d.questions} days_label={word} />
+          <Kpi label="Time in Brief" value={minutesText(current.minutes)} current={current.minutes} previous={previous.minutes} days={days} pick={(d) => d.minutes} days_label={word} />
+          <Kpi label="Demo video opened" value={current.demo_opened} current={current.demo_opened} previous={previous.demo_opened} days={days} pick={(d) => d.demo_opened} days_label={word} />
+        </dl>
+      </section>
+
+      <Section id="admin-activity" title="Activity over time" note={`Each point is one day, over the last ${word}. Point at a day to read its numbers.`}>
+        <div className="grid gap-8 lg:grid-cols-2">
+          <LineChart title="People using Brief" days={days} unit="people" lines={[{ label: "Active people", pick: (d) => d.people, color: "var(--primary)" }, { label: "New sign-ups", pick: (d) => d.signed_up, color: "#0d9488" }]} />
+          <LineChart title="Documents and questions" days={days} unit="count" lines={[{ label: "Questions", pick: (d) => d.questions, color: "var(--primary)" }, { label: "Documents uploaded", pick: (d) => d.documents, color: "#d97706" }]} />
+          <LineChart title="Time in Brief" days={days} unit="minutes" note="Counted while Brief is open, in front, and being used. A tab left open in the background adds nothing." lines={[{ label: "Minutes", pick: (d) => d.minutes, color: "var(--primary)" }]} />
+          <LineChart title="Visits" days={days} unit="visits" lines={[{ label: "Visits", pick: (d) => d.visits, color: "var(--primary)" }]} />
+        </div>
+      </Section>
+
+      <div className="grid gap-5 lg:grid-cols-2">
+        <Section id="admin-funnel" title="How far people get" note="Everyone who has ever signed up, counted by the furthest step they reached.">
+          <Funnel
+            label="How far people get"
+            steps={[
+              { name: "Signed up", count: funnel.signed_up },
+              { name: "Uploaded a document", count: funnel.uploaded_a_document },
+              { name: "Asked a question", count: funnel.asked_a_question },
+              { name: "Came back on another day", count: funnel.came_back_another_day },
+              { name: "Shared their dashboard", count: funnel.shared_their_dashboard },
+            ]}
+          />
+        </Section>
+        <Section id="admin-reasons" title="Why people came" note="From the question on the welcome page, which can be skipped.">
+          <BarList label="Why people came" counts={stats.reasons} name={reasonLabel} empty="Nobody has signed up yet." />
+        </Section>
+      </div>
+
+      <Section id="admin-demo" title="The demo video" note="Counted when the Watch how it works button is pressed and when the video plays to the end. Nobody is identified: only a count for each day is kept.">
+        <dl aria-label="The demo video" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <Stat label="Opened" value={demo.opened_total} hint={`${demo.opened_7_days} this week · ${demo.opened_30_days} in 30 days`} />
+          <Stat label="Watched to the end" value={demo.finished_total} hint={`${demo.finished_7_days} this week`} />
+          <Stat label="Finish rate" value={finishRate} hint="Of those who opened it" />
+          <Stat label={`Opened, last ${word}`} value={current.demo_opened} hint={`${previous.demo_opened} in the ${word} before`} />
+        </dl>
+        <div className="mt-6 max-w-3xl">
+          <LineChart title="Demo video, opened and finished" days={days} unit="count" lines={[{ label: "Opened", pick: (d) => d.demo_opened, color: "var(--primary)" }, { label: "Watched to the end", pick: (d) => d.demo_finished, color: "#0d9488" }]} />
+        </div>
+      </Section>
+
       <Section id="admin-people" title="People" note="Everyone who has signed in with Google, and who has been using Brief.">
         <Stats label="People">
           <Stat label="Signed up" value={people.total} hint="Everyone with an account" />
@@ -119,20 +190,12 @@ export function AdminDashboard({ stats }: { stats: AdminStats }) {
           <Stat label="Active today" value={people.active_today} hint="Had Brief open and in use" />
           <Stat label="Active this week" value={people.active_7_days} hint={`${people.active_30_days} in 30 days`} />
         </Stats>
-        <div className="mt-6 grid gap-6 md:grid-cols-2">
-          <DayChart title="People active each day" days={stats.by_day} pick={(day) => day.people} unit="people" />
-          <DayChart title="New sign-ups each day" days={stats.by_day} pick={(day) => day.signed_up} unit="sign-ups" />
-        </div>
-      </Section>
-
-      <Section id="admin-time" title="Time in Brief" note="Counted while Brief is open, in front, and being used. A tab left open in the background adds nothing.">
-        <Stats label="Time in Brief">
-          <Stat label="Average visit" value={minutesText(time.average_minutes_per_visit_7_days)} hint="Last 7 days" />
-          <Stat label="Per person, per day" value={minutesText(time.average_minutes_per_person_per_day_7_days)} hint="Of people who came, last 7 days" />
-          <Stat label="Visits" value={time.visits_7_days} hint="Last 7 days" />
-        </Stats>
-        <div className="mt-6">
-          <DayChart title="Minutes in Brief each day" days={stats.by_day} pick={(day) => Math.round(day.minutes)} unit="minutes" />
+        <div className="mt-4">
+          <Stats label="Time in Brief">
+            <Stat label="Average visit" value={minutesText(time.average_minutes_per_visit_7_days)} hint="Last 7 days" />
+            <Stat label="Per person, per day" value={minutesText(time.average_minutes_per_person_per_day_7_days)} hint="Of people who came, last 7 days" />
+            <Stat label="Visits" value={time.visits_7_days} hint="Last 7 days" />
+          </Stats>
         </div>
       </Section>
 
@@ -163,10 +226,6 @@ export function AdminDashboard({ stats }: { stats: AdminStats }) {
         </Stats>
       </Section>
 
-      <Section id="admin-reasons" title="Why people came" note="From the question on the welcome page, which can be skipped.">
-        <BarList label="Why people came" counts={stats.reasons} name={reasonLabel} empty="Nobody has signed up yet." />
-      </Section>
-
       <div className="grid gap-5 md:grid-cols-2">
         <Section id="admin-sharing" title="Sharing">
           <Stats label="Sharing">
@@ -184,6 +243,10 @@ export function AdminDashboard({ stats }: { stats: AdminStats }) {
           <p className="mt-1 text-xs text-muted-foreground">{used}% of today&apos;s limit</p>
         </Section>
       </div>
+
+      <Section id="admin-reports" title="Download a report" note="A daily or monthly report, as a spreadsheet or a PDF.">
+        <AdminReports />
+      </Section>
     </div>
   );
 }

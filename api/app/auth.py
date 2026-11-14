@@ -40,6 +40,17 @@ async def verify_service_token(authorization: str | None = Header(default=None))
     return email
 
 
+# Who the website says it is when it records something that happened for a visitor who is not signed in. It is not a person and has no row.
+VISITOR_SUBJECT = "site-visitor"
+
+
+async def verify_visitor_token(subject: str = Depends(verify_service_token)) -> None:
+    """Accepts only the token the website makes for a visitor who is not signed in, so a count can be added from the website's server
+    and from nowhere else. A signed-in person's token is not accepted here, and neither is a missing or forged one."""
+    if subject != VISITOR_SUBJECT:
+        raise HTTPException(status_code=401, detail="invalid token")
+
+
 async def get_current_user(
     email: str = Depends(verify_service_token),
     session: AsyncSession = Depends(get_session),

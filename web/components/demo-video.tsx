@@ -5,6 +5,11 @@ import { useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 
+/** Tells the site, with nobody identified, that this happened, so the owner can see how often the video is opened and finished. It never gets in the way. */
+function count(event: "demo_opened" | "demo_finished") {
+  void fetch(`/api/events/${event}`, { method: "POST", keepalive: true }).catch(() => {});
+}
+
 /**
  * The button on the first screen that plays a 90 second walk through of Brief: why it was built, how it works and how private it is.
  * It opens in a window over the page, with captions, and the video is only fetched once it is opened. Escape, the Close button or a click
@@ -13,9 +18,13 @@ import { Button } from "@/components/ui/button";
 export function DemoVideoButton() {
   const dialog = useRef<HTMLDialogElement>(null);
   const [open, setOpen] = useState(false);
+  // Whether the end of this showing has been counted, so a video that is replayed from the controls counts once.
+  const finished = useRef(false);
 
   function show() {
     setOpen(true);
+    finished.current = false;
+    count("demo_opened");
     dialog.current?.showModal();
   }
 
@@ -42,7 +51,14 @@ export function DemoVideoButton() {
           </Button>
         </div>
         {open && (
-          <video className="demo-video w-full rounded-lg bg-black" controls autoPlay playsInline preload="metadata" poster="/demo/brief-demo-poster.jpg">
+          <video className="demo-video w-full rounded-lg bg-black" controls autoPlay playsInline preload="metadata"
+            poster="/demo/brief-demo-poster.jpg"
+            onEnded={() => {
+              if (finished.current) return;
+              finished.current = true;
+              count("demo_finished");
+            }}
+          >
             <source src="/demo/brief-demo.mp4" type="video/mp4" />
             <track kind="captions" src="/demo/brief-demo.vtt" srcLang="en" label="English" />
             Your browser can&apos;t play this video.
