@@ -42,7 +42,7 @@ describe("DemoVideoButton", () => {
     expect(captions).toHaveAttribute("kind", "captions");
     expect(captions).toHaveAttribute("src", "/demo/brief-demo.vtt");
     expect(captions).toHaveAttribute("srclang", "en");
-    expect(dialog()).toHaveAccessibleName("Brief in under 2 minutes");
+    expect(dialog()).toHaveAccessibleName("Brief in under 90 seconds");
   });
 
   it("is put away, and the video taken out so it stops, by the Close button", () => {
@@ -129,7 +129,7 @@ describe("DemoVideoButton", () => {
       render(<DemoVideoButton />);
 
       expect(() => fireEvent.click(screen.getByRole("button", { name: /watch how it works/i }))).not.toThrow();
-      expect(screen.getByLabelText(/^Brief in under 2 minutes$/)).toBeInTheDocument();
+      expect(screen.getByLabelText(/^Brief in under 90 seconds$/)).toBeInTheDocument();
     });
   });
 });

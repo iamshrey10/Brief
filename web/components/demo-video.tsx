@@ -11,7 +11,7 @@ function count(event: "demo_opened" | "demo_finished") {
 }
 
 /**
- * The button on the first screen that plays a walk through of Brief of just under two minutes: signing in, the tour, adding photos, the key terms, asking a question, sharing, and the account.
+ * The button on the first screen that plays a walk through of Brief of under a minute and a half: signing in, the tour, adding photos, the key terms, asking a question, sharing, the account, and the technology behind it.
  * It opens in a window over the page, with captions, and the video is only fetched once it is opened. Escape, the Close button or a click
  * outside it puts it away, and it stops playing when it goes.
  */
@@ -36,7 +36,7 @@ export function DemoVideoButton() {
       </Button>
       <dialog
         ref={dialog}
-        aria-label="Brief in under 2 minutes"
+        aria-label="Brief in under 90 seconds"
         onClose={() => setOpen(false)}
         onClick={(event) => {
           if (event.target === event.currentTarget) dialog.current?.close();
@@ -44,7 +44,7 @@ export function DemoVideoButton() {
         className="m-auto w-[min(94vw,1040px)] max-w-none rounded-2xl border border-border bg-card p-3 text-card-foreground shadow-2xl backdrop:bg-black/70"
       >
         <div className="flex items-center justify-between gap-3 px-2 pb-3">
-          <p className="text-sm font-medium text-foreground">Brief in under 2 minutes</p>
+          <p className="text-sm font-medium text-foreground">Brief in under 90 seconds</p>
           <Button type="button" variant="ghost" size="sm" onClick={() => dialog.current?.close()}>
             <X aria-hidden="true" className="size-4" />
             Close
