@@ -3,7 +3,6 @@ import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
 import { AppHeader } from "@/components/app-header";
-import { FirstTimeTour } from "@/components/first-time-tour";
 import { DashboardStats } from "@/components/dashboard-stats";
 import { AddDocumentsCard } from "@/components/add-documents-card";
 import { NowReading } from "@/components/now-reading";
@@ -24,11 +23,10 @@ import { asDocuments, asInsights, documentStats, openQuestionGroups, recentActiv
 export const metadata = { title: "Dashboard", robots: { index: false, follow: false } };
 
 /** The first thing a person sees after signing in: where their documents stand, and what needs doing. */
-export default async function DashboardHome({ searchParams }: { searchParams?: Promise<{ tour?: string | string[] }> } = {}) {
+export default async function DashboardHome() {
   const email = (await auth())?.user?.email;
   // The proxy already turns visitors away, and this makes the page safe on its own too.
   if (!email) redirect("/");
-  const startTour = (await searchParams)?.tour === "1";
 
   const [documentsBody, insightsBody, datesBody, meBody, sharedBody] = await Promise.all([
     backendGet(email, "/documents"),
@@ -48,7 +46,6 @@ export default async function DashboardHome({ searchParams }: { searchParams?: P
   return (
     <div className="flex flex-1 flex-col">
       <AppHeader email={email} current="dashboard" />
-      {startTour && <FirstTimeTour start />}
       <div className="mx-auto flex w-[min(100%-3rem,1400px)] flex-1 flex-col gap-4 py-3 sm:gap-5 sm:py-5">
         <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary to-primary/80 px-7 py-5 text-primary-foreground shadow-lg shadow-primary/20 max-sm:px-5 max-sm:py-4 md:px-8 md:py-6">
           <div aria-hidden="true" className="pointer-events-none absolute -top-16 -right-10 size-56 rounded-full bg-white/10" />

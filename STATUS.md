@@ -1,165 +1,103 @@
 # Where Brief stands
 
-A plain account of what works today, what is still missing, and how long the rest should take. I
-update it every week, so you can hold my pace against my promises.
+A plain account of what works today, what is still missing, and what I am unsure about. I update it every week so you can
+hold my pace against my promises.
 
-**Last updated:** November 2, 2026 (day 42 of building)
+**Last updated:** November 13, 2026
 
 ## The short version
 
-Brief is about **88% of the way** to a finished first version, counting working days: 42 done and about 6 to go. You can sign in
-and land on a Dashboard that shows where your documents stand and what is coming up, upload a contract, a scan or a photo,
-see its key terms and the questions it leaves unanswered, ask questions and get an answer with a checked quote, and take the
-summary away as a PDF. The parts still ahead are putting it online, a step that retries a weak search, and a recorded demo.
+Brief is live at [briefcontracts.com](https://briefcontracts.com). You can sign in with Google, upload a contract, a scan or a
+phone photo, see its key terms and the questions it leaves open, ask questions and get an answer with a checked quote, share your
+dashboard for a time you choose, and take the summary away as a PDF. It works on a phone and a laptop.
 
-**Expected finish for the core product: around November 11**, with a realistic window of November 6 to November 17.
-**That is four days later than I said last week, and the reason is in the calendar section.** The extras (Word files, several
-files at once, sharper photo handling) would add about 4 more working days.
+It has only been used by me so far. I have run the real sign-in, an upload, a read and a question on the live site several times, but
+no outside person has tried it, so expect surprises. What is left is small and listed below.
 
 ## By the numbers
 
 | | |
 |---|---|
-| Working days so far | 42 |
-| Commits | 471 |
-| Tests | 2,230 (987 backend, 1,104 frontend, 139 in a real browser), run on every pull request |
-| Lines of code vs lines of tests | about 10,400 vs 22,600 (tests count the browser test helpers) |
-| API endpoints | 21 |
-| Database tables | 8 |
+| Commits | about 590 |
+| Tests | 3,336 (1,265 backend, 1,783 frontend, 288 in a real browser), run on every pull request |
+| API routes | 45 |
+| Database tables | 13 |
 | Evaluations | 5 (search, question answering on three documents, key terms, must-ask checklist, steadiness) |
 | Documents it can read | PDFs (including scanned ones, read by OCR), and phone photos or scans (JPG, PNG, HEIC) |
 | Limits | 50 MB a file, 25 documents a person, 100 pages a document |
-| Time to answer a question | about 2.5 seconds on average |
-| Time to read a whole document (key terms or the checklist) | about 10 and 30 seconds on my test documents, since each is now read three times |
+| Daily allowance per person | 40 questions, 10 document reads, 20 overviews |
+| Time to answer a question | about 2.5 seconds on average on my test documents (measured before it went online) |
+| Time to read a whole document | about 10 to 30 seconds on my test documents, since the key terms and the questions are each read three times |
 
 ## What works today
 
-- **A Dashboard** as the first screen after sign in: counts of documents ready, being read or needing attention, the soonest
-  dates, the questions still to ask across every document, what Brief found in each, recent activity, and a place to add a
-  document right there. It reads only what is already saved, so opening it never calls the model.
-- **Scanned PDFs** are read by OCR page by page, like a photo, so a document saved as pictures works.
-- **Actions on a document:** copy the summary, download it as a PDF, add its clear dates to a calendar, email the questions it
-  leaves open, print it, and find words in the clause text.
-- **A sample lease** to try without uploading anything.
-- **Sign in** with Google, and every request checked twice, once in the web app and once in the API.
-- **Upload** a PDF or a photo of a page. Scans get cleaned up and read, and a blurry one is flagged
-  instead of quietly accepted.
-- **Clause splitting.** A contract is cut into its real numbered clauses, not arbitrary pieces.
-- **Search** that mixes keyword and meaning-based matching.
-- **Ask a question and get a checked answer.** Each answer points to the clause it came from, and it only
-  appears if the quote really is in the document. If the document does not say, Brief says that.
-- **A chat screen** where clicking a citation jumps to the clause and highlights the exact words.
-- **Key terms** such as the interest rate, fees, and dates, each with its quote, on an Overview screen
-  next to the document. Clicking one jumps to the clause and highlights the exact words.
-- **Must-ask questions.** For a loan, lease, or job offer, Brief answers the questions people most
-  often skip, each with the exact quotes behind it, or says the document does not answer it. An
-  important question left unanswered is flagged as a gap, with wording for asking the other side. An
-  answer can rest on up to three separate passages, and a second, independent check confirms that the
-  quoted text really answers the question and does not just mention the topic. They show on the same
-  Overview screen, with a Copy button for the wording.
-- **A dashboard** with drag and drop upload, a list of your documents, and a way to rename, change the
-  kind of, delete, or read again each one. A document that fails says why in plain words, and a long one
-  shows how far it has got. It works in dark mode and at phone width.
-- **Steadier results.** The key terms and the questions are each read three times with fixed seeds and
-  kept by vote, because the same contract read twice used to come out differently.
-- **Easier to debug.** Every call carries a request id that appears in every log line it causes, and a failure
-  message ends with a short `Reference` code that finds it. Each question also saves what it used (which clauses
-  the model saw and which it cited, ids only, never text), and one command prints it for a reference code. A
-  health check says whether the server can do real work, not just whether it is running.
-- **Checked in a real browser.** 88 automatic browser tests cover the pages anyone can reach and, signed in
-  with a sign in that exists only outside production, uploading, renaming, Read again, Try again, delete,
-  sign out, asking and clicking a source, at phone width too, and an accessibility scan of every main screen
-  and of the states with something open or an error showing. They found and fixed a missing main landmark,
-  button names that did not contain their visible words, error text that was too faint in light mode, and a
-  heading level that was skipped.
-- **The API describes itself.** Every route has a group, a plain summary and the errors it can give, checked by
-  a test against the code, at `/docs` while building and not on a live server.
-- **Security basics.** Uploads are checked against what the file really is, tokens must expire, the
-  servers refuse weak secrets in production, you can delete your account and everything in it, and a
-  scan of the libraries runs weekly. The README's Security section lists what is and is not covered.
+- **Sign in** with Google, with optional two-step verification (a 6 digit code from an authenticator app). Every request is checked
+  twice, once in the website and once in the API.
+- **Upload** a PDF, a scan, or a photo (including from a phone camera). A blurry photo is refused with a reason instead of being
+  quietly accepted. A document that fails says why in plain words, and a long one shows how far it has got.
+- **Key terms** such as the interest rate, fees, deposit and dates, each with its quote. Clicking one jumps to the clause and
+  highlights the exact words.
+- **Before you sign.** For a loan, lease or job offer, the questions people most often skip, answered from the document with the
+  quotes behind them, or marked as not covered, with wording for asking the other side.
+- **Ask a question and get a checked answer.** The answer only appears if its quote really is in the document. If the document
+  doesn't say, Brief says that.
+- **Take it with you:** copy the summary, download it as a PDF, add its clear dates to a calendar, email the open questions, print
+  it, and find words in the clause text.
+- **A Dashboard** with where your documents stand, the soonest dates, the questions still to ask, and what Brief found in each.
+  Opening it never calls the model.
+- **Documents:** folders, search, rename, read again, and a Bin that keeps deleted documents for 7 days.
+- **Sharing.** Show your dashboard to someone you approve for 1 hour up to 90 days, with a countdown, and take it back at any time.
+- **A Welcome page and a short tour** for first-time visitors, which can be replayed from Profile.
+- **Steadier results.** The key terms and the questions are each read three times with fixed seeds and kept by vote.
+- **Easier to debug.** Every call carries a request id that appears in every log line it causes, and a failure message ends with a
+  short `Reference` code that finds it.
+- **Checked in a real browser.** The browser tests cover the pages anyone can reach and, signed in with a sign in that exists only
+  outside production, uploading, renaming, reading again, deleting, sharing, the tour, asking and clicking a source, at phone width
+  too, with accessibility scans of the main screens. They have found and fixed real problems, such as a missing page region, faint
+  error text, a skipped heading level, and a page that jumped about while it loaded.
+- **Security basics.** Uploads are checked against what the file really is, tokens must expire, the servers refuse weak secrets in
+  production, you can delete your account and everything in it, and a scan of the libraries runs weekly. The README lists what is
+  and is not covered.
 
 ## What is left
 
-I count effort in working days, meaning a focused session like the ones so far. The second half is
-heavier on polish and proof than the first.
-
-| Piece | Estimate | Status |
-|---|---|---|
-| Key terms, must-ask questions, the Overview screen, the dashboard, delete and edit, limits | done | Finished Oct 5 to 8 |
-| Steadier results | 0.5 day | Voted reads help on three real leases but not fully on the longest, and I still cannot say whether the voted questions are right |
-| An agent step that retries a weak search or checks a term against typical terms | 2 to 3 days | Not started |
-| A larger test set, with a build that fails if quality drops | 0.25 day | The build fails on a drop. There are now three short documents (a loan and lease, a job offer, an education loan) with 135 questions between them; the education loan is measured but not held to the limits yet, because its score moves by a question or two from run to run |
-| An automatic click-through test of the screens in a real browser | done | 102 browser tests, signed in too, covering upload, rename, Read again, Try again, delete and sign out, using a sign in that exists only outside production and a fake API; still not the real API or Google |
-| Tracing, so every answer can be inspected afterwards | 0.25 day | Mostly done: request ids, reference codes and a saved record of what each question used, found by a script. Not built: a screen for looking at it |
-| Putting the backend online | 1.75 days | Not started. The plan is written down (Vercel for the website, Render for the API, Neon for the database, Upstash for Redis, Cloudflare R2 for files). Ready: the images, a readiness check, example settings files, a script for the storage rules, and a checklist. Still needs the accounts, and a decision on paying for Gemini |
-| Hardening: a browser test of delete account and upload checks, then a security pass once it is online | 0.5 day | Mostly done (limits, delete, upload checks, secrets, dependency scan) |
-| README, diagrams, and a short demo | 0.75 day | README kept current as I go; five diagrams are written and a demo script exists; the recorded demo waits for the site being online |
-| **Core total still to go** | **about 6 days** (range 5 to 9) | |
-| Word (.docx) files | 1 day | Last |
-| Several files in one upload | 2 days | Last |
-| Sharper handling of low quality photos | 1 day | Last |
-| **Extras total** | **about 4 days** | |
-
-## How long, in calendar time
-
-At five working days a week, 6 days from Tuesday November 3 would end around November 10. I add a quarter on top for the things
-that always go wrong, which lands around November 11, so call it **about November 11**. A fast run at six days a week could finish
-near November 9, and a slow one at four days a week would reach November 17. Adding the extras moves each of those by about a week.
-A first version people can try only needs the backend online, which is about two days of work once the accounts exist and the
-decision about paying for Gemini is made.
-
-**Why the date moved.** Last week I said November 7. Since then four working days went on things that were not on the list: a
-Dashboard and a rebuilt landing page with animation, summary actions (a PDF built in the browser, calendar and email), reading
-scanned PDFs after a real one failed, a real file test of every kind of document, and a branch and pull request workflow with a
-protected main. Deployment, the one item that would move the date back, still has not started because it waits on accounts. The
-list of what is left did not grow.
-
-These are estimates, not promises. I will say so in the update log if they move.
+| Piece | Status |
+|---|---|
+| Re-record the demo video with the final screens | Not started |
+| An alert that tells me when the site is down | Not set up yet |
+| The per-minute request limit in the website | Built, but on the live site it cannot reach its Redis and lets requests through. The setting is now cleaned up on read and the log says what looks wrong; I still need to confirm the value in Upstash. The daily limits and the site-wide cap are enforced by the API and work |
+| Build and test tools | 32 open dependency alerts, all in development tools (vite, hono, undici and similar). None ships to a user, and the scan of what ships passes. I will update them in a separate careful change |
+| An agent step that retries a weak search | Not started, and may not be worth it |
+| Word (.docx) files, several files in one upload, sharper handling of low quality photos | Not started |
 
 ## Where I am unsure
 
-- **The test sets are small.** The 24 search questions, the 135 answer questions on three short documents (a
-  loan and lease, a job offer and an education loan, each 17 clauses; 81 with an answer and 54 without), and the
-  key-terms check are all short, clean examples. The scores on them (96% right clause first; on the first two
-  documents 57 of 57 cited correctly and 36 of 36 correctly declined; on the education loan 21 to 23 of 24 and
-  17 to 18 of 18 across three runs) are not a claim about contracts in general, and a difference of one or two
-  answers between runs is noise at this size. Twenty of the 36 are near
-  misses, where the topic is in a clause but the fact asked for is not, and those found something real: twice a
-  question asking for one specific detail was answered with the nearest related fact (a number of months when
-  dollars were asked for, a number of days when weekdays were asked for). The first time I judged my own question
-  ambiguous and replaced it, saying so. The second time I left the question and changed the answering
-  instruction to treat a related fact that lacks the requested detail as not covered. After that both documents
-  scored 100 percent, with no false refusals, but that is one run each, so it is evidence and not proof.
-- **Real documents are messier.** Key terms can now rest on up to three checked quotes, so a fact spread
-  over two sentences (a deposit amount and its refund rule) is no longer dropped. On my sample lease the
-  deposit is now found, 8 of 12 terms instead of 7. That is one lease, and I have not yet confirmed which
-  terms a real lease genuinely lacks, because that needs me to read the whole lease.
-- **Steadier is not the same as more accurate.** On three real leases, the voted key terms changed 0, 0
-  and 2 fields between runs, where one unseeded read changed 4, 5 and 5, so voting helps but did not
-  fully steady the longest lease (286 pieces). The voted questions gave the same answers in every run on
-  all three. On the longest lease they answer 5 questions where one unseeded read answered 6 to 9, and I
-  have not read that lease to say which is right: the voted version may be stricter, or the single read
-  may have been counting passing mentions. Judging each answer alone mattered: judged in a group, the
-  second check had steadily left out a lease's deposit that it confirms every time on its own. Voting
-  costs time: a document now makes ten or more model calls and can take from a few seconds to about a
-  minute on the free tier. Three leases and a handful of runs is a check, not a general claim.
-- **Keyword search is weak.** It scored 4% on its own, so search is really relying on meaning-based
-  matching for now. My test set has no exact-term questions, so I cannot yet say how it does on those.
+- **The test sets are small.** The 24 search questions, the 135 answer questions on three short documents (a loan and lease, a job
+  offer and an education loan, each 17 clauses; 81 with an answer and 54 without), and the key-terms check are all short, clean
+  examples. The scores on them (96% right clause first; on the first two documents 57 of 57 cited correctly and 36 of 36 correctly
+  declined; on the education loan 21 to 23 of 24 and 17 to 18 of 18 across three runs) are not a claim about contracts in general,
+  and a difference of one or two answers between runs is noise at this size. Twenty of the 36 declined questions are near misses,
+  where the topic is in a clause but the fact asked for is not, and those found something real: twice a question asking for one
+  specific detail was answered with the nearest related fact. I changed the answering instruction to treat a related fact that lacks
+  the requested detail as not covered, and both documents then scored 100 percent. That is one run each, so it is evidence and not
+  proof.
+- **Real documents are messier.** Key terms can rest on up to three checked quotes, so a fact spread over two sentences is no longer
+  dropped. That is one lease, and I have not confirmed which terms a real lease genuinely lacks.
+- **Steadier is not the same as more accurate.** On three real leases the voted key terms changed 0, 0 and 2 fields between runs,
+  where one unseeded read changed 4, 5 and 5. Voting helps but did not fully steady the longest lease. I have not read that lease to
+  say whether the voted version is stricter or the single read was counting passing mentions. Voting costs time: a document makes
+  ten or more model calls.
+- **Keyword search is weak.** It scored 4% on its own, so search relies on meaning-based matching. My test set has no exact-term
+  questions, so I cannot say how it does on those.
 - **Reranking made things worse** (67% against 96%), so it is switched off by default.
-- **Free quotas.** The free Gemini tier caps some models at 20 requests a day, and the model I use at
-  15 requests a minute. Reading one document now takes ten or more calls, so a few people at once
-  would hit that. Putting this online for other people will probably need a paid plan.
+- **Daily limits are per account.** Someone who deletes their account and signs up again gets a fresh allowance. The site-wide
+  daily cap on model calls is what bounds the cost.
 - **The slowest answer took 41 seconds.** I have not looked into why.
-- **Nothing is online yet.** The container images build and the readiness check works against my local
-  database, but I have not run any of it on a real host. Real hosting usually surfaces surprises, so that part
-  of the estimate is the least certain.
-- **The browser tests use a fake API.** It checks tokens like the real one and refuses what the real one
-  would, but it is not the real one, so they show the website behaves correctly given those answers, not that
-  the real API gives them. The accessibility scans find what a machine can detect, which is only part of the
-  problems, so a person should still try the screens with a keyboard and a screen reader. I have not yet
-  looked at the newest screens on a real phone.
-- **Build tools** have one known high severity report with no fixed version yet. It is not part of what
-  ships.
+- **The live site has seen very little use.** Hosting is on small plans, which is fine for a launch and not for heavy use.
+- **The browser tests use a fake API.** It checks tokens like the real one and refuses what the real one would, but it is not the
+  real one. The accessibility scans find what a machine can detect, which is only part of the problems, so a person should still try
+  the screens with a keyboard and a screen reader.
+- **The Privacy and Terms pages are plain language I wrote.** A lawyer has not reviewed them.
 
 ## Update log
 
@@ -173,5 +111,7 @@ These are estimates, not promises. I will say so in the update log if they move.
 | Oct 21 | Answer traces (what each question used, ids only, found from a reference code), documentation of every route checked against the code, example settings files, a script for the storage upload rules, a deployment checklist, and a test-only sign in with a fake API that lets the signed in screens be tested in a real browser: 88 browser tests, accessibility scans of every main screen and state, and four real problems they found fixed. 313 commits, 1,588 tests. About 80 percent, and the finish moved from about October 30 to about November 3 for the reason given above. |
 | Oct 28 | The landing page was rebuilt (top bar, hero, what you get, how it works, footer) and the signed in screens got one shared top bar; the Overview and Ask tabs are clearer. A third question set (an education loan) was added and the answering instruction gained a rule for "which one" questions, measured on all three before it was kept (a second rule for simple arithmetic was tried and removed because it cost an answer). The website file `middleware` was renamed to `proxy`, and a check, run in CI too, now refuses any commit message that credits a tool. 404 commits, 1,853 tests. About 85 percent, and the finish moved from about November 3 to about November 7 for the reason given above. |
 | Nov 2 | A Dashboard became the first screen, with a place to add a document, counts, dates, the questions still to ask and what Brief found in each document. Scanned PDFs are now read by OCR after a real scan failed. A document has one row of actions (copy or download the summary as a PDF, calendar, email, print) and a find box. Real files of each kind were run through the real services: PDF, photos of a lease, a job offer and a loan, and a deliberately smeared photo, which was refused with a clear reason. Work now goes in through short branches and pull requests, and main is protected. 471 commits, 2,230 tests. About 88 percent, and the finish moved from about November 7 to about November 11 for the reason given above. |
+| Nov 3 to 12 | The signed in pages got sections along the top (and along the bottom on a phone), a Bin that keeps deleted documents for 7 days, folders, sharing, and optional two-step verification. It went online: the website on Vercel, the API on Render, the database on Neon, Redis on Upstash, files on Cloudflare R2, with Google sign-in in production. A Welcome page asks for a name and why you came, an owner page shows totals only, and the Privacy and Terms pages were rewritten to say what Brief really does. |
+| Nov 13 | The site moved to briefcontracts.com. Sharing got a time limit (1 hour up to 90 days) with a countdown. A read cut short by a server restart now starts again by itself. A first-time tour points at the real parts of the page and stays open as you move around. Taps feel quicker: a bar appears at once when a page is on its way, buttons press in, and a document page that jumped about while it loaded (a layout shift of 1.8 on a phone, where under 0.1 is good) now sits still. The README was rewritten. |
 
 Thanks for reading. If something here looks wrong or unclear, please open an issue.

@@ -1,28 +1,40 @@
 /** The address that opens the tour: the welcome page sends new people here, and Profile offers it again to anyone. */
 export const TOUR_URL = "/dashboard?tour=1";
 
-/** One card of the first-time tour. A card may offer a button that takes the person to the place it describes. */
+/** One step of the guided tour. A step with a `path` belongs to that page and a `target` is the part of it to point at. */
 export type TourStep = {
   id: string;
   title: string;
   body: string;
   /** A few short things to look for, shown as a list under the text. */
   points?: string[];
-  action?: { label: string; href: string };
+  /** The page this step is about. Moving to the step takes the person there. Without one, the step stays wherever they are. */
+  path?: string;
+  /** The `data-tour` name of the part of the page to point at, found on the page the step belongs to. */
+  target?: string;
 };
 
-/** The tour, in the order it is told: what Brief is, then each part of it, then keeping the account safe. */
+/** The tour, in the order it is told: what Brief is, each part of it on its own page, then keeping the account safe. */
 export const TOUR_STEPS: readonly TourStep[] = [
   {
     id: "welcome",
     title: "Welcome to Brief",
-    body: "Brief reads a lease, a loan or a job offer and explains it clause by clause, with the exact words behind every answer. This short tour shows where everything is.",
+    body: "Brief reads a lease, a loan or a job offer and explains it clause by clause, with the exact words behind every answer. This short tour points at each part. It stays open as you move around, and closes only when you close it.",
+    path: "/dashboard",
   },
   {
     id: "add",
     title: "Add a document",
-    body: "Drop in a PDF, or take a photo of the pages on your phone. Nothing to hand? Use Try a sample lease and see Brief work in seconds.",
-    action: { label: "Go to Documents", href: "/dashboard/documents" },
+    body: "Drop in a PDF, or take a photo of the pages on your phone. Say what kind of document it is and press Upload.",
+    path: "/dashboard/documents",
+    target: "upload",
+  },
+  {
+    id: "sample",
+    title: "No contract handy?",
+    body: "Try a sample lease. Brief loads a made up one, reads it, and you can see everything it does in a few seconds.",
+    path: "/dashboard/documents",
+    target: "sample",
   },
   {
     id: "overview",
@@ -39,18 +51,21 @@ export const TOUR_STEPS: readonly TourStep[] = [
     id: "share",
     title: "Share your dashboard",
     body: "Let family or a friend view your documents. You choose how long they can look, from 1 hour up to 90 days, and you can take the access away at any time.",
-    action: { label: "Open sharing", href: "/dashboard/shared#sharing" },
+    path: "/dashboard/shared",
+    target: "sharing",
   },
   {
     id: "bin",
     title: "The Bin keeps your mistakes safe",
-    body: "A document you delete goes to the Bin and stays for 7 days. Restore it from Profile, or delete it for good.",
-    action: { label: "Open the Bin", href: "/dashboard/profile#bin" },
+    body: "A document you delete goes to the Bin and stays for 7 days. Open it here to restore one, or delete it for good.",
+    path: "/dashboard/profile",
+    target: "bin",
   },
   {
     id: "safe",
     title: "Keep your account safe",
-    body: "Two-step verification adds a second lock: a 6 digit code from an authenticator app. It is optional and takes a minute. Profile also shows what you have used today.",
-    action: { label: "Set up two-step", href: "/dashboard/profile#two-step" },
+    body: "Two-step verification adds a second lock: a 6 digit code from an authenticator app. It is optional and takes a minute. You can take this tour again any time from Profile.",
+    path: "/dashboard/profile",
+    target: "two-step",
   },
 ] as const;

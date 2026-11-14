@@ -1,5 +1,6 @@
 import Redis from "ioredis";
 
+import { cleanRedisUrl, redisUrlProblem } from "@/lib/redis-url";
 import { WINDOW_SECONDS } from "@/lib/retry-after";
 
 let connection: Redis | undefined;
@@ -11,15 +12,17 @@ let connection: Redis | undefined;
  */
 function redis(): Redis {
   if (!connection) {
-    connection = new Redis(process.env.REDIS_URL ?? "redis://localhost:6379", {
+    connection = new Redis(cleanRedisUrl(process.env.REDIS_URL), {
       connectTimeout: 3000,
       maxRetriesPerRequest: 1,
     });
-    connection.on("error", (error) =>
+    connection.on("error", (error) => {
+      // A fixed word about the shape of the setting, never its value, so a wrong paste can be told from an outage.
+      const problem = redisUrlProblem(process.env.REDIS_URL);
       console.error(
-        `rate limiter: could not reach Redis (${describeRedisError(error)})`,
-      ),
-    );
+        `rate limiter: could not reach Redis (${describeRedisError(error)})${problem ? `; the REDIS_URL setting ${problem}` : ""}`,
+      );
+    });
   }
   return connection;
 }

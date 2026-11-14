@@ -109,3 +109,16 @@ describe("the summary buttons", () => {
     expect(writeText).toHaveBeenCalledWith(expect.stringMatching(/^Subject: Questions about the lease before I sign\n\nHi,/));
   });
 });
+
+describe("SummaryActionsPlaceholder", () => {
+  it("holds the place of the row while the key terms load, and says nothing to a screen reader", async () => {
+    const { SummaryActionsPlaceholder } = await import("./summary-actions");
+    const { container } = render(<SummaryActionsPlaceholder />);
+
+    const placeholder = container.querySelector("[data-summary-actions-placeholder]");
+    expect(placeholder).not.toBeNull();
+    expect(placeholder).toHaveAttribute("aria-hidden", "true");
+    expect(placeholder?.querySelectorAll(".rounded-lg").length).toBe(4);
+    expect(container.textContent).toBe("");
+  });
+});
