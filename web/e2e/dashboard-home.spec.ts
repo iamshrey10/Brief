@@ -28,7 +28,7 @@ test("a document that could not be read shows up as needing attention, and leads
   await expect(card.getByText("1", { exact: true })).toBeVisible();
   await page.getByRole("link", { name: "Open your documents" }).click();
 
-  await expect(page).toHaveURL(/\/dashboard\/documents$/);
+  await expect(page).toHaveURL(/\/dashboard\/documents#your-documents$/);
   await expect(page.getByRole("region", { name: "Your documents" }).getByText("broken-scan.pdf")).toBeVisible();
 });
 
