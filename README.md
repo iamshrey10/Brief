@@ -17,7 +17,8 @@ Brief is built around the opposite rule: nothing is shown that can't be proved f
 ## What it does
 
 - **Reads what you give it.** PDFs, scanned PDFs (by OCR), and photos of paper pages (JPG, PNG, HEIC), including
-  from a phone camera. A blurry photo is refused with a reason instead of quietly accepted.
+  from a phone camera. Up to five photos make one document with a page for each. A blurry photo is refused with a reason
+  instead of quietly accepted.
 - **Key terms.** The interest rate, fees, deposit, dates and so on, each with its quote. Click one and the
   clause opens with the exact words highlighted.
 - **Before you sign.** The questions people most often skip, answered from the document or marked as not covered,

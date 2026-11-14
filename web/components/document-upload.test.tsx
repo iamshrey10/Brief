@@ -219,7 +219,7 @@ describe("DocumentUpload form", () => {
     render(<DocumentUpload initialDocuments={[]} />);
 
     expect(screen.getByText(/drop a contract here/i)).toBeInTheDocument();
-    expect(screen.getByText("PDF, JPG, PNG, or HEIC, up to 50 MB")).toBeInTheDocument();
+    expect(screen.getByText(/PDF, JPG, PNG, or HEIC, up to 50 MB/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Upload" })).toBeDisabled();
   });
 
