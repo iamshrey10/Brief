@@ -71,4 +71,9 @@ describe("web/.env.example", () => {
     expect(example).toMatch(/AUTH_TRUST_HOST/);
     expect(example).toMatch(/Vercel/);
   });
+
+  it("explains the optional Google Analytics id, and that it is public", () => {
+    expect(example).toMatch(/NEXT_PUBLIC_GA_ID=/);
+    expect(example).toMatch(/not a secret/);
+  });
 });

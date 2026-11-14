@@ -17,9 +17,9 @@ export function LegalPage({ title, updated, children }: { title: string; updated
   );
 }
 
-export function Section({ title, children }: { title: string; children: ReactNode }) {
+export function Section({ title, id, children }: { title: string; id?: string; children: ReactNode }) {
   return (
-    <section className="flex flex-col gap-2">
+    <section id={id} className="flex flex-col gap-2 scroll-mt-20">
       <h2 className="font-heading text-lg font-semibold">{title}</h2>
       {children}
     </section>

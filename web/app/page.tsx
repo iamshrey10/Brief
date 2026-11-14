@@ -1,10 +1,12 @@
 import { auth } from "@/auth";
+import { AnalyticsNotice } from "@/components/analytics-notice";
 import { HERO_WORDS, LandingBackdrop } from "@/components/landing-backdrop";
 import { LandingHero } from "@/components/landing-hero";
 import { LandingFeatures } from "@/components/landing-features";
 import { LandingSteps } from "@/components/landing-steps";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
+import { analyticsId } from "@/lib/analytics";
 
 export default async function Home() {
   const session = await auth();
@@ -20,6 +22,7 @@ export default async function Home() {
       <LandingFeatures />
       <LandingSteps />
       <SiteFooter />
+      <AnalyticsNotice id={analyticsId()} />
     </div>
   );
 }

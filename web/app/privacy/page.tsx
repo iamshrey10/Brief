@@ -1,11 +1,13 @@
 import { ContactEmail } from "@/components/contact-email";
+import { AnalyticsChoiceControl } from "@/components/analytics-notice";
 import { LegalPage, Section } from "@/components/legal-page";
+import { analyticsId } from "@/lib/analytics";
 
 export const metadata = { title: "Privacy" };
 
 export default function PrivacyPage() {
   return (
-    <LegalPage title="Privacy" updated="November 12, 2026">
+    <LegalPage title="Privacy" updated="November 14, 2026">
       <p>
         Brief reads a contract you upload and explains it. This page says what it keeps, who else handles it, and how to
         remove it. It describes how the service works today, in plain words.
@@ -78,12 +80,19 @@ export default function PrivacyPage() {
         </p>
       </Section>
 
-      <Section title="Cookies and storage in your browser">
+      <Section title="Cookies and storage in your browser" id="cookies">
         <p>
           A few small cookies keep you signed in and protect the sign in. If you turn on two-step verification and choose to trust a
           browser, one more cookie remembers it for 30 days. Your choice of light or dark appearance is remembered in your browser.
-          There are no advertising or tracking cookies.
+          Brief sets no advertising cookies.
         </p>
+        <p>
+          The first page can count visits with Google Analytics, to learn roughly how many people arrive, from which sites and on what kind of
+          device. It starts only if you say yes in the notice at the bottom of that page, it never runs on the signed in pages, it shortens
+          addresses, and its advertising features are off. Google then sets its own cookies and receives that visit data under its own terms.
+          You can change your mind here at any time.
+        </p>
+        <AnalyticsChoiceControl id={analyticsId()} />
       </Section>
 
       <Section title="Removing your data">

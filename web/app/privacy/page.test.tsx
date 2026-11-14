@@ -38,7 +38,7 @@ describe("the privacy page", () => {
   });
 
   it("is dated today", () => {
-    expect(html()).toContain("Last updated November 12, 2026");
+    expect(html()).toContain("Last updated November 14, 2026");
   });
 
   it("names every service that handles the data, and says where", () => {
@@ -69,9 +69,11 @@ describe("the privacy page", () => {
     expect(html()).toContain("does not show anyone&#x27;s name or email address");
   });
 
-  it("mentions the browser cookie for a trusted device, and that there is no tracking", () => {
+  it("mentions the browser cookie for a trusted device, that there are no advertising cookies, and the optional visit counting", () => {
     expect(html()).toContain("30 days");
-    expect(html()).toContain("no advertising or tracking cookies");
+    expect(html()).toContain("no advertising cookies");
+    expect(html()).toContain("Google Analytics");
+    expect(html()).toContain("only if you say yes");
   });
 
   it("gives an email way to ask, and no longer points to GitHub", () => {
