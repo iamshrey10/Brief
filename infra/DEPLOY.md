@@ -52,7 +52,8 @@ it drifts from what the server reads.
 ## 4. The website
 
 Settings are listed in `web/.env.example`, also checked by a test: `AUTH_SECRET`, `AUTH_GOOGLE_ID`,
-`AUTH_GOOGLE_SECRET`, `SERVICE_JWT_SECRET`, `BACKEND_URL`, `REDIS_URL`. Outside Vercel add `AUTH_TRUST_HOST=true`,
+`AUTH_GOOGLE_SECRET`, `SERVICE_JWT_SECRET`, `BACKEND_URL`, `REDIS_URL`, and optionally `NEXT_PUBLIC_GA_ID` (the Google Analytics
+measurement id, public, used on the first page only after a visitor agrees, and needing a redeploy to change). Outside Vercel add `AUTH_TRUST_HOST=true`,
 or the sign in routes answer 500.
 
 ## 5. Sign in with Google

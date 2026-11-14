@@ -34,6 +34,14 @@ describe("securityHeaders", () => {
     }
   });
 
+  it("lets Google Analytics load and report, and nothing else from outside", () => {
+    const policy = byKey()["Content-Security-Policy-Report-Only"];
+
+    expect(policy).toContain("script-src 'self' 'unsafe-inline' https://www.googletagmanager.com");
+    expect(policy).toContain("https://*.google-analytics.com");
+    expect(policy).toContain("object-src 'none'");
+  });
+
   it("lists each header once, with a value", () => {
     const keys = securityHeaders.map((h) => h.key);
 
@@ -83,8 +91,10 @@ describe("the report only policy", () => {
     expect(directive("base-uri")).toBe("base-uri 'self'");
   });
 
-  it("lets the browser send an upload to the storage service and nowhere else outside this site", () => {
-    expect(directive("connect-src")).toBe("connect-src 'self' https://*.r2.cloudflarestorage.com");
+  it("lets the browser send an upload to the storage service, and visit counts to Google Analytics, and nowhere else outside this site", () => {
+    expect(directive("connect-src")).toBe(
+      "connect-src 'self' https://*.r2.cloudflarestorage.com https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com",
+    );
   });
 
   it("allows a form to post to this site and to Google, for signing in", () => {

@@ -48,6 +48,8 @@ export default defineConfig({
         REDIS_URL: process.env.REDIS_URL ?? "redis://localhost:6379",
         // Turns on the sign in that exists only outside production, see lib/e2e-auth.ts
         E2E_AUTH: "true",
+        // A made up id, so the visit counting notice can be tested. Google itself is never reached: its address is answered by the test.
+        NEXT_PUBLIC_GA_ID: "G-E2ETEST123",
       },
     },
   ],
