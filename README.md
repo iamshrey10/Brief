@@ -101,8 +101,9 @@ Brief holds private documents, so each layer limits what it can reach.
   everything.
 - **Logs.** A log line carries a fixed message and ids, never the text of a document, a question or an answer. A
   test reads every logging call and fails if one could.
-- **Admin.** The owner's page shows totals only: people, sign-ins, documents, questions and average time in Brief.
-  It cannot show a document or a question.
+- **Admin.** The owner's page shows totals only: people, sign-ins, documents, questions, average time in Brief and how often the
+  demo video is opened and finished, as charts over 7, 30 or 90 days, with daily and monthly reports to download. It cannot show a
+  document, a question or a name.
 - **Dependencies.** A scan of the libraries that ship runs on every push and every week, and the build fails on a
   known high severity problem.
 

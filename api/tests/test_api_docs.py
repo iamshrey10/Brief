@@ -3,7 +3,7 @@ from pathlib import Path
 
 from app.main import app
 
-TAGS = {"health", "account", "documents", "answers", "sharing", "admin"}
+TAGS = {"health", "account", "documents", "answers", "sharing", "admin", "events"}
 
 
 def _operations() -> list[tuple[str, str, dict]]:
@@ -98,7 +98,8 @@ def _routes() -> list[tuple[str, str, str, bool]]:
                 and decorator.func.value.id == "app"
                 and decorator.func.attr in {"get", "post", "patch", "delete"}
             ):
-                needs_sign_in = "get_current_user" in _own_codes_and_calls(node)[1]
+                # The token check that turns a request away with 401: a person's sign in, or the website's own token for a visitor.
+                needs_sign_in = bool({"get_current_user", "verify_visitor_token"} & _own_codes_and_calls(node)[1])
                 found.append((decorator.func.attr.upper(), decorator.args[0].value, node.name, needs_sign_in))
     return found
 

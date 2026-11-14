@@ -16,6 +16,12 @@ describe("the privacy page", () => {
     expect(html()).toContain("email address");
   });
 
+  it("says what the owner sees, that it can be saved as a report, and how the demo video is counted without anyone identified", () => {
+    expect(html()).toContain("daily or monthly report");
+    expect(html()).toContain("watched to the end");
+    expect(html()).toContain("without a cookie or an address");
+  });
+
   it("says plainly that the text goes to Google's Gemini service", () => {
     expect(html()).toContain("Gemini");
     expect(html()).toContain("clauses, and your question");

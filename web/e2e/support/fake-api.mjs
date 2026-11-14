@@ -49,6 +49,8 @@ const LONG_CLAUSES = Array.from({ length: 40 }, (_, index) => ({
 const fresh = () => ({
   admin: false,
   signals: 0,
+  events: [],
+  reports: [],
   trash: [],
   twoFactor: { enabled: false, pending: null, secret: null, recovery: [], devices: [], wrong: 0 },
   name: { first_name: "Test", last_name: "Reader" },
@@ -220,6 +222,18 @@ const server = createServer(async (request, response) => {
     return send(response, 204);
   }
 
+  if (path === "/__events") return send(response, 200, state.events);
+  if (path === "/__reports") return send(response, 200, state.reports);
+  // Something that happened for a visitor who is not signed in, counted with the website's own token for one.
+  const counted = /^\/events\/([a-z_]+)$/.exec(path);
+  if (counted && method === "POST") {
+    const who = readerFrom(request.headers.authorization);
+    if (who !== "site-visitor") return send(response, 401, { detail: "invalid token" });
+    if (!["demo_opened", "demo_finished"].includes(counted[1])) return send(response, 404, { detail: "not found" });
+    state.events.push(counted[1]);
+    return send(response, 204);
+  }
+
   // Like the real API, nothing else is answered without a signed token.
   const reader = readerFrom(request.headers.authorization);
   if (!reader) return send(response, 401, { detail: "not signed in" });
@@ -276,8 +290,34 @@ const server = createServer(async (request, response) => {
   }
   if (method === "GET" && path === "/admin/stats") {
     if (!state.admin) return send(response, 404, { detail: "not found" });
+    const days = Number(url.searchParams.get("days") ?? "30");
+    if (![7, 30, 90].includes(days)) return send(response, 400, { detail: "days must be 7, 30 or 90" });
+    state.requests.push({ method, path: `${path}?days=${days}`, requestId: request.headers["x-request-id"] ?? null });
+    const byDay = Array.from({ length: days }, (_, index) => {
+      const day = new Date(Date.UTC(2026, 10, 12 - (days - 1 - index)));
+      return {
+        day: day.toISOString().slice(0, 10),
+        signed_up: index % 7 === 0 ? 2 : 0,
+        people: (index * 3) % 9,
+        visits: (index * 5) % 11,
+        minutes: (index * 7) % 40,
+        documents: (index * 2) % 6,
+        questions: (index * 4) % 13,
+        reads: (index * 2) % 5,
+        overviews: index % 4,
+        demo_opened: (index * 3) % 8,
+        demo_finished: (index * 3) % 8 > 3 ? 2 : 0,
+      };
+    });
+    const sum = (field) => byDay.reduce((total, row) => total + row[field], 0);
+    const totals = (scale) => ({
+      signed_up: Math.round(sum("signed_up") * scale), people: Math.round(7 * scale), visits: Math.round(sum("visits") * scale), minutes: Math.round(sum("minutes") * scale * 10) / 10,
+      documents: Math.round(sum("documents") * scale), questions: Math.round(sum("questions") * scale), reads: Math.round(sum("reads") * scale), overviews: Math.round(sum("overviews") * scale),
+      demo_opened: Math.round(sum("demo_opened") * scale), demo_finished: Math.round(sum("demo_finished") * scale), average_minutes_per_visit: 3.2,
+    });
     return send(response, 200, {
       generated_at: new Date().toISOString(),
+      range_days: days,
       people: { total: 12, new_7_days: 5, new_30_days: 11, active_today: 3, active_7_days: 7, active_30_days: 10 },
       time_in_brief: { average_minutes_per_person_per_day_7_days: 6.5, average_minutes_per_visit_7_days: 3.2, visits_7_days: 40 },
       documents: { stored: 30, uploaded_7_days: 9, uploaded_30_days: 28, by_kind: { lease: 20, loan: 10 }, by_status: { ready: 28, failed: 2 }, photos: 4, pdfs_and_other: 26 },
@@ -287,10 +327,26 @@ const server = createServer(async (request, response) => {
       reasons: { lease: 6, loan: 3, not_said: 3 },
       sharing: { waiting_or_active: 3, active: 1 },
       site: { model_calls_today: 120, daily_limit: 3000 },
-      by_day: Array.from({ length: 30 }, (_, index) => {
-        const day = new Date(Date.UTC(2026, 10, 12 - (29 - index)));
-        return { day: day.toISOString().slice(0, 10), signed_up: index % 7 === 0 ? 2 : 0, people: (index * 3) % 9, minutes: (index * 7) % 40 };
-      }),
+      funnel: { signed_up: 12, uploaded_a_document: 9, asked_a_question: 7, came_back_another_day: 4, shared_their_dashboard: 2 },
+      demo: { opened_total: 48, finished_total: 19, opened_7_days: 12, finished_7_days: 5, opened_30_days: 40, finished_30_days: 16 },
+      period: { current: totals(1), previous: totals(0.8) },
+      by_day: byDay,
+    });
+  }
+  if (method === "GET" && path === "/admin/report") {
+    if (!state.admin) return send(response, 404, { detail: "not found" });
+    const period = url.searchParams.get("period") ?? "day";
+    const date = url.searchParams.get("date") ?? "2026-11-12";
+    state.reports.push({ period, date });
+    const month = period === "month";
+    const from = month ? `${date.slice(0, 7)}-01` : date;
+    const to = month ? `${date.slice(0, 7)}-03` : date;
+    const rows = month ? ["01", "02", "03"] : [date.slice(8, 10)];
+    return send(response, 200, {
+      period, label: month ? date.slice(0, 7) : date, from, to, generated_at: new Date().toISOString(),
+      totals: { signed_up: 3, people: 5, visits: 9, minutes: 41.5, documents: 6, questions: 22, reads: 4, overviews: 3, demo_opened: 11, demo_finished: 4, average_minutes_per_visit: 4.6 },
+      reasons_of_new_people: { lease: 2, loan: 1 },
+      by_day: rows.map((d, i) => ({ day: `${from.slice(0, 7)}-${d}`, signed_up: 1, people: 2 + i, visits: 3, minutes: 13.8, documents: 2, questions: 7, reads: 1, overviews: 1, demo_opened: 4, demo_finished: 1 })),
     });
   }
   if (method === "GET" && path === "/me") return send(response, 200, { id: "e2e-reader", email: "e2e-reader@example.invalid", is_admin: state.admin, ...state.name });

@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { AdminDashboard } from "@/components/admin-dashboard";
 import { AppHeader } from "@/components/app-header";
-import { asAdminStats } from "@/lib/admin";
+import { asAdminStats, RANGES } from "@/lib/admin";
 import { backendGet } from "@/lib/backend";
 
 export const metadata = { title: "Admin", robots: { index: false, follow: false } };
@@ -12,11 +12,14 @@ export const metadata = { title: "Admin", robots: { index: false, follow: false 
  * How Brief is being used, for its owner only. The backend answers only for the addresses it was told, and anyone else gets
  * the same page as for an address that does not exist. The page holds counts and never a document, a question, a name or an address.
  */
-export default async function AdminPage() {
+export default async function AdminPage({ searchParams }: { searchParams?: Promise<{ days?: string | string[] }> } = {}) {
   const email = (await auth())?.user?.email;
   // The proxy already turns visitors away, and this makes the page safe on its own too.
   if (!email) redirect("/");
-  const stats = asAdminStats(await backendGet(email, "/admin/stats"));
+  // 7, 30 or 90 days, and 30 for anything else.
+  const asked = Number((await searchParams)?.days);
+  const days = (RANGES as readonly number[]).includes(asked) ? asked : 30;
+  const stats = asAdminStats(await backendGet(email, `/admin/stats?days=${days}`));
   if (!stats) notFound();
 
   return (

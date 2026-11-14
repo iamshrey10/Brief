@@ -308,3 +308,14 @@ class TrustedDevice(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class SiteEvent(Base):
+    """How many times something happened on the site in a day, with nobody attached: the demo video being opened, or watched to
+    the end. It holds a name, a day and a count, and nothing that could say who did it."""
+
+    __tablename__ = "site_events"
+
+    day: Mapped[dt.date] = mapped_column(Date, primary_key=True)
+    name: Mapped[str] = mapped_column(String(40), primary_key=True)
+    count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")

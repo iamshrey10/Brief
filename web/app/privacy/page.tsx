@@ -60,7 +60,13 @@ export default function PrivacyPage() {
         <p>
           The person who runs Brief has a page of totals: how many people signed up and were active, how long visits last on average,
           how many documents, questions, reads and overviews there are, and how many people came for each reason. These are counts.
-          That page does not show anyone&apos;s name or email address, or any document, question or answer.
+          That page does not show anyone&apos;s name or email address, or any document, question or answer. It can also be saved as a daily
+          or monthly report, which holds the same kind of counts.
+        </p>
+        <p>
+          It also counts how many times the demo video on the first page is opened, and how many times it is watched to the end. That is
+          one number for each day. It is added up without a cookie or an address, so it cannot be tied to anyone, even a visitor who is not
+          signed in.
         </p>
       </Section>
 
