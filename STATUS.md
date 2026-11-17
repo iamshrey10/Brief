@@ -64,7 +64,7 @@ no outside person has tried it, so expect surprises. What is left is small and l
 
 | Piece | Status |
 |---|---|
-| The demo video | Remade on November 17 from the real app, real API and real Gemini on the sample lease, in light theme at 1080p, 1 minute 29.6 seconds, with a faster narration (about 162 words a minute), captions on every sentence, scenes for sharing and security, a short technology scene and a video window that fits any screen |
+| The demo video | Remade on November 17 from the real app on made up sample documents, light theme, 1080p, 1 minute 28 seconds, with captions on every sentence. It shows understanding a document, the library, a short look at reminders, sharing the dashboard and two-step verification, and has no technology scene |
 | An alert that tells me when the site is down | UptimeRobot is recorded as checking the site and the API's `/health/ready` every 5 minutes and emailing on a failure (see `infra/DEPLOY.md`). Confirm it in the UptimeRobot account before the launch post |
 | The per-minute request limit in the website | Built, but on the live site it cannot reach its Redis and lets requests through. The setting is now cleaned up on read and the log says what looks wrong; I still need to confirm the value in Upstash. The daily limits and the site-wide cap are enforced by the API and work |
 | Build and test tools | 32 open dependency alerts, all in development tools (vite, hono, undici and similar). None ships to a user, and the scan of what ships passes. I will update them in a separate careful change |

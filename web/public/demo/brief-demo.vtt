@@ -1,64 +1,49 @@
 WEBVTT
 
-00:00:00.800 --> 00:00:02.559
-Leases. Loans. Job offers.
+00:00:00.800 --> 00:00:02.178
+Hey, welcome to Brief!
 
-00:00:02.700 --> 00:00:04.996
-Pages of fine print, and one signature.
+00:00:02.500 --> 00:00:07.845
+We all deal with important documents: contracts, agreements, leases, and other paperwork.
 
-00:00:05.000 --> 00:00:07.096
-This is Brief: every clause, explained.
+00:00:08.300 --> 00:00:13.952
+Understanding every detail, keeping it organized, and remembering important dates can be hard.
 
-00:00:08.200 --> 00:00:11.037
-The terms that cost you money are buried in dense text.
+00:00:14.400 --> 00:00:15.899
+That's where Brief comes in.
 
-00:00:11.300 --> 00:00:14.870
-A chatbot might guess, and a guess in a contract is dangerous.
+00:00:17.000 --> 00:00:21.372
+Add a contract, a scan, or photos from your phone, and Brief reads it for you.
 
-00:00:14.900 --> 00:00:17.599
-Brief shows the exact words behind every answer.
+00:00:21.600 --> 00:00:25.365
+It pulls out the key terms, each with the exact words behind it.
 
-00:00:18.300 --> 00:00:24.263
-Sign in with Google, and your dashboard shows every document, what is ready, and the questions still to ask.
+00:00:25.600 --> 00:00:29.807
+Ask a question in plain words, and the answer shows the wording it came from.
 
-00:00:24.500 --> 00:00:31.567
-Upload any contract or agreement, as a PDF, a scan, or phone photos, and Brief reads it into numbered clauses.
+00:00:29.900 --> 00:00:33.677
+And if the document doesn't say, Brief tells you, instead of pretending.
 
-00:00:32.200 --> 00:00:35.536
-Open a document, and the key terms appear, each with its quote.
+00:00:35.700 --> 00:00:37.836
+Everything you add stays in one place.
 
-00:00:35.800 --> 00:00:38.601
-Click one, and the exact words light up in the clause.
+00:00:38.300 --> 00:00:44.327
+Brief files each one by kind, and you can search, filter, rename, or open any document in a click.
 
-00:00:39.200 --> 00:00:44.512
-Before you sign lists the questions people forget to ask, and flags what the document leaves out.
+00:00:46.000 --> 00:00:51.412
+You can also set reminders for important dates and tasks, so you never miss what matters.
 
-00:00:44.800 --> 00:00:48.918
-Copy the summary, download a PDF, or add the dates to your calendar.
+00:00:53.000 --> 00:01:00.790
+Need to let someone see where your documents stand? Share your dashboard with family or friends, read only, for as long as you choose.
 
-00:00:50.800 --> 00:00:52.713
-Now ask a question in plain words.
+00:01:00.800 --> 00:01:03.355
+And anything shared with you is listed right there.
 
-00:00:53.100 --> 00:00:58.314
-Brief finds the right clauses by meaning and by keywords, then Gemini writes the answer.
+00:01:05.300 --> 00:01:14.463
+Your account security matters too. Brief also supports two-factor authentication with an authenticator app, adding an extra layer of protection.
 
-00:00:58.200 --> 00:01:02.418
-Code checks every quote against the clause, and shows only what it can prove.
+00:01:15.900 --> 00:01:19.490
+So now, nothing is scattered, and no important date slips by.
 
-00:01:02.400 --> 00:01:04.717
-If the document does not say, Brief says so.
-
-00:01:06.200 --> 00:01:10.047
-Share your dashboard with someone you trust, and choose how long they can see it.
-
-00:01:11.100 --> 00:01:18.120
-Your account is protected by Google sign-in and optional two-step verification, and you can delete everything at any time.
-
-00:01:18.300 --> 00:01:22.508
-Built with Next.js, FastAPI, Postgres, and Google Gemini.
-
-00:01:22.800 --> 00:01:26.435
-It explains what a document says. It is not legal advice.
-
-00:01:26.700 --> 00:01:28.315
-Brief. Every clause, explained.
+00:01:20.200 --> 00:01:26.794
+Understand, organize, remember, and stay protected. That's Brief. Everything important, all in one place.
