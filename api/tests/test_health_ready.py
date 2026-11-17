@@ -51,3 +51,37 @@ async def test_it_needs_no_sign_in_and_is_never_cached(client, monkeypatch):
 
     assert response.status_code == 200
     assert response.headers["cache-control"] == "no-store"
+
+
+async def test_a_monitor_that_checks_with_head_gets_the_same_answer_with_no_body(client, monkeypatch):
+    _pretend(monkeypatch, {"database": "ok", "migrations": "current"})
+
+    response = await client.head("/health/ready")
+
+    assert response.status_code == 200
+    assert response.content == b""
+    assert response.headers["cache-control"] == "no-store"
+
+
+@pytest.mark.parametrize("status", [{"database": "unreachable", "migrations": "unknown"}, {"database": "ok", "migrations": "different"}])
+async def test_a_head_check_gets_503_when_the_server_cannot_do_real_work(client, monkeypatch, status):
+    _pretend(monkeypatch, status)
+
+    response = await client.head("/health/ready")
+
+    assert response.status_code == 503
+    assert response.content == b""
+
+
+async def test_the_plain_health_page_also_answers_head(client):
+    response = await client.head("/health")
+
+    assert response.status_code == 200
+    assert response.content == b""
+
+
+def test_the_head_versions_are_not_listed_as_extra_routes_in_the_documentation():
+    paths = app.openapi()["paths"]
+
+    assert "head" not in paths["/health/ready"]
+    assert "head" not in paths["/health"]
