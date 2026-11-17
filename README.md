@@ -136,7 +136,7 @@ Measured on November 17, 2026 on a laptop:
 
 ESLint, TypeScript, Ruff and the production build are clean.
 
-- **Continuous integration.** Every push and pull request runs three required jobs on GitHub Actions: website lint, tests and build; browser tests; and API lint and tests. Coverage floors are enforced in both test suites, and a check fails the build if a recorded AI evaluation score drops.
+- **Continuous integration.** Every push and pull request runs three required jobs on GitHub Actions: website lint, tests and build; browser tests; and API lint and tests. Coverage floors are enforced in both test suites, and a check fails the build if a recorded AI evaluation score drops. The browser tests run as three parts side by side, and a pull request that only adds or edits screenshots and other files in `Brief-Resources` skips the slow tests (the commit message check still runs). A newer push to a pull request replaces the run that is still going.
 - **Dependency audit.** `pnpm audit` and `pip-audit` run on every push and every week.
 - **Browser tests use a fake API.** They show the website behaves correctly given the API's answers, not that the real API is correct. They include accessibility scans.
 - **AI evaluations** call the real Gemini API, so they run on demand with a key and are not part of the automated suite. Their recorded scores and caveats are in [STATUS.md](STATUS.md).

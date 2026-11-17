@@ -6,9 +6,53 @@ on:
   pull_request:
     branches: [main]
 
+# A newer push to the same pull request replaces the run that is still going, so a fix is not queued behind a run that no longer matters.
+# A run on main is never cancelled.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
+  # Decides whether the slow tests are needed. They are skipped only when a pull request does nothing but add or edit files in
+  # Brief-Resources (screenshots, PDFs and the like), which no test reads. Anything else, including deleting or renaming one of those
+  # files, which could break a link in the README, runs everything. A push to main always runs everything. If this job itself fails, the
+  # jobs below treat that as "run everything", never as "skip".
+  changes:
+    name: what changed
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.diff.outputs.code }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: diff
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.base_ref }}
+        run: |
+          if [ "$EVENT" != "pull_request" ]; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+            echo "Not a pull request: everything runs."
+            exit 0
+          fi
+          git diff --name-status "origin/$BASE" HEAD > changed.txt
+          cat changed.txt
+          # Anything that is not an added or edited file under Brief-Resources/ counts as a change to the code.
+          other=$(awk -F'\t' '!(($1 == "A" || $1 == "M") && $2 ~ /^Brief-Resources\//)' changed.txt)
+          if [ -s changed.txt ] && [ -z "$other" ]; then
+            echo "code=false" >> "$GITHUB_OUTPUT"
+            echo "Only Brief-Resources files were added or edited: the slow tests are skipped."
+          else
+            echo "code=true" >> "$GITHUB_OUTPUT"
+            echo "Code or something else changed: everything runs."
+          fi
+
   web:
     name: web, lint, tests and build
+    needs: changes
+    # Runs unless the change check said, in so many words, that no code changed.
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -29,9 +73,17 @@ jobs:
       - run: pnpm test:coverage
       - run: pnpm build
 
-  web-browser:
-    name: web, browser tests
+  # The browser tests, split into three parts that run side by side. Each part has its own server, fake API and Redis, and the tests
+  # reset their own data, so the parts do not affect one another. The one required check, "web, browser tests", is the job after this.
+  web-browser-shard:
+    name: browser tests, part ${{ matrix.shard }} of 3
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     defaults:
       run:
         working-directory: web
@@ -58,16 +110,39 @@ jobs:
           cache-dependency-path: web/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
-      - run: pnpm e2e
+      - run: pnpm e2e --shard=${{ matrix.shard }}/3
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: playwright-traces
+          name: playwright-traces-${{ matrix.shard }}
           path: web/test-results/
           retention-days: 7
 
+  # The check the branch rule asks for, under its old name. It passes when all three parts passed, or when the change check said no code
+  # changed. It fails if any part failed, was cancelled, or if the change check itself broke and the parts did not run.
+  web-browser:
+    name: web, browser tests
+    needs: [changes, web-browser-shard]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          CODE: ${{ needs.changes.outputs.code }}
+          SHARDS: ${{ needs.web-browser-shard.result }}
+        run: |
+          if [ "$CODE" = "false" ]; then
+            echo "No code changed, so the browser tests were not needed."
+            exit 0
+          fi
+          if [ "$SHARDS" != "success" ]; then
+            echo "The browser tests did not pass: the parts finished as '$SHARDS'."
+            exit 1
+          fi
+          echo "All three parts of the browser tests passed."
+
   api:
     name: api, lint and tests
+    needs: changes
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -102,18 +177,26 @@ jobs:
           # The whole history, so the commit message check sees every commit and not only the newest.
           fetch-depth: 0
       - uses: actions/setup-python@v5
+        if: ${{ needs.changes.outputs.code != 'false' }}
         with:
           python-version: "3.12"
           cache: pip
           cache-dependency-path: api/requirements-dev.txt
-      - run: sudo apt-get update && sudo apt-get install -y tesseract-ocr
-      - run: pip install -r requirements-dev.txt
-      - run: ruff check .
-      - run: python -c "import app.main"
-      - run: alembic upgrade head
+      - if: ${{ needs.changes.outputs.code != 'false' }}
+        run: sudo apt-get update && sudo apt-get install -y tesseract-ocr
+      - if: ${{ needs.changes.outputs.code != 'false' }}
+        run: pip install -r requirements-dev.txt
+      - if: ${{ needs.changes.outputs.code != 'false' }}
+        run: ruff check .
+      - if: ${{ needs.changes.outputs.code != 'false' }}
+        run: python -c "import app.main"
+      - if: ${{ needs.changes.outputs.code != 'false' }}
+        run: alembic upgrade head
       # --cov fails the run if coverage of app/ falls below the floor in api/.coveragerc
-      - run: python -m pytest -v --cov
+      - if: ${{ needs.changes.outputs.code != 'false' }}
+        run: python -m pytest -v --cov
       # The recorded evaluation results must still meet their minimums. No model or secret is needed.
-      - run: python ../evals/check_results.py
-      # No commit message may credit an AI tool.
+      - if: ${{ needs.changes.outputs.code != 'false' }}
+        run: python ../evals/check_results.py
+      # No commit message may credit an AI tool. This one runs on every pull request, whatever changed.
       - run: ../scripts/check-commit-messages.sh
