@@ -2,8 +2,10 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 
 import { resetFakeApi, signInAsTestReader } from "./support/session";
+import { settled } from "./support/settled";
 
 async function problems(page: Page): Promise<string[]> {
+  await settled(page);
   const results = await new AxeBuilder({ page }).analyze();
   return results.violations.map(
     (violation) =>

@@ -386,3 +386,59 @@ summary {
   color: #fff;
   background-color: rgba(0, 0, 0, 0.55);
 }
+
+/*
+ * The charts on the Admin page draw themselves in once: each line is drawn from its start to its end, its fill and dots fade in
+ * behind it, and each bar grows from the left, one after another by --d. The finished picture is the normal style, so a reader who
+ * prefers less motion simply sees it, and the numbers are in the page from the first frame.
+ */
+@keyframes chart-draw {
+  from { stroke-dashoffset: 1; }
+  to { stroke-dashoffset: 0; }
+}
+@keyframes chart-grow {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+@keyframes chart-fade {
+  from { opacity: 0; }
+}
+.chart-line {
+  stroke-dasharray: 1;
+  animation: chart-draw 900ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation-delay: var(--d, 0ms);
+}
+.chart-area,
+.chart-dot {
+  animation: chart-fade 700ms ease both;
+  animation-delay: 350ms;
+}
+.chart-bar {
+  transform-origin: left center;
+  animation: chart-grow 700ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation-delay: var(--d, 0ms);
+}
+
+/* The video window eases in, and the dark behind it fades, instead of both appearing at once. */
+@keyframes dialog-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+}
+@keyframes backdrop-in {
+  from { opacity: 0; }
+}
+dialog.demo-dialog[open] {
+  animation: dialog-in 220ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+dialog.demo-dialog[open]::backdrop {
+  animation: backdrop-in 220ms ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .chart-line,
+  .chart-area,
+  .chart-dot,
+  .chart-bar,
+  dialog.demo-dialog[open],
+  dialog.demo-dialog[open]::backdrop {
+    animation: none;
+  }
+}
