@@ -5,6 +5,7 @@ import { AppHeader } from "@/components/app-header";
 import { countByKind, summaryLine } from "@/lib/document-summary";
 import { mintServiceToken } from "@/lib/service-token";
 import { DocumentUpload } from "@/components/document-upload";
+import { Rise } from "@/components/rise";
 
 export const metadata = { title: "Your contracts", robots: { index: false, follow: false } };
 
@@ -36,7 +37,7 @@ export default async function Dashboard() {
     <div className="flex flex-1 flex-col">
       <AppHeader email={email} current="documents" />
       <div className="mx-auto flex w-[min(100%-3rem,1400px)] flex-1 flex-col gap-4 py-4 sm:gap-5 sm:py-6">
-        <div>
+        <Rise order={0}>
           <h1 className="font-heading text-2xl font-semibold tracking-tight text-foreground sm:text-3xl md:text-4xl">
             Your contracts
           </h1>
@@ -44,21 +45,25 @@ export default async function Dashboard() {
             Upload a loan, lease, or job offer. Brief explains it clause by clause and shows you the
             exact words behind every answer.
           </p>
-        </div>
+        </Rise>
 
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2" aria-label="Your documents at a glance" role="group">
-          <p className="text-sm font-medium text-foreground">{summaryLine(initialDocuments)}</p>
-          {countByKind(initialDocuments).map(({ kind, label, count }) => (
-            <span
-              key={kind}
-              className="rounded-full border border-border bg-card px-2.5 py-0.5 text-xs text-muted-foreground"
-            >
-              {label} <span className="font-medium text-foreground">{count}</span>
-            </span>
-          ))}
-        </div>
+        <Rise order={1}>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2" aria-label="Your documents at a glance" role="group">
+            <p className="text-sm font-medium text-foreground">{summaryLine(initialDocuments)}</p>
+            {countByKind(initialDocuments).map(({ kind, label, count }) => (
+              <span
+                key={kind}
+                className="rounded-full border border-border bg-card px-2.5 py-0.5 text-xs text-muted-foreground"
+              >
+                {label} <span className="font-medium text-foreground">{count}</span>
+              </span>
+            ))}
+          </div>
+        </Rise>
 
-        <DocumentUpload initialDocuments={initialDocuments} />
+        <Rise order={2}>
+          <DocumentUpload initialDocuments={initialDocuments} />
+        </Rise>
 
         <footer className="flex flex-col items-start gap-3 border-t border-border/70 pt-6">
           <p className="text-xs text-muted-foreground">

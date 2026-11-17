@@ -52,7 +52,7 @@ function BarList({ label, counts, name, empty }: { label: string; counts: Record
             </span>
           </div>
           <div aria-hidden="true" className="mt-1 h-2 overflow-hidden rounded-full bg-border">
-            <div className="h-full rounded-full bg-primary" style={{ width: `${Math.max(2, share * 100)}%` }} />
+            <div className="chart-bar h-full rounded-full bg-primary" style={{ width: `${Math.max(2, share * 100)}%` }} />
           </div>
         </li>
       ))}
@@ -238,7 +238,7 @@ export function AdminDashboard({ stats }: { stats: AdminStats }) {
             {site.model_calls_today} <span className="text-base font-normal text-muted-foreground">of {site.daily_limit} calls</span>
           </p>
           <div role="progressbar" aria-label="Share of today's limit used" aria-valuemin={0} aria-valuemax={100} aria-valuenow={used} className="mt-3 h-2.5 overflow-hidden rounded-full bg-border">
-            <div className={cn("h-full rounded-full", used >= 90 ? "bg-destructive" : "bg-primary")} style={{ width: `${Math.max(used, 1)}%` }} />
+            <div className={cn("chart-bar h-full rounded-full", used >= 90 ? "bg-destructive" : "bg-primary")} style={{ width: `${Math.max(used, 1)}%` }} />
           </div>
           <p className="mt-1 text-xs text-muted-foreground">{used}% of today&apos;s limit</p>
         </Section>

@@ -1,3 +1,5 @@
+import type { CSSProperties } from "react";
+
 import { shortDay, type AdminDay } from "@/lib/admin";
 import { cn } from "@/lib/utils";
 
@@ -71,13 +73,13 @@ export function LineChart({ title, days, lines, unit, note }: { title: string; d
             {days[index] ? shortDay(days[index].day) : ""}
           </text>
         ))}
-        {series[0] && <path d={area(series[0])} fill={lines[0].color} opacity={0.12} />}
+        {series[0] && <path className="chart-area" d={area(series[0])} fill={lines[0].color} opacity={0.12} />}
         {series.map((values, index) => (
-          <path key={lines[index].label} d={path(values)} fill="none" stroke={lines[index].color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+          <path key={lines[index].label} className="chart-line" pathLength={1} style={{ "--d": `${index * 120}ms` } as CSSProperties} d={path(values)} fill="none" stroke={lines[index].color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
         ))}
         {days.map((day, index) => (
           <g key={day.day}>
-            {days.length <= 31 && series[0] && <circle cx={x(index)} cy={y(series[0][index])} r={2.5} fill={lines[0].color} />}
+            {days.length <= 31 && series[0] && <circle className="chart-dot" cx={x(index)} cy={y(series[0][index])} r={2.5} fill={lines[0].color} />}
             {/* A wide invisible strip for each day, so the pointer has something to rest on and the tooltip names the day. */}
             <rect x={x(index) - plotWidth / Math.max(1, days.length - 1) / 2} y={TOP} width={plotWidth / Math.max(1, days.length - 1)} height={plotHeight} fill="transparent">
               <title>{`${shortDay(day.day)}: ${lines.map((line, i) => `${series[i][index]} ${line.label.toLowerCase()}`).join(", ")}`}</title>
@@ -142,7 +144,7 @@ export function Funnel({ label, steps }: { label: string; steps: { name: string;
               </span>
             </div>
             <div aria-hidden="true" className="mt-1 h-3 overflow-hidden rounded-full bg-border">
-              <div className={cn("h-full rounded-full bg-primary")} style={{ width: `${Math.max(step.count > 0 ? 2 : 0, (step.count / first) * 100)}%`, opacity: 1 - index * 0.14 }} />
+              <div className={cn("chart-bar h-full rounded-full bg-primary")} style={{ width: `${Math.max(step.count > 0 ? 2 : 0, (step.count / first) * 100)}%`, opacity: 1 - index * 0.14, "--d": `${index * 90}ms` } as CSSProperties} />
             </div>
           </li>
         );

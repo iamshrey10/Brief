@@ -41,7 +41,7 @@ export function DemoVideoButton() {
         onClick={(event) => {
           if (event.target === event.currentTarget) dialog.current?.close();
         }}
-        className="m-auto w-[min(94vw,1040px)] max-w-none rounded-2xl border border-border bg-card p-3 text-card-foreground shadow-2xl backdrop:bg-black/70"
+        className="demo-dialog m-auto w-[min(94vw,1040px)] max-w-none rounded-2xl border border-border bg-card p-3 text-card-foreground shadow-2xl backdrop:bg-black/70"
       >
         <div className="flex items-center justify-between gap-3 px-2 pb-3">
           <p className="text-sm font-medium text-foreground">Brief in under 90 seconds</p>

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
 import { AppHeader } from "@/components/app-header";
+import { Rise } from "@/components/rise";
 import { BarChart3, Compass, Lock, Palette, Trash2, Users } from "lucide-react";
 import { PendingBadge } from "@/components/pending-badge";
 import { ProfileRow } from "@/components/profile-row";
@@ -52,12 +53,12 @@ export default async function ProfilePage() {
     <div className="flex flex-1 flex-col">
       <AppHeader email={email} current="profile" />
       <div className="mx-auto flex w-[min(100%-3rem,1400px)] flex-1 flex-col gap-4 py-4 sm:gap-5 sm:py-6">
-        <div>
+        <Rise order={0}>
           <h1 className="font-heading text-2xl font-semibold tracking-tight text-foreground sm:text-3xl md:text-4xl">Profile</h1>
           <p className="mt-1 max-w-xl text-sm text-muted-foreground sm:mt-2 sm:text-base">Your account, what you have used today, and the Bin.</p>
-        </div>
+        </Rise>
 
-        <div className="grid grid-cols-1 items-start gap-4 sm:gap-5 md:grid-cols-2">
+        <Rise order={1} className="grid grid-cols-1 items-start gap-4 sm:gap-5 md:grid-cols-2">
           <div className="flex min-w-0 flex-col gap-4 sm:gap-5">
             <ProfileAccount email={email} firstName={me?.first_name ?? null} lastName={me?.last_name ?? null} />
             <UsageCard usage={usage} />
@@ -95,7 +96,7 @@ export default async function ProfilePage() {
               </section>
             </ProfileRow>
           </div>
-        </div>
+        </Rise>
 
         <section
           aria-labelledby="danger-heading"

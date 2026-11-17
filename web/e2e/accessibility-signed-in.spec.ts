@@ -2,8 +2,10 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 
 import { resetFakeApi, signInAsTestReader } from "./support/session";
+import { settled } from "./support/settled";
 
 async function problems(page: Page): Promise<string[]> {
+  await settled(page);
   const results = await new AxeBuilder({ page }).analyze();
   return results.violations.map(
     (violation) =>
@@ -35,7 +37,6 @@ for (const scheme of ["light", "dark"] as const) {
       await expect(page.getByRole("region", { name: "What Brief found" })).toBeVisible();
       await expect(page.getByRole("region", { name: "Still to ask" })).toBeVisible();
       // The sections rise into place when the page appears. Colors are judged on the page as it rests, not part way through a fade.
-      await page.evaluate(() => Promise.all(document.getAnimations().map((animation) => animation.finished)));
 
       expect(await problems(page)).toEqual([]);
     });

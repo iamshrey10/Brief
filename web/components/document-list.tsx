@@ -483,7 +483,7 @@ function DocumentRow({
   // The actions sit beside the link, not inside it: a button inside a link is not valid, and
   // pressing one must never also open the document.
   return (
-    <div className="flex flex-col rounded-lg border border-border bg-card sm:flex-row sm:items-center sm:gap-1 sm:pr-2">
+    <div className="lift flex flex-col rounded-lg border border-border bg-card sm:flex-row sm:items-center sm:gap-1 sm:pr-2">
       {readable ? (
         <Link
           href={`/dashboard/documents/${doc.id}`}
