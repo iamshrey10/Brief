@@ -2,7 +2,8 @@
 
 Backend for Brief. Python 3.12, FastAPI, async.
 
-Ingestion, retrieval, extraction, grounded Q&A, citation verifier, agentic tool calling, eval API.
+Ingestion (text and OCR), hybrid search, key term and question extraction, grounded answers, and a citation check that
+throws away any quote that is not really in the clause.
 
 ## Running locally
 

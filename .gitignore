@@ -14,10 +14,12 @@ __pycache__/
 venv/
 *.egg-info/
 
-# Environment and secrets
+# Environment and secrets: every .env file is ignored except the examples that hold no values
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
+*.pem
+*.key
 
 # Editor and OS
 .DS_Store
@@ -26,6 +28,15 @@ venv/
 
 # Logs
 *.log
+
+# Tool caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.tsbuildinfo
+test-results/
+playwright-report/
+.vercel
 
 # Test coverage data
 .coverage
