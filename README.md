@@ -17,8 +17,8 @@ Brief is built around the opposite rule: nothing is shown that can't be proved f
 ## What it does
 
 - **Reads what you give it.** PDFs, scanned PDFs (by OCR), and photos of paper pages (JPG, PNG, HEIC), including
-  from a phone camera. Up to five photos make one document with a page for each. A blurry photo is refused with a reason
-  instead of quietly accepted.
+  from a phone camera. Up to five photos make one document with a page for each. A photo or scan that is hard to read is flagged "Hard to read",
+  and a file with no readable text is refused with a reason, instead of being quietly accepted.
 - **Key terms.** The interest rate, fees, deposit, dates and so on, each with its quote. Click one and the
   clause opens with the exact words highlighted.
 - **Before you sign.** The questions people most often skip, answered from the document or marked as not covered,
@@ -50,6 +50,18 @@ The text of a contract is treated as text to read, never as instructions to foll
 must also appear in its quote. The key terms and the "Before you sign" questions are each read three times with
 fixed seeds and kept by vote, because the same contract read twice by a model can come out differently. Steadier is
 not the same as more accurate, and the scores are in [STATUS.md](STATUS.md) with their caveats.
+
+## Where AI is used
+
+Brief calls Google's Gemini in three places, always from the API and never from the browser. Everything around those calls is ordinary code.
+
+| Where | Model | What it does |
+|---|---|---|
+| Reading a document | `gemini-embedding-001` | Turns each clause into 768 numbers that capture its meaning |
+| Asking a question | `gemini-embedding-001`, `gemini-3.5-flash-lite` | Finds the best clauses, then writes one answer with quotes |
+| Key terms and the questions to ask | `gemini-3.5-flash-lite` | Reads the document three times, then a separate call judges each answer |
+
+What is not AI: the splitting of text into clauses, the search ranking, the quote check, the number check, the majority vote, the limits and all the storage are plain code, and Tesseract (which reads scans) is OCR software, not a language model. There is no tool calling, no agent loop and no fine-tuning. [Brief-AI-LLM-Documentation.pdf](Brief-Resources/09-AI-and-LLM/Brief-AI-LLM-Documentation.pdf) explains each step, what is sent to the model, how failures are handled, and the limits.
 
 ## How it's built
 
@@ -168,6 +180,21 @@ answers 200 only when the database responds and is on the migration the code exp
 separate step for each release (`alembic upgrade head`). [infra/DEPLOY.md](infra/DEPLOY.md) is the checklist and lists
 every setting. [docs/MANUAL-TEST.md](docs/MANUAL-TEST.md) is a step by step check of the real sign-in, the real API
 and the real model.
+
+## Documentation
+
+The documents in [Brief-Resources](Brief-Resources) were written from the code on November 17, 2026, and each says where a claim comes from.
+
+| Document | Read it for |
+|---|---|
+| [Project Overview](Brief-Resources/01-Project-Overview/Brief-Project-Overview.pdf), [Summary](Brief-Resources/01-Project-Overview/Brief-Project-Summary.pdf), [Key Features](Brief-Resources/01-Project-Overview/Brief-Key-Features.pdf) | What Brief is, the verified results, and every feature with its files |
+| [Technology Stack](Brief-Resources/05-Technology-Stack/Brief-Technology-Stack.pdf) | Every technology: what, why, where and how |
+| [System Architecture](Brief-Resources/06-System-Architecture/Brief-System-Architecture.pdf), [Explanation](Brief-Resources/06-System-Architecture/Brief-Architecture-Explanation.pdf) | The parts, how they talk, and the journey of a request |
+| [System Design](Brief-Resources/07-System-Design/Brief-System-Design.pdf) | Requirements, design, data, security, errors, scale, limits |
+| [AI and LLM](Brief-Resources/09-AI-and-LLM/Brief-AI-LLM-Documentation.pdf) | Where a model is used, how, and what is checked |
+| [CI/CD](Brief-Resources/08-CI-CD/Brief-CI-CD-Explanation.pdf) | How a change reaches the live site |
+
+Screenshots of the real screens are in [Brief-Resources/02-Application-Screenshots](Brief-Resources/02-Application-Screenshots/Web). The sources of the documents and diagrams are in `Brief-Resources/_source`, and `node build.mjs` there rebuilds them.
 
 ## License
 
