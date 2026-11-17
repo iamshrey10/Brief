@@ -10,7 +10,7 @@ import { render } from "./md.mjs";
 import { DOCUMENTS } from "./documents.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.resolve(HERE, "../Brief-Resources");
+const ROOT = process.env.BRIEF_RESOURCES || "/Users/shreyasrevankar/Desktop/Fall Project/Brief-Resources";
 const PYTHON = path.resolve(HERE, "../api/.venv/bin/python");
 const css = fs.readFileSync(path.join(HERE, "style.css"), "utf8");
 const commit = execFileSync("git", ["rev-parse", "--short", "HEAD"], { cwd: HERE, encoding: "utf8" }).trim();

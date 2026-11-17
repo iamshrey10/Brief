@@ -12,7 +12,7 @@ import { cicd } from "./diagram-cicd.mjs";
 import { aiWorkflow } from "./diagram-ai.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.resolve(HERE, "../Brief-Resources");
+const ROOT = process.env.BRIEF_RESOURCES || "/Users/shreyasrevankar/Desktop/Fall Project/Brief-Resources";
 const ALL = [
   { name: "architecture", folder: "06-System-Architecture", file: "Brief-Final-System-Architecture.png", make: architecture },
   { name: "stack", folder: "05-Technology-Stack", file: "Brief-Technology-Stack-Diagram.png", make: stack },
