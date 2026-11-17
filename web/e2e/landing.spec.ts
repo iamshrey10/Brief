@@ -54,6 +54,32 @@ test("Watch how it works opens the short video with captions in a window, and Es
   await expect(window).toBeHidden();
 });
 
+test("the video window fits a short screen without cropping or stretching the picture, and the page behind it does not scroll", async ({ page }) => {
+  // A phone held sideways: the shortest screen the window has to fit.
+  await page.setViewportSize({ width: 844, height: 390 });
+  await page.goto("/");
+  const button = page.getByRole("button", { name: "Watch how it works" });
+  await button.click();
+
+  const window = page.getByRole("dialog", { name: "Brief in under 90 seconds" });
+  await expect(window).toBeVisible();
+  const box = (await window.boundingBox())!;
+  expect(box.x).toBeGreaterThanOrEqual(0);
+  expect(box.y).toBeGreaterThanOrEqual(0);
+  expect(box.x + box.width).toBeLessThanOrEqual(844);
+  expect(box.y + box.height).toBeLessThanOrEqual(390);
+  const video = (await window.locator("video").boundingBox())!;
+  // 16 by 9 stays 16 by 9.
+  expect(video.width / video.height).toBeGreaterThan(1.74);
+  expect(video.width / video.height).toBeLessThan(1.82);
+  expect(await page.evaluate(() => getComputedStyle(document.documentElement).overflow)).toBe("hidden");
+
+  await page.keyboard.press("Escape");
+  await expect(window).toBeHidden();
+  await expect(button).toBeFocused();
+  expect(await page.evaluate(() => getComputedStyle(document.documentElement).overflow)).not.toBe("hidden");
+});
+
 test("the top bar stays in view after scrolling to the bottom", async ({ page }) => {
   await page.goto("/");
   await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
