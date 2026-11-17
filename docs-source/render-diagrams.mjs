@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { chromium } from "../../web/node_modules/@playwright/test/index.mjs";
+import { chromium } from "../web/node_modules/@playwright/test/index.mjs";
 import { architecture } from "./diagram-architecture.mjs";
 import { stack } from "./diagram-stack.mjs";
 import { designFlow } from "./diagram-flow.mjs";
@@ -12,14 +12,14 @@ import { cicd } from "./diagram-cicd.mjs";
 import { aiWorkflow } from "./diagram-ai.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.resolve(HERE, "..");
+const ROOT = path.resolve(HERE, "../Brief-Resources");
 const ALL = [
   { name: "architecture", folder: "06-System-Architecture", file: "Brief-Final-System-Architecture.png", make: architecture },
   { name: "stack", folder: "05-Technology-Stack", file: "Brief-Technology-Stack-Diagram.png", make: stack },
   { name: "flow", folder: "07-System-Design", file: "Brief-System-Design-Flow.png", make: designFlow },
   { name: "data", folder: "07-System-Design", file: "Brief-Data-Flow-Diagram.png", make: dataFlow },
   { name: "cicd", folder: "08-CI-CD", file: "Brief-CI-CD-Pipeline.png", make: cicd },
-  { name: "ai", folder: "09-AI-and-LLM", file: "Brief-AI-Workflow-Diagram.png", make: aiWorkflow },
+  { name: "ai", folder: "05-Technology-Stack", file: "Brief-AI-Workflow-Diagram.png", make: aiWorkflow },
 ];
 const wanted = process.argv.slice(2);
 const browser = await chromium.launch();
