@@ -33,7 +33,7 @@ from app import request_id
 from app.insights import DocumentInsight, saved_insights
 from app.key_dates import KeyDate, saved_key_dates
 from app.key_terms import KeyTermsGenerationError, KeyTermsResult, get_key_terms, load_key_terms
-from app import admin, sharing, two_factor
+from app import admin, reminders, sharing, two_factor
 from app.filing import FilingError, file_document
 from app.folders import FOLDERS, folder_for
 from app.models import ChecklistAnswerRow, Clause, Document, Extraction, User
@@ -127,7 +127,7 @@ app = FastAPI(
     ),
     openapi_tags=[
         {"name": "health", "description": "Is the server up, and can it do real work."},
-        {"name": "account", "description": "The signed-in person: who they are, their daily limits, deleting the account."},
+        {"name": "account", "description": "The signed-in person: who they are, their daily limits, their own reminders, deleting the account."},
         {"name": "documents", "description": "Uploading, reading, renaming and deleting documents."},
         {"name": "answers", "description": "Questions, search, key terms and the questions to ask before signing."},
         {"name": "sharing", "description": "Letting someone else look at your dashboard, read only, and looking at one shared with you."},
@@ -143,7 +143,7 @@ app = FastAPI(
 _ERROR_MEANINGS = {
     400: "The request is not valid: the message says what is wrong.",
     401: "Not signed in, or the token has expired.",
-    404: "There is no such document, invitation or shared dashboard, or it belongs to someone else.",
+    404: "There is no such document, reminder, invitation or shared dashboard, or it belongs to someone else.",
     409: "Not allowed in the document's current state, or a limit on how much a person can keep was reached.",
     429: "A limit was reached: the message says which one, or when to try again.",
     502: "A service the server relies on had a problem: try again in a moment.",
@@ -414,6 +414,190 @@ async def my_key_dates(
 ) -> list[KeyDate]:
     """The dates in this person's documents that are already saved. Looking uses nothing up."""
     return await saved_key_dates(session, user.id)
+
+
+class ReminderIn(BaseModel):
+    # The lengths are checked in reminders.py, with a sentence a person can read. These bounds only stop an absurdly large body.
+    title: str = Field(max_length=2000)
+    due_date: dt.date
+    due_time: dt.time | None = None
+    description: str | None = Field(default=None, max_length=5000)
+    document_id: str | None = None
+
+
+class ReminderChange(BaseModel):
+    """Only what is sent is changed. Sending null for the time, the description or the document clears it."""
+
+    title: str | None = Field(default=None, max_length=2000)
+    due_date: dt.date | None = None
+    due_time: dt.time | None = None
+    description: str | None = Field(default=None, max_length=5000)
+    document_id: str | None = None
+    completed: bool | None = None
+
+
+class ReminderOut(BaseModel):
+    id: str
+    title: str
+    description: str | None
+    due_date: dt.date
+    due_time: str | None
+    document_id: str | None
+    document_name: str | None
+    completed: bool
+    completed_at: datetime | None
+    created_at: datetime
+
+
+def _reminder_out(row: reminders.ReminderRow) -> ReminderOut:
+    reminder = row.reminder
+    return ReminderOut(
+        id=str(reminder.id),
+        title=reminder.title,
+        description=reminder.description,
+        due_date=reminder.due_date,
+        due_time=reminder.due_time.strftime("%H:%M") if reminder.due_time else None,
+        # A document in the Bin is not linked, so a reminder never shows a name the person cannot open.
+        document_id=str(reminder.document_id) if reminder.document_id and row.document_name else None,
+        document_name=row.document_name,
+        completed=reminder.completed_at is not None,
+        completed_at=reminder.completed_at,
+        created_at=reminder.created_at,
+    )
+
+
+@app.get(
+    "/me/reminders",
+    tags=["account"],
+    summary="List your own reminders",
+    description=(
+        "Returns the reminders the signed-in person made for themselves, soonest first, done or not, each with its date, "
+        "optional time and note, and the document it is linked to, if any. Brief only shows these on the dashboard: it "
+        "does not send an email, a text or a notification. Looking uses nothing up."
+    ),
+    responses=_errors(401),
+)
+async def list_my_reminders(
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> list[ReminderOut]:
+    return [_reminder_out(row) for row in await reminders.list_reminders(session, user.id)]
+
+
+@app.post(
+    "/me/reminders",
+    status_code=201,
+    tags=["account"],
+    summary="Add a reminder for yourself",
+    description=(
+        "Keeps a reminder with a title and a date, and optionally a time, a note and one of the signed-in person's "
+        "documents. It does not need a document. The date can be in the past, and then it shows as overdue. A person can "
+        "keep up to 200 reminders. Brief does not send any alert when the date comes."
+    ),
+    responses=_errors(401, 404, 409),
+)
+async def create_my_reminder(
+    body: ReminderIn,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> ReminderOut:
+    document_id = None
+    if body.document_id is not None:
+        document = await reminders.find_document(session, user.id, body.document_id)
+        if document is None:
+            raise HTTPException(status_code=404, detail="document not found")
+        document_id = document.id
+    try:
+        made = await reminders.create_reminder(
+            session,
+            user.id,
+            title=body.title,
+            due_date=body.due_date,
+            due_time=body.due_time,
+            description=body.description,
+            document_id=document_id,
+        )
+    except reminders.BadReminder as problem:
+        raise HTTPException(status_code=422, detail=str(problem)) from problem
+    if made is None:
+        raise HTTPException(
+            status_code=409,
+            detail=f"You can keep up to {reminders.MAX_REMINDERS} reminders. Delete one to add another.",
+        )
+    row = next(row for row in await reminders.list_reminders(session, user.id) if row.reminder.id == made.id)
+    return _reminder_out(row)
+
+
+@app.patch(
+    "/me/reminders/{reminder_id}",
+    tags=["account"],
+    summary="Change or complete one of your reminders",
+    description=(
+        "Changes only what is sent: the title, the date, the time, the note, the linked document, or whether it is done. "
+        "Sending null for the time, the note or the document clears it. Only the person who made a reminder can change it."
+    ),
+    responses=_errors(401, 404),
+)
+async def change_my_reminder(
+    reminder_id: str,
+    body: ReminderChange,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> ReminderOut:
+    reminder = await reminders.owned(session, user.id, reminder_id)
+    if reminder is None:
+        raise HTTPException(status_code=404, detail="reminder not found")
+    sent = body.model_fields_set
+    new_document_id = reminder.document_id
+    if "document_id" in sent:
+        if body.document_id is None:
+            new_document_id = None
+        else:
+            document = await reminders.find_document(session, user.id, body.document_id)
+            if document is None:
+                raise HTTPException(status_code=404, detail="document not found")
+            new_document_id = document.id
+    try:
+        if "title" in sent:
+            reminder.title = reminders.clean_title(body.title)
+        if "due_date" in sent:
+            if body.due_date is None:
+                raise reminders.BadReminder("Choose a date for the reminder.")
+            reminder.due_date = reminders.check_date(body.due_date)
+        if "due_time" in sent:
+            reminder.due_time = reminders.clean_time(body.due_time)
+        if "description" in sent:
+            reminder.description = reminders.clean_description(body.description)
+    except reminders.BadReminder as problem:
+        await session.rollback()
+        raise HTTPException(status_code=422, detail=str(problem)) from problem
+    reminder.document_id = new_document_id
+    if "completed" in sent and body.completed is not None:
+        reminders.mark_completed(reminder, body.completed)
+    await session.commit()
+    row = next(row for row in await reminders.list_reminders(session, user.id) if row.reminder.id == reminder.id)
+    return _reminder_out(row)
+
+
+@app.delete(
+    "/me/reminders/{reminder_id}",
+    status_code=204,
+    tags=["account"],
+    summary="Delete one of your reminders",
+    description="Removes a reminder for good. It does not touch the document it was linked to. Only the person who made a reminder can delete it.",
+    responses=_errors(401, 404),
+)
+async def delete_my_reminder(
+    reminder_id: str,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> Response:
+    reminder = await reminders.owned(session, user.id, reminder_id)
+    if reminder is None:
+        raise HTTPException(status_code=404, detail="reminder not found")
+    await session.delete(reminder)
+    await session.commit()
+    return Response(status_code=204)
 
 
 @app.get(
