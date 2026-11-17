@@ -61,7 +61,7 @@ Brief calls Google's Gemini in three places, always from the API and never from 
 | Asking a question | `gemini-embedding-001`, `gemini-3.5-flash-lite` | Finds the best clauses, then writes one answer with quotes |
 | Key terms and the questions to ask | `gemini-3.5-flash-lite` | Reads the document three times, then a separate call judges each answer |
 
-What is not AI: the splitting of text into clauses, the search ranking, the quote check, the number check, the majority vote, the limits and all the storage are plain code, and Tesseract (which reads scans) is OCR software, not a language model. There is no tool calling, no agent loop and no fine-tuning. [Brief-AI-LLM-Documentation.pdf](Brief-Resources/09-AI-and-LLM/Brief-AI-LLM-Documentation.pdf) explains each step, what is sent to the model, how failures are handled, and the limits.
+What is not AI: the splitting of text into clauses, the search ranking, the quote check, the number check, the majority vote, the limits and all the storage are plain code, and Tesseract (which reads scans) is OCR software, not a language model. There is no tool calling, no agent loop and no fine-tuning. [Brief-AI-LLM-Documentation.pdf](Brief-Resources/05-Technology-Stack/Brief-AI-LLM-Documentation.pdf) explains each step, what is sent to the model, how failures are handled, and the limits.
 
 ## How it's built
 
@@ -191,10 +191,10 @@ The documents in [Brief-Resources](Brief-Resources) were written from the code o
 | [Technology Stack](Brief-Resources/05-Technology-Stack/Brief-Technology-Stack.pdf) | Every technology: what, why, where and how |
 | [System Architecture](Brief-Resources/06-System-Architecture/Brief-System-Architecture.pdf), [Explanation](Brief-Resources/06-System-Architecture/Brief-Architecture-Explanation.pdf) | The parts, how they talk, and the journey of a request |
 | [System Design](Brief-Resources/07-System-Design/Brief-System-Design.pdf) | Requirements, design, data, security, errors, scale, limits |
-| [AI and LLM](Brief-Resources/09-AI-and-LLM/Brief-AI-LLM-Documentation.pdf) | Where a model is used, how, and what is checked |
+| [AI and LLM](Brief-Resources/05-Technology-Stack/Brief-AI-LLM-Documentation.pdf) | Where a model is used, how, and what is checked |
 | [CI/CD](Brief-Resources/08-CI-CD/Brief-CI-CD-Explanation.pdf) | How a change reaches the live site |
 
-Screenshots of the real screens are in [Brief-Resources/02-Application-Screenshots](Brief-Resources/02-Application-Screenshots/Web). The sources of the documents and diagrams are in `Brief-Resources/_source`, and `node build.mjs` there rebuilds them.
+Screenshots of the real screens are in [Brief-Resources/02-Application-Screenshots](Brief-Resources/02-Application-Screenshots/Web). The sources of the documents and diagrams are in `docs-source/`, and `node build.mjs` there rebuilds them.
 
 ## License
 

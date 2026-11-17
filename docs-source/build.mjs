@@ -5,13 +5,13 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { chromium } from "../../web/node_modules/@playwright/test/index.mjs";
+import { chromium } from "../web/node_modules/@playwright/test/index.mjs";
 import { render } from "./md.mjs";
 import { DOCUMENTS } from "./documents.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.resolve(HERE, "..");
-const PYTHON = path.resolve(HERE, "../../api/.venv/bin/python");
+const ROOT = path.resolve(HERE, "../Brief-Resources");
+const PYTHON = path.resolve(HERE, "../api/.venv/bin/python");
 const css = fs.readFileSync(path.join(HERE, "style.css"), "utf8");
 const commit = execFileSync("git", ["rev-parse", "--short", "HEAD"], { cwd: HERE, encoding: "utf8" }).trim();
 const today = "November 17, 2026";
@@ -37,6 +37,7 @@ function figureFinder(folder) {
 
 function page(spec, body, toc, pages) {
   const rows = toc
+    .filter((h) => h.level <= (spec.tocDepth ?? 3))
     .map((h) => `<div class="row l${h.level}"><span class="n">${h.number}</span><span class="t">${esc(h.title)}</span><span class="dots"></span><span class="p">${pages?.[h.id] ?? ""}</span></div>`)
     .join("");
   return `<!doctype html><html lang="en" style='--running:"${spec.running.replace(/"/g, "")}"'><head><meta charset="utf-8"><title>${esc(spec.title)}</title><style>${css}</style></head><body>
@@ -60,7 +61,7 @@ const browser = await chromium.launch();
 for (const spec of DOCUMENTS.filter((d) => wanted.length === 0 || wanted.includes(d.name))) {
   const source = fs.readFileSync(path.join(HERE, "docs", `${spec.name}.md`), "utf8");
   const { html, toc } = render(source, { figure: figureFinder(spec.folder) });
-  const out = path.join(ROOT, spec.folder, `${spec.file}.pdf`);
+  const out = path.join(spec.outRoot ?? ROOT, spec.folder, `${spec.file}.pdf`);
   fs.mkdirSync(path.dirname(out), { recursive: true });
   const temp = path.join(HERE, `.pass1-${spec.name}.pdf`);
   await pdfOf(browser, page(spec, html, toc, null), temp);
