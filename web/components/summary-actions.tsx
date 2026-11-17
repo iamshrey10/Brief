@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { CalendarButton } from "@/components/calendar-button";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { downloadBytes, safeFileName } from "@/lib/download";
+import { safeFileName, saveFile } from "@/lib/download";
 import { clearDates } from "@/lib/key-dates";
 import { buildQuestionsEmail } from "@/lib/questions-email";
 import type { ChecklistResult, KeyTermsResult } from "@/lib/overview";
@@ -49,7 +49,7 @@ export function SummaryActions({
   keyTerms: KeyTermsResult;
   checklist: ChecklistResult | null;
 }) {
-  const [status, setStatus] = useState<"idle" | "copied" | "failed">("idle");
+  const [status, setStatus] = useState<"idle" | "copied" | "failed" | "saved" | "savefailed">("idle");
   const [showEmail, setShowEmail] = useState(false);
   const email = buildQuestionsEmail(docType, checklist?.answers ?? []);
   const hasDates = clearDates(keyTerms.terms).length > 0;
@@ -86,9 +86,17 @@ export function SummaryActions({
     timer.current = setTimeout(() => setStatus("idle"), 2500);
   }
 
-  function save() {
-    const blocks = summaryBlocks(docType, keyTerms, checklist);
-    downloadBytes(safeFileName(filename, "summary", "pdf"), buildPdf(blocks, blocks[0].text), "application/pdf");
+  async function save() {
+    try {
+      const blocks = summaryBlocks(docType, keyTerms, checklist);
+      const result = await saveFile(safeFileName(filename, "summary", "pdf"), buildPdf(blocks, blocks[0].text), "application/pdf");
+      setStatus(result === "cancelled" ? "idle" : "saved");
+    } catch {
+      // Say so, instead of a button that looks like it did nothing.
+      setStatus("savefailed");
+    }
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => setStatus("idle"), 6000);
   }
 
   return (
@@ -146,7 +154,15 @@ export function SummaryActions({
             : "The email opens in your own mail program. ")}
         {(hasDates || email) && "Nothing is sent by Brief."}
         <span role="status" className="ml-1">
-          {status === "copied" ? "Copied. Paste it anywhere." : status === "failed" ? "Your browser would not allow copying." : ""}
+          {status === "copied"
+            ? "Copied. Paste it anywhere."
+            : status === "failed"
+              ? "Your browser would not allow copying."
+              : status === "saved"
+                ? "Saved. Look in your downloads or the Files app."
+                : status === "savefailed"
+                  ? "Your browser would not save the file. Try Print or save as PDF, or Copy summary."
+                  : ""}
         </span>
       </p>
     </div>

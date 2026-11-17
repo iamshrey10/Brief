@@ -180,6 +180,33 @@ test("Copy summary puts the summary on the clipboard and Download summary saves 
   expect(text).not.toContain("sample-lease");
 });
 
+test("on a phone, Download summary offers the share sheet with the PDF, and says it was saved", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, baseURL: "http://localhost:3100" });
+  await context.addInitScript(() => {
+    const shared: { name: string; type: string; size: number }[] = [];
+    (window as unknown as { __shared: typeof shared }).__shared = shared;
+    Object.assign(navigator, {
+      canShare: () => true,
+      share: async (data: { files: File[] }) => {
+        for (const file of data.files) shared.push({ name: file.name, type: file.type, size: file.size });
+      },
+    });
+  });
+  const page = await context.newPage();
+  await signInAsTestReader(page);
+  await page.goto("/dashboard/documents/doc-lease");
+  await expect(page.getByRole("region", { name: "Key terms" }).getByText("Security deposit")).toBeVisible();
+
+  await page.getByRole("button", { name: "Download summary (PDF)" }).tap();
+
+  await expect(page.getByText("Saved. Look in your downloads or the Files app.")).toBeVisible();
+  const shared = await page.evaluate(() => (window as unknown as { __shared: { name: string; type: string; size: number }[] }).__shared);
+  expect(shared).toHaveLength(1);
+  expect(shared[0]).toMatchObject({ name: "sample-lease-summary.pdf", type: "application/pdf" });
+  expect(shared[0].size).toBeGreaterThan(1500);
+  await context.close();
+});
+
 test("Find in this document marks matches, steps through them, and stays reachable below the top bar on a long document", async ({ page }) => {
   await seedDocument(page, { id: "doc-long", filename: "long.pdf", doc_type: "lease", status: "ready" });
   await page.setViewportSize({ width: 1280, height: 700 });
