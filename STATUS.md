@@ -3,7 +3,7 @@
 A plain account of what works today, what is still missing, and what I am unsure about. I update it every week so you can
 hold my pace against my promises.
 
-**Last updated:** November 13, 2026
+**Last updated:** November 17, 2026
 
 ## The short version
 
@@ -18,15 +18,15 @@ no outside person has tried it, so expect surprises. What is left is small and l
 
 | | |
 |---|---|
-| Commits | about 590 |
-| Tests | 3,576 (1,298 backend, 1,937 frontend, 341 in a real browser), counted from the CI run of November 17 on the last commit and run on every pull request |
-| API routes | 47 |
+| Commits | 614 on main |
+| Tests | 3,577 (1,298 backend, 1,937 frontend, 342 in a real browser), all passing, run on my laptop on November 17 after the demo video change, and run on every pull request. The documents in `Brief-Resources` quote 3,576, the CI count one pull request earlier (the extra test checks the video window on a phone held sideways) |
+| API routes | 49 handlers (47 documented, plus two hidden HEAD versions of the health routes) |
 | Database tables | 14 |
 | Evaluations | 5 (search, question answering on three documents, key terms, must-ask checklist, steadiness) |
 | Documents it can read | PDFs (including scanned ones, read by OCR), and phone photos or scans (JPG, PNG, HEIC) |
 | Limits | 50 MB a file, 25 documents a person, 100 pages a document |
 | Daily allowance per person | 40 questions, 10 document reads, 20 overviews |
-| Time to answer a question | about 2.5 seconds on average on my test documents (measured before it went online) |
+| Time to answer a question | 4.0 seconds on average, slowest 46.4 seconds, on my test documents (the latest recorded run, `evals/results/qa-2026-10-27.md`) |
 | Time to read a whole document | about 10 to 30 seconds on my test documents, since the key terms and the questions are each read three times |
 
 ## What works today
@@ -64,7 +64,7 @@ no outside person has tried it, so expect surprises. What is left is small and l
 | Piece | Status |
 |---|---|
 | The demo video | Remade on November 17 from the real app, real API and real Gemini on the sample lease, in light theme at 1080p, 1 minute 29.6 seconds, with a faster narration (about 162 words a minute), captions on every sentence, scenes for sharing and security, a short technology scene and a video window that fits any screen |
-| An alert that tells me when the site is down | Not set up yet |
+| An alert that tells me when the site is down | UptimeRobot is recorded as checking the site and the API's `/health/ready` every 5 minutes and emailing on a failure (see `infra/DEPLOY.md`). Confirm it in the UptimeRobot account before the launch post |
 | The per-minute request limit in the website | Built, but on the live site it cannot reach its Redis and lets requests through. The setting is now cleaned up on read and the log says what looks wrong; I still need to confirm the value in Upstash. The daily limits and the site-wide cap are enforced by the API and work |
 | Build and test tools | 32 open dependency alerts, all in development tools (vite, hono, undici and similar). None ships to a user, and the scan of what ships passes. I will update them in a separate careful change |
 | An agent step that retries a weak search | Not started, and may not be worth it |
@@ -92,7 +92,7 @@ no outside person has tried it, so expect surprises. What is left is small and l
 - **Reranking made things worse** (67% against 96%), so it is switched off by default.
 - **Daily limits are per account.** Someone who deletes their account and signs up again gets a fresh allowance. The site-wide
   daily cap on model calls is what bounds the cost.
-- **The slowest answer took 41 seconds.** I have not looked into why.
+- **The slowest answer took 46.4 seconds** in the latest recorded run. I have not looked into why, and I have not measured it on the live site.
 - **The live site has seen very little use.** Hosting is on small plans, which is fine for a launch and not for heavy use.
 - **The browser tests use a fake API.** It checks tokens like the real one and refuses what the real one would, but it is not the
   real one. The accessibility scans find what a machine can detect, which is only part of the problems, so a person should still try
