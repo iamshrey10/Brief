@@ -8,11 +8,12 @@ import { signInWithGoogle, signOutToHome } from "@/lib/auth-actions";
 export function SiteHeader({ signedIn }: { signedIn: boolean }) {
   return (
     <header className="sticky top-0 z-40 border-b border-border/70 bg-background">
-      <div className="mx-auto flex h-16 w-[min(100%-3rem,1400px)] items-center justify-between gap-4">
+      <div className="mx-auto flex min-h-16 w-[min(100%-3rem,1400px)] flex-wrap items-center justify-between gap-x-3 gap-y-1 py-1">
         <Link href="/" className="font-heading text-2xl font-semibold tracking-tight text-foreground max-sm:inline-block max-sm:py-2">
           Brief<span className="text-primary">.</span>
         </Link>
-        <div className="flex items-center gap-2">
+        {/* The controls wrap on a very narrow phone, where a signed in visitor sees three of them and they are wider than the bar. */}
+        <div className="flex flex-wrap items-center justify-end gap-2">
           <ThemeToggle />
           {signedIn ? (
             <>
