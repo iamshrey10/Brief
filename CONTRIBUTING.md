@@ -20,7 +20,7 @@ what was tested, and what a host deploys from it is too.
        scripts/check-all.sh --e2e    # and the browser tests (needs Redis: docker compose up -d)
 
 4. Push the branch and open a pull request into `main`. Say what changed, how it works, what was checked and what is not in it.
-5. Wait for the three required checks: **api, lint and tests**, **web, lint, tests and build**, and **web, browser tests**.
+5. Wait for the three required checks: **api, lint and tests**, **web, lint, tests and build**, and **web, browser tests**. The browser tests run as three parts side by side, and the last check passes when all three have. If a pull request only adds or edits files in `Brief-Resources` (screenshots, PDFs and the like), the slow tests are skipped and the three checks still pass; the commit message check always runs. Deleting or renaming one of those files runs everything, since a link could break.
 6. Merge with **Rebase and merge**. Squash and merge commits are switched off, so every commit stays on `main` as it was
    written. The branch is deleted after the merge.
 
