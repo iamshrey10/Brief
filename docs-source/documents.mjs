@@ -9,11 +9,12 @@ export const DOCUMENTS = [
   { name: "design", folder: "07-System-Design", file: "Brief-System-Design", title: "System Design", kind: "System design", subtitle: "Requirements, design, data, security, errors, performance, scale and limits", running: "System Design" },
   { name: "cicd", folder: "08-CI-CD", file: "Brief-CI-CD-Explanation", title: "CI/CD Explanation", kind: "CI/CD", subtitle: "How a change becomes the live site, and how it is checked on the way", running: "CI/CD Explanation" },
   { name: "ai", folder: "05-Technology-Stack", file: "Brief-AI-LLM-Documentation", title: "AI and LLM Documentation", kind: "AI and LLM", subtitle: "Where a language model is used in Brief, how, and what is deliberately not left to it", running: "AI and LLM" },
-  { name: "ip-prep", folder: "04-Interview-Preparation", file: "Brief-Interview-Preparation", title: "Interview Preparation", kind: "Interview preparation", subtitle: "Brief explained in plain English: what it is, how it works, why it was built this way, and what comes next", running: "Interview Preparation" },
-  { name: "ip-qa", tocDepth: 2, folder: "04-Interview-Preparation", file: "Brief-Expected-Questions-and-Answers", title: "Expected Questions and Answers", kind: "Interview question bank", subtitle: "Questions an interviewer may ask about Brief, each with a short answer, a detailed answer and a follow-up", running: "Expected Questions and Answers" },
-  { name: "ip-deep", folder: "04-Interview-Preparation", file: "Brief-Technical-Deep-Dive", title: "Technical Deep Dive", kind: "Technical deep dive", subtitle: "The real implementation: files, functions, routes, data models and how the parts talk to each other", running: "Technical Deep Dive" },
-  { name: "ip-pitch", folder: "04-Interview-Preparation", file: "Brief-Three-Minute-Pitch", title: "Project Pitches", kind: "Pitch", subtitle: "A 30 second pitch, a 60 second explanation, a three minute presentation and a five minute version", running: "Project Pitches" },
-  { name: "ip-quick", folder: "04-Interview-Preparation", file: "Brief-Interview-Quick-Revision", title: "Quick Revision", kind: "Quick revision", subtitle: "Ten to fifteen minutes of revision before an interview", running: "Quick Revision" },
-  { name: "ip-challenges", folder: "04-Interview-Preparation", file: "Brief-Technical-Challenges-and-Decisions", title: "Technical Challenges and Decisions", kind: "Engineering decisions", subtitle: "The real problems met while building Brief, the options considered, and why each choice was made", running: "Challenges and Decisions" },
-  { name: "ip-achievements", folder: "04-Interview-Preparation", file: "Brief-Project-Achievements", title: "Project Achievements", kind: "Achievements", subtitle: "Three resume-ready bullets with the evidence behind each, and versions for a resume, LinkedIn, the README and a hackathon", running: "Project Achievements" },
 ];
+
+// Extra documents that are kept on one computer and not committed (see documents-private.mjs when it exists).
+try {
+  const { PRIVATE } = await import("./documents-private.mjs");
+  DOCUMENTS.push(...PRIVATE);
+} catch (error) {
+  if (error?.code !== "ERR_MODULE_NOT_FOUND") throw error;
+}
