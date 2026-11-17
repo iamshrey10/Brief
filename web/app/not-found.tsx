@@ -18,7 +18,7 @@ export default function NotFound() {
           </Link>
         </div>
       </header>
-      <main className="mx-auto flex w-[min(100%-3rem,40rem)] flex-1 flex-col justify-center gap-4 py-16">
+      <div className="mx-auto flex w-[min(100%-3rem,40rem)] flex-1 flex-col justify-center gap-4 py-16">
         <p className="font-mono text-xs tracking-wide text-muted-foreground">404</p>
         <h1 className="font-heading text-3xl font-semibold tracking-tight text-foreground">That page isn&apos;t here.</h1>
         <p className="text-muted-foreground">
@@ -32,7 +32,7 @@ export default function NotFound() {
             Back to the first page
           </Link>
         </div>
-      </main>
+      </div>
     </div>
   );
 }
