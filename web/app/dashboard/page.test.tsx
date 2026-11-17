@@ -88,7 +88,7 @@ describe("the dashboard home", () => {
   it("asks for the documents and what is worked out about each, each once", async () => {
     await page();
 
-    expect(getMock.mock.calls.map(([, path]) => path).sort()).toEqual(["/documents", "/me", "/me/insights", "/me/key-dates", "/shared"]);
+    expect(getMock.mock.calls.map(([, path]) => path).sort()).toEqual(["/documents", "/me", "/me/insights", "/me/key-dates", "/me/reminders", "/shared"]);
   });
 
   it("shows how long the lease has left when a clear end date was found, and no card when none was", async () => {
@@ -107,6 +107,38 @@ describe("the dashboard home", () => {
 
     getMock.mockResolvedValue([]);
     expect(await page()).not.toContain("Lease remaining");
+  });
+
+  it("always shows the Reminders card with the plus button, even with no lease and no documents", async () => {
+    const html = await page();
+
+    expect(html).toContain('aria-label="Reminders"');
+    expect(html).toContain('aria-label="Add a reminder"');
+    expect(html).not.toContain("Lease remaining");
+    expect(html).toContain("Nothing here yet.");
+  });
+
+  it("shows the person's own reminders, apart from the ones found in their documents", async () => {
+    getMock.mockImplementation(async (_email: string, path: string) =>
+      path === "/me/reminders"
+        ? [{ id: "r1", title: "Call the landlord", description: null, due_date: "2099-01-05", due_time: null, document_id: null, document_name: null, completed: false }]
+        : [],
+    );
+
+    const html = await page();
+
+    expect(html).toContain("Your reminders");
+    expect(html).toContain("Call the landlord");
+    expect(html).not.toContain("From your documents");
+  });
+
+  it("says the reminders could not be loaded, and still shows the card, when the backend cannot be asked for them", async () => {
+    getMock.mockImplementation(async (_email: string, path: string) => (path === "/me/reminders" ? null : []));
+
+    const html = await page();
+
+    expect(html).toContain("Your reminders could not be loaded just now");
+    expect(html).toContain('aria-label="Add a reminder"');
   });
 
   it("asks someone who has not given their name for it first, and only when the backend clearly says so", async () => {

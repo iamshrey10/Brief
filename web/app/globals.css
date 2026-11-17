@@ -440,13 +440,16 @@ summary {
   object-fit: contain;
   max-height: calc(100dvh - 6.5rem);
 }
-html:has(dialog.demo-dialog[open]) {
+html:has(dialog.demo-dialog[open]),
+html:has(dialog.reminder-dialog[open]) {
   overflow: hidden;
 }
-dialog.demo-dialog[open] {
+dialog.demo-dialog[open],
+dialog.reminder-dialog[open] {
   animation: dialog-in 220ms cubic-bezier(0.2, 0.7, 0.2, 1);
 }
-dialog.demo-dialog[open]::backdrop {
+dialog.demo-dialog[open]::backdrop,
+dialog.reminder-dialog[open]::backdrop {
   animation: backdrop-in 220ms ease;
 }
 @media (prefers-reduced-motion: reduce) {
@@ -455,7 +458,9 @@ dialog.demo-dialog[open]::backdrop {
   .chart-dot,
   .chart-bar,
   dialog.demo-dialog[open],
-  dialog.demo-dialog[open]::backdrop {
+  dialog.demo-dialog[open]::backdrop,
+  dialog.reminder-dialog[open],
+  dialog.reminder-dialog[open]::backdrop {
     animation: none;
   }
 }
