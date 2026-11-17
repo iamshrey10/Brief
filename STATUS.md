@@ -63,7 +63,7 @@ no outside person has tried it, so expect surprises. What is left is small and l
 
 | Piece | Status |
 |---|---|
-| The demo video | Re-recorded on November 13 with the final screens, in light theme at 1080p, about 1 minute 25 seconds, with a stack scene |
+| The demo video | Remade on November 17 from the real app, real API and real Gemini on the sample lease, in light theme at 1080p, 1 minute 28.8 seconds, with a faster narration (about 156 words a minute), an animated technology scene and a video window that fits any screen |
 | An alert that tells me when the site is down | Not set up yet |
 | The per-minute request limit in the website | Built, but on the live site it cannot reach its Redis and lets requests through. The setting is now cleaned up on read and the log says what looks wrong; I still need to confirm the value in Upstash. The daily limits and the site-wide cap are enforced by the API and work |
 | Build and test tools | 32 open dependency alerts, all in development tools (vite, hono, undici and similar). None ships to a user, and the scan of what ships passes. I will update them in a separate careful change |
