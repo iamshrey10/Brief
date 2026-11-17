@@ -558,7 +558,9 @@ async def create_upload(
         raise HTTPException(status_code=400, detail="unknown folder")
     if body.content_type not in ALLOWED_CONTENT_TYPES:
         raise HTTPException(status_code=400, detail="unsupported file type")
-    if body.file_size_bytes <= 0 or body.file_size_bytes > MAX_FILE_SIZE_BYTES:
+    if body.file_size_bytes <= 0:
+        raise HTTPException(status_code=400, detail="That file is empty. Choose a file with something in it.")
+    if body.file_size_bytes > MAX_FILE_SIZE_BYTES:
         raise HTTPException(status_code=400, detail="file is too large, 50MB max")
 
     # Uploads this person started and never confirmed would otherwise hold a slot for ever. Cleared only

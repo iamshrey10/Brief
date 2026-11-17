@@ -485,7 +485,9 @@ export function OverviewPanel({
   return (
     <section
       aria-label="Overview"
-      className="min-h-0 flex-1 overflow-y-auto rounded-lg border border-border bg-background p-4 print:overflow-visible print:border-0 print:p-0"
+      // The panel scrolls on its own, so it must be able to take focus, or a keyboard cannot reach what is below the fold.
+      tabIndex={0}
+      className="min-h-0 flex-1 overflow-y-auto rounded-lg border border-border bg-background p-4 outline-none focus-visible:ring-3 focus-visible:ring-ring/50 print:overflow-visible print:border-0 print:p-0"
     >
       <div className="flex flex-col gap-8">
         {keyTerms.state.status !== "ready" && keyTerms.state.status !== "error" && <SummaryActionsPlaceholder />}
