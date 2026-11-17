@@ -11,9 +11,10 @@ function count(event: "demo_opened" | "demo_finished") {
 }
 
 /**
- * The button on the first screen that plays a walk through of Brief of under a minute and a half: signing in, the tour, adding photos, the key terms, asking a question, sharing, the account, and the technology behind it.
+ * The button on the first screen that plays a walk through of Brief of under a minute and a half: the problem, the dashboard and adding a document, the key terms with their quotes, the questions to ask before signing, asking a question and checking its source, and the technology behind it.
  * It opens in a window over the page, with captions, and the video is only fetched once it is opened. Escape, the Close button or a click
- * outside it puts it away, and it stops playing when it goes.
+ * outside it puts it away, and it stops playing when it goes. The window is as wide as the screen allows without the picture becoming taller than the
+ * screen (see .demo-dialog in globals.css), the page behind it does not scroll, and the picture is never stretched.
  */
 export function DemoVideoButton() {
   const dialog = useRef<HTMLDialogElement>(null);
@@ -41,7 +42,7 @@ export function DemoVideoButton() {
         onClick={(event) => {
           if (event.target === event.currentTarget) dialog.current?.close();
         }}
-        className="demo-dialog m-auto w-[min(94vw,1040px)] max-w-none rounded-2xl border border-border bg-card p-3 text-card-foreground shadow-2xl backdrop:bg-black/70"
+        className="demo-dialog m-auto max-w-none rounded-2xl border border-border bg-card p-3 text-card-foreground shadow-2xl backdrop:bg-black/70"
       >
         <div className="flex items-center justify-between gap-3 px-2 pb-3">
           <p className="text-sm font-medium text-foreground">Brief in under 90 seconds</p>
