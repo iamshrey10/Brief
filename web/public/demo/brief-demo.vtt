@@ -18,11 +18,11 @@ A chatbot might guess, and a guess in a contract is dangerous.
 00:00:14.900 --> 00:00:17.599
 Brief shows the exact words behind every answer.
 
-00:00:18.300 --> 00:00:23.107
-Sign in with Google, and your dashboard shows every document, and what needs attention.
+00:00:18.300 --> 00:00:24.263
+Sign in with Google, and your dashboard shows every document, what is ready, and the questions still to ask.
 
-00:00:24.200 --> 00:00:29.808
-Add a PDF, a scan, or up to five phone photos, and Brief reads it into numbered clauses.
+00:00:24.500 --> 00:00:31.567
+Upload any contract or agreement, as a PDF, a scan, or phone photos, and Brief reads it into numbered clauses.
 
 00:00:32.200 --> 00:00:35.536
 Open a document, and the key terms appear, each with its quote.
@@ -48,17 +48,17 @@ Code checks every quote against the clause, and shows only what it can prove.
 00:01:02.400 --> 00:01:04.717
 If the document does not say, Brief says so.
 
-00:01:06.200 --> 00:01:10.388
-Under the hood, a Next.js website talks to a FastAPI service.
+00:01:06.200 --> 00:01:10.047
+Share your dashboard with someone you trust, and choose how long they can see it.
 
-00:01:10.400 --> 00:01:15.259
-Postgres with pgvector stores the clauses, and Gemini does the language work.
+00:01:11.100 --> 00:01:18.120
+Your account is protected by Google sign-in and optional two-step verification, and you can delete everything at any time.
 
-00:01:15.500 --> 00:01:19.916
-It runs on Vercel and Render, and GitHub Actions tests every change.
+00:01:18.300 --> 00:01:22.508
+Built with Next.js, FastAPI, Postgres, and Google Gemini.
 
-00:01:20.100 --> 00:01:23.919
-Brief explains what a document says. It is not legal advice.
+00:01:22.800 --> 00:01:26.435
+It explains what a document says. It is not legal advice.
 
-00:01:24.200 --> 00:01:27.662
-Brief. Every clause, explained, at briefcontracts.com.
+00:01:26.700 --> 00:01:28.315
+Brief. Every clause, explained.

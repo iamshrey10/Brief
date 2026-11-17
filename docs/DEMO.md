@@ -1,18 +1,20 @@
 # Recording a demo of Brief
 
-**The video on the site** (`web/public/demo/brief-demo.mp4`, 1 minute 28.8 seconds, 1920 by 1080, 30 frames per second, light theme) was remade on
+**The video on the site** (`web/public/demo/brief-demo.mp4`, 1 minute 29.6 seconds, 1920 by 1080, 30 frames per second, light theme) was remade on
 November 17, 2026. It plays when someone presses "Watch how it works" on the first page. The screens are the real website running locally against
 the real API, a real Postgres and real Gemini calls, on the sample lease that ships with the site (`web/public/samples/sample-lease.pdf`, a made up
 lease with made up names and amounts), so the key terms, the questions to ask and both answers are the model's own output, not canned text. It covers
-the problem, the dashboard and the Documents page, the key terms with their quotes, "Before you sign", asking a question and checking its source, a
-question the lease does not answer, an animated scene of the technology (Next.js, React, TypeScript, Tailwind CSS, FastAPI, Python, PostgreSQL with
-pgvector on Neon, Google Gemini with `gemini-3.5-flash-lite` and `gemini-embedding-001`, Vercel, Render, Cloudflare R2 and GitHub Actions), and a closing
-card with the address. It says out loud that Brief is not legal advice.
+the problem, the dashboard and adding any kind of contract (PDF, scan or phone photos), the key terms with their quotes, "Before you sign", asking a
+question and checking its source, a question the lease does not answer, sharing the dashboard for a time the owner chooses, two-step verification and
+deleting everything, a short animated scene of the technology (Next.js, React, TypeScript, Tailwind CSS, FastAPI, Python, PostgreSQL with pgvector,
+Google Gemini with `gemini-3.5-flash-lite` and `gemini-embedding-001`, Vercel, Render, Cloudflare R2 and GitHub Actions), and a closing card with the
+address. Every spoken sentence is also a caption in the picture. It says out loud that Brief is not legal advice.
 
-It does not show a file being uploaded (local file storage was not connected, so the lease was read by the API's own reading code), it does not show the
+The sharing, Profile and two-step screens came from the website's stand-in test API (no AI is involved in them), with Brief's real daily limits set
+on the Profile page and the invitation link showing briefcontracts.com. It does not show a file being uploaded (local file storage was not connected, so the lease was read by the API's own reading code), it does not show the
 waiting time of the key terms (about 45 seconds the first time), and the typing and the cursor are made by a script. The account address shown is changed to
 example.com. The voice is the Kokoro voice `am_fenrir` at 1.1 times normal speed, one clip for each sentence, over a quiet ambient pad made for the video, so
-there is nothing to license. The narration is about 156 words a minute. The captions are burned into the picture from 8 seconds on, and the same sentences
+there is nothing to license. The narration is about 162 words a minute overall. The captions are burned into the picture from 8 seconds on, and the same sentences
 are in `brief-demo.vtt` for the video window's captions button. The script, the storyboard and the production notes are in
 the `03-Demo-Video` folder of the Brief-Resources documents.
 
