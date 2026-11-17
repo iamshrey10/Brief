@@ -21,6 +21,7 @@ export default function PrivacyPage() {
           <li>The file you upload, in private storage, and its name and the kind you chose. A photo is kept as the photo.</li>
           <li>The text of the document split into clauses, and a numeric fingerprint of each clause used for search.</li>
           <li>What Brief worked out from it: the key terms, the dates, and the answers to the questions to ask before signing.</li>
+          <li>Reminders you write for yourself: the title, the date, and the time, the note and the document you linked, if you add them. Brief shows them to you on your dashboard and does not send alerts. They go when you delete them, and when you delete your account.</li>
           <li>How many questions, reads and overviews you used today, to apply a daily limit.</li>
           <li>How long Brief is open and in use for you each day, and how many visits that was. It is seconds and a count, with no page names and no content.</li>
           <li>For up to 30 days, a record of how each question was answered: when, how long it took, and the ids of the clauses used. It holds no question and no answer text.</li>

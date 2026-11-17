@@ -32,7 +32,7 @@ Brief is built around one rule: nothing is shown that cannot be proved from the 
 - **Ask in your own words.** Every answer cites its clause. If nothing in the document supports an answer, you are told so.
 - **Any document, any format.** PDFs, scanned PDFs (OCR) and phone photos, with hard-to-read pages flagged instead of silently accepted.
 - **Take it with you.** Copy the summary, download it as a PDF, add dates to a calendar, or email the open questions.
-- **Dashboard.** Every document, the soonest dates and the questions still open, without calling the model.
+- **Dashboard and reminders.** Every document, the soonest dates and the questions still open, without calling the model. A Reminders card shows the lease dates found in your documents and the reminders you write yourself (a title, a date, and optionally a time, a note and a document), which you can edit, tick off and delete. Brief shows them and does not send alerts.
 - **Sharing.** Show your dashboard to someone you approve, for a time you choose (1 hour to 90 days), and revoke it at any time.
 - **Account security.** Google sign-in, optional two-step verification with an authenticator app, and deleting your account removes everything.
 
@@ -61,7 +61,7 @@ It works on a phone and a laptop, in light and dark. More screens are in [Brief-
 | Area | Technologies | What they do in Brief |
 |---|---|---|
 | **Frontend** | Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS 4, shadcn/ui, Auth.js | Renders every screen and handles Google sign-in. It is also the browser's only door to the API: its `/api/backend/*` routes check the session, apply a per-user rate limit, and sign a 60-second token for each call. |
-| **Backend** | FastAPI, Python 3.12, SQLAlchemy 2 (async), Alembic, Pydantic | Owns everything that matters: reading documents, splitting clauses, search, answers, key terms, daily limits, sharing and two-step verification. 49 route handlers. |
+| **Backend** | FastAPI, Python 3.12, SQLAlchemy 2 (async), Alembic, Pydantic | Owns everything that matters: reading documents, splitting clauses, search, answers, key terms, daily limits, sharing and two-step verification. 53 route handlers. |
 | **Database and storage** | PostgreSQL 16 with pgvector, Redis 7, Cloudflare R2 | Postgres holds users, documents, clauses, their embeddings and a full-text index, so one query can use meaning and keywords. Redis holds the rate-limit counters. R2 holds the uploaded files, reached only through links that expire after five minutes. |
 | **AI and LLM** | Google Gemini (`gemini-3.5-flash-lite`, `gemini-embedding-001`), PyMuPDF, Tesseract OCR, OpenCV | Embeddings and search find the right clauses. The model writes answers, key terms and questions, and a second call judges them. PyMuPDF reads PDF text, and Tesseract reads scans and photos. |
 | **Infrastructure and DevOps** | Docker, Vercel, Render, Neon, Upstash, GitHub Actions, Dependabot | The website runs on Vercel and the API in a container on Render, with managed Postgres and Redis. GitHub Actions runs the checks on every change and a dependency audit every week. |
@@ -129,10 +129,10 @@ Measured on November 17, 2026 on a laptop:
 
 | Suite | Total | Passed | Failed | Skipped |
 |---|---|---|---|---|
-| API (pytest) | 1,298 | 1,298 | 0 | 0 |
-| Website unit tests (Vitest) | 1,937 | 1,937 | 0 | 0 |
-| Browser tests (Playwright, Chromium) | 342 | 342 | 0 | 0 |
-| **All** | **3,577** | **3,577** | **0** | **0** |
+| API (pytest) | 1,350 | 1,350 | 0 | 0 |
+| Website unit tests (Vitest) | 2,011 | 2,011 | 0 | 0 |
+| Browser tests (Playwright, Chromium) | 362 | 362 | 0 | 0 |
+| **All** | **3,723** | **3,723** | **0** | **0** |
 
 ESLint, TypeScript, Ruff and the production build are clean.
 

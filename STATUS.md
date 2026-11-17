@@ -19,9 +19,9 @@ no outside person has tried it, so expect surprises. What is left is small and l
 | | |
 |---|---|
 | Commits | 614 on main |
-| Tests | 3,577 (1,298 backend, 1,937 frontend, 342 in a real browser), all passing, run on my laptop on November 17 after the demo video change, and run on every pull request. The documents in `Brief-Resources` quote 3,576, the CI count one pull request earlier (the extra test checks the video window on a phone held sideways) |
-| API routes | 49 handlers (47 documented, plus two hidden HEAD versions of the health routes) |
-| Database tables | 14 |
+| Tests | 3,723 (1,350 backend, 2,011 frontend, 362 in a real browser), all passing, run on my laptop on November 17 after the reminders feature, and run on every pull request. The documents in `Brief-Resources` quote 3,576, the count from an earlier CI run |
+| API routes | 53 handlers (51 documented, plus two hidden HEAD versions of the health routes) |
+| Database tables | 15 |
 | Evaluations | 5 (search, question answering on three documents, key terms, must-ask checklist, steadiness) |
 | Documents it can read | PDFs (including scanned ones, read by OCR), and phone photos or scans (JPG, PNG, HEIC) |
 | Limits | 50 MB a file, 25 documents a person, 100 pages a document |
@@ -45,6 +45,7 @@ no outside person has tried it, so expect surprises. What is left is small and l
   it, and find words in the clause text.
 - **A Dashboard** with where your documents stand, the soonest dates, the questions still to ask, and what Brief found in each.
   Opening it never calls the model.
+- **Your own reminders.** The Reminders card on the Dashboard has a plus button for adding a reminder with a title and a date, and optionally a time, a note and one of your documents. A reminder can be edited, ticked off, brought back and deleted, and is kept for you alone. Brief only shows reminders: it does not send an email, a text or any alert.
 - **Documents:** folders, search, rename, read again, and a Bin that keeps deleted documents for 7 days.
 - **Sharing.** Show your dashboard to someone you approve for 1 hour up to 90 days, with a countdown, and take it back at any time.
 - **A Welcome page and a short tour** for first-time visitors, which can be replayed from Profile.
