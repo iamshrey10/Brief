@@ -39,7 +39,7 @@ and the browser tests check the screens as a person would see them.
     pnpm exec playwright install chromium   # once
     pnpm e2e
 
-These run a real browser against the site on port 3100, one test at a time (88 tests, a little over a minute). They
+These run a real browser against the site on port 3100, one test at a time (the count is printed at the end of a run). They
 cover the pages anyone can reach (the landing page, being turned away from the dashboard and the data routes,
 the light and dark mode button, the phone layout) and, signed in, the dashboard (listing, delete with confirm,
 cancel and Escape), the document page (clauses, a key term with two numbered quote buttons, a gap with wording

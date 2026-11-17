@@ -32,7 +32,7 @@ flowchart LR
 ```
 
 - **The browser never talks to the API.** Every call goes through the website's proxy routes (`web/lib/proxy.ts`),
-  which check the session, apply a rate limit of 30 calls a minute per person in Redis, give the call a request id, and
+  which check the session, apply a rate limit of 120 calls a minute per person in Redis, give the call a request id, and
   sign a token that expires in 60 seconds. A test fails if a route skips the proxy.
 - **The API trusts only that token.** It checks the signature, the algorithm (HS256 only) and the expiry, and every
   query is scoped to the person it names, so one person's documents are never reachable by another.
@@ -102,7 +102,7 @@ sequenceDiagram
     API->>Model: embed the clauses in batches
     API->>DB: save progress after each batch
     API->>DB: save clauses and embeddings, status ready, needs_retake or failed with a reason
-    loop every 3 seconds while processing
+    loop every 5 seconds while processing
         Browser->>Web: GET /api/backend/documents
         Web->>API: token + request id
         API-->>Browser: the list, with progress
