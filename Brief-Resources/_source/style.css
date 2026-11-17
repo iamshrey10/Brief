@@ -1,0 +1,72 @@
+/* One look for every Brief document: Times New Roman body, an indigo accent taken from the product, numbered headings, plain tables. */
+:root { --ink: #1b1b1f; --muted: #55555e; --accent: #3a32c4; --rule: #d9d6cf; --wash: #f4f2ec; --soft: #eeefff; }
+* { box-sizing: border-box; }
+html { font-family: "Times New Roman", Times, serif; color: var(--ink); font-size: 11.5pt; line-height: 1.42; }
+body { margin: 0; }
+@page { size: Letter; margin: 0.95in 0.9in 0.85in 0.9in; }
+@page cover { margin: 0; }
+.cover { page: cover; width: 8.5in; height: 11in; position: relative; overflow: hidden; background: #fbfaf8; break-after: page; }
+.cover .band { position: absolute; left: 0; top: 0; width: 100%; height: 4.1in; background: linear-gradient(135deg, #4f46e5 0%, #3a32c4 100%); }
+.cover .mark { position: absolute; left: 0.95in; top: 0.8in; color: #fff; font-size: 40pt; font-weight: bold; letter-spacing: 0.5px; }
+.cover .mark span { color: #c9c6ff; }
+.cover .kind { position: absolute; left: 0.95in; top: 1.95in; color: #dcdaff; font-size: 12pt; letter-spacing: 2.5px; text-transform: uppercase; }
+.cover h1 { position: absolute; left: 0.95in; right: 0.95in; top: 2.35in; margin: 0; color: #fff; font-size: 33pt; line-height: 1.12; font-weight: bold; }
+.cover .subtitle { position: absolute; left: 0.95in; right: 1.2in; top: 4.55in; font-size: 15pt; line-height: 1.4; color: var(--muted); font-style: italic; }
+.cover .facts { position: absolute; left: 0.95in; right: 0.95in; bottom: 1.05in; border-top: 1.5pt solid var(--accent); padding-top: 0.18in; font-size: 11pt; color: var(--muted); line-height: 1.7; }
+.cover .facts strong { color: var(--ink); }
+.page-body { page: body; }
+@page wide {
+  size: Letter landscape;
+  margin: 0.9in 0.7in 0.8in 0.7in;
+  @top-left { content: "Brief"; font: 9.5pt "Times New Roman", serif; color: #6a6a73; border-bottom: 0.6pt solid #cfccc4; padding-bottom: 5pt; width: 100%; }
+  @top-right { content: var(--running); font: italic 9.5pt "Times New Roman", serif; color: #6a6a73; border-bottom: 0.6pt solid #cfccc4; padding-bottom: 5pt; width: 100%; text-align: right; }
+  @bottom-left { content: "briefcontracts.com"; font: 9pt "Times New Roman", serif; color: #8a8a93; }
+  @bottom-right { content: "Page " counter(page) " of " counter(pages); font: 9pt "Times New Roman", serif; color: #55555e; }
+}
+figure.wide { page: wide; break-before: page; break-after: page; margin: 0; text-align: center; }
+figure.wide img { max-height: 6.15in; max-width: 100%; width: auto; border: 0.6pt solid var(--rule); }
+@page body {
+  margin: 0.95in 0.9in 0.85in 0.9in;
+  @top-left { content: "Brief"; font: 9.5pt "Times New Roman", serif; color: #6a6a73; border-bottom: 0.6pt solid #cfccc4; padding-bottom: 5pt; width: 100%; }
+  @top-right { content: var(--running); font: italic 9.5pt "Times New Roman", serif; color: #6a6a73; border-bottom: 0.6pt solid #cfccc4; padding-bottom: 5pt; width: 100%; text-align: right; }
+  @bottom-left { content: "briefcontracts.com"; font: 9pt "Times New Roman", serif; color: #8a8a93; }
+  @bottom-right { content: "Page " counter(page) " of " counter(pages); font: 9pt "Times New Roman", serif; color: #55555e; }
+}
+h1.doc { font-size: 24pt; margin: 0 0 4pt; }
+.toc { break-after: page; page: body; }
+.toc h1 { font-size: 20pt; color: var(--accent); margin: 0 0 14pt; border-bottom: 1.2pt solid var(--accent); padding-bottom: 6pt; }
+.toc .row { display: flex; align-items: baseline; gap: 6pt; margin: 3.2pt 0; font-size: 11.5pt; }
+.toc .row.l3 { margin-left: 22pt; font-size: 10.5pt; color: #3a3a42; margin-top: 1.4pt; margin-bottom: 1.4pt; }
+.toc .row .n { width: 26pt; color: var(--accent); font-weight: bold; }
+.toc .row.l3 .n { width: 30pt; font-weight: normal; }
+.toc .row .t { flex: none; }
+.toc .row .dots { flex: 1; border-bottom: 0.8pt dotted #a9a6a0; transform: translateY(-3pt); }
+.toc .row .p { width: 22pt; text-align: right; }
+h2 { font-size: 17pt; color: var(--accent); margin: 22pt 0 7pt; padding-bottom: 4pt; border-bottom: 0.9pt solid var(--rule); break-after: avoid; page-break-after: avoid; }
+h2 .num { display: inline-block; min-width: 26pt; }
+h3 { font-size: 13pt; margin: 15pt 0 4pt; color: #25252b; break-after: avoid; page-break-after: avoid; }
+h3 .num { display: inline-block; min-width: 32pt; color: var(--accent); }
+h4 { font-size: 11.5pt; margin: 10pt 0 2pt; font-style: italic; break-after: avoid; }
+p { margin: 0 0 7pt; text-align: left; orphans: 3; widows: 3; }
+ul, ol { margin: 2pt 0 8pt 0; padding-left: 20pt; }
+li { margin: 0 0 3pt; }
+li ul { margin: 2pt 0 2pt; }
+code { font-family: "Courier New", monospace; font-size: 9.8pt; background: var(--wash); padding: 0 2.5pt; border-radius: 2pt; }
+pre { font-family: "Courier New", monospace; font-size: 9pt; line-height: 1.32; background: var(--wash); border: 0.6pt solid var(--rule); border-radius: 3pt; padding: 7pt 9pt; margin: 4pt 0 9pt; white-space: pre-wrap; break-inside: avoid; }
+table { width: 100%; border-collapse: collapse; margin: 5pt 0 11pt; font-size: 10pt; line-height: 1.32; break-inside: auto; }
+thead { display: table-header-group; }
+th { background: var(--accent); color: #fff; text-align: left; padding: 4.5pt 6pt; font-weight: bold; border: 0.6pt solid var(--accent); }
+td { padding: 4pt 6pt; border: 0.6pt solid var(--rule); vertical-align: top; }
+tr { break-inside: avoid; }
+tbody tr:nth-child(even) td { background: #faf9f6; }
+td code, th code { font-size: 9pt; }
+.note { background: var(--soft); border-left: 3pt solid var(--accent); padding: 6pt 10pt; margin: 6pt 0 10pt; font-size: 10.8pt; break-inside: avoid; }
+figure { margin: 8pt 0 12pt; text-align: center; break-inside: avoid; }
+figure img { max-width: 100%; border: 0.6pt solid var(--rule); border-radius: 3pt; }
+figcaption { font-size: 9.8pt; font-style: italic; color: var(--muted); margin-top: 4pt; }
+.pagebreak { break-after: page; }
+strong { font-weight: bold; }
+
+td.label { width: 22%; font-weight: bold; background: #f1f0fb; color: #25252b; }
+tbody tr:nth-child(even) td.label { background: #f1f0fb; }
+.keep table { break-inside: avoid; }
