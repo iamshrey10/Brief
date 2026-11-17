@@ -1,19 +1,24 @@
 # Recording a demo of Brief
 
-**The video on the site** (`web/public/demo/brief-demo.mp4`, 1 minute 23 seconds, 1920 by 1080, light theme) was recorded on November 13, 2026
-from the website running locally against the test API (`web/e2e/support/fake-api.mjs`), so it shows a made up lease and made up numbers,
-not a live model reading a file. The interface is the real website. It covers the landing page, signing in and the Welcome page, the guided tour,
-photos of a paper contract put together into one document (on a phone), the key terms and "Before you sign", asking a question and
-clicking its source, the Dashboard tile that leads to the documents, sharing with a time limit and the invitation, the Bin, two-step
-verification and Appearance, then a short stack scene (Next.js, FastAPI, Postgres with pgvector, Gemini, the quote check, Redis and
-Cloudflare R2), and ends on a card with the address. Small labels name each scene, and each part fades in and out.
+**The video on the site** (`web/public/demo/brief-demo.mp4`, 1 minute 28.8 seconds, 1920 by 1080, 30 frames per second, light theme) was remade on
+November 17, 2026. It plays when someone presses "Watch how it works" on the first page. The screens are the real website running locally against
+the real API, a real Postgres and real Gemini calls, on the sample lease that ships with the site (`web/public/samples/sample-lease.pdf`, a made up
+lease with made up names and amounts), so the key terms, the questions to ask and both answers are the model's own output, not canned text. It covers
+the problem, the dashboard and the Documents page, the key terms with their quotes, "Before you sign", asking a question and checking its source, a
+question the lease does not answer, an animated scene of the technology (Next.js, React, TypeScript, Tailwind CSS, FastAPI, Python, PostgreSQL with
+pgvector on Neon, Google Gemini with `gemini-3.5-flash-lite` and `gemini-embedding-001`, Vercel, Render, Cloudflare R2 and GitHub Actions), and a closing
+card with the address. It says out loud that Brief is not legal advice.
 
-How it was made, so it can be done again: the picture is captured frame by frame from the browser at 1.5 times its pixel density (a true
-1080p), with a drawn cursor, because the built in video recording cannot capture more than the normal size. The narration is the Kokoro
-voice `am_fenrir` at 1.14 times normal speed, one clip for each scene, placed where its scene starts. The phone part is a touch screen at
-390 by 844 on a plain background. The test address is replaced in the page, the lease end date and the daily limits shown were set to
-realistic values for the recording, and the invitation link shows the real address. It shows no browser address bar, because a screen
-capture of the page holds the page only. It does not claim more than the product does, and it says out loud that Brief is not legal advice.
+It does not show a file being uploaded (local file storage was not connected, so the lease was read by the API's own reading code), it does not show the
+waiting time of the key terms (about 45 seconds the first time), and the typing and the cursor are made by a script. The account address shown is changed to
+example.com. The voice is the Kokoro voice `am_fenrir` at 1.1 times normal speed, one clip for each sentence, over a quiet ambient pad made for the video, so
+there is nothing to license. The narration is about 156 words a minute. The captions are burned into the picture from 8 seconds on, and the same sentences
+are in `brief-demo.vtt` for the video window's captions button. The script, the storyboard and the production notes are in
+the `03-Demo-Video` folder of the Brief-Resources documents.
+
+The video window (`web/components/demo-video.tsx`, `.demo-dialog` in `web/app/globals.css`) is as wide as the screen allows without the 16 by 9 picture
+being taller than the screen, never stretches the picture, and keeps the page behind it from scrolling while it is open. Escape, the Close button or a
+click outside it puts it away, and focus goes back to the button.
 
 The rest of this page is the script for recording a longer demo by hand against the real services.
 
