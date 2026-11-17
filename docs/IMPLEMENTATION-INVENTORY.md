@@ -169,4 +169,4 @@ These were wrong or stale compared with the code and were corrected in the same 
 - `api/scripts/*` (`seed.py`, `find_request.py`, `recent_failures.py`, `set_bucket_cors.py`): operational tools used by
   `infra/DEPLOY.md` and `docs/ARCHITECTURE.md`, and covered by tests.
 - `evals/results/*`: recorded results that CI compares with `thresholds.json`.
-- `web/public/demo/brief-demo.mp4` (8 MB): the demo video the site plays.
+- `web/public/demo/brief-demo.mp4` (16 MB): the demo video the site plays.

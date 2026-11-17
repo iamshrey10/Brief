@@ -192,7 +192,7 @@ Each feature below answers the same seven questions: what it does, why it exists
 
 | | |
 |---|---|
-| What it does | The public landing page explains Brief, offers a demo video of about 83 seconds, and, only if the visitor says yes, counts visits with Google Analytics. The Privacy and Terms pages explain what is kept. |
+| What it does | The public landing page explains Brief, offers a demo video of 1 minute 29 seconds, and, only if the visitor says yes, counts visits with Google Analytics. The Privacy and Terms pages explain what is kept. |
 | Why it exists | Visitors need to understand the product before signing in, and the owner wants to know where visitors come from without tracking anyone who has not agreed. |
 | How a person uses it | Presses "Watch how it works", or answers the small notice at the bottom of the page. |
 | Website | `app/page.tsx`, `components/landing-hero.tsx`, `landing-features.tsx`, `landing-steps.tsx`, `demo-video.tsx`, `analytics-notice.tsx`, `lib/analytics.ts`, `app/privacy/`, `app/terms/`, `app/not-found.tsx` |
