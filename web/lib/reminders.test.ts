@@ -215,7 +215,11 @@ describe("errorText", () => {
 
   it("explains the cases that need it, and never shows technical detail", async () => {
     expect(await errorText(answer(401, { detail: "invalid token" }))).toContain("Sign in again");
-    expect(await errorText(answer(404, { detail: "reminder not found" }))).toContain("Refresh the page");
+    expect(await errorText(answer(404, { detail: "reminder not found" }))).toBe("That reminder no longer exists. Refresh the page.");
+    expect(await errorText(answer(404, { detail: "document not found" }))).toContain("That document could not be found");
+    // The API answers "Not Found" for a route it does not have, which is what a new website sees from a server not yet updated.
+    expect(await errorText(answer(404, { detail: "Not Found" }))).toBe("Reminders are not available right now. Please try again in a few minutes.");
+    expect(await errorText(answer(404, "<html>not found</html>"))).toContain("not available right now");
     expect(await errorText(answer(422, { detail: [{ loc: ["body", "due_date"], msg: "bad" }] }))).toContain("check the reminder");
     expect(await errorText(answer(502, { detail: "could not reach the reading service" }))).toBe("Something went wrong on our side. Please try again in a moment.");
     expect(await errorText(answer(500, "<html>boom</html>"))).toBe("Something went wrong on our side. Please try again in a moment.");

@@ -496,7 +496,34 @@ describe("changing, finishing and deleting a reminder", () => {
     await user.click(screen.getByRole("button", { name: "Delete reminder: Call the landlord" }));
     await user.click(within(screen.getByRole("group")).getByRole("button", { name: "Delete" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("could not be found");
+    expect(await screen.findByRole("alert")).toHaveTextContent("That reminder no longer exists. Refresh the page.");
     expect(screen.getByText("Call the landlord")).toBeInTheDocument();
+  });
+
+  it("says so, and not that something is missing, when the server does not have reminders yet", async () => {
+    const user = userEvent.setup();
+    fetchMock.mockReturnValueOnce(answer(404, { detail: "Not Found" }));
+    show();
+    await openAdd(user);
+    await user.type(inDialog().getByLabelText(/Title/), "While the server updates");
+
+    await user.click(inDialog().getByRole("button", { name: "Add reminder" }));
+
+    expect(await inDialog().findByRole("alert")).toHaveTextContent("Reminders are not available right now. Please try again in a few minutes.");
+    expect(dialog()).toHaveAttribute("open");
+    expect(inDialog().getByLabelText(/Title/)).toHaveValue("While the server updates");
+  });
+
+  it("says the document could not be found, when that is what the server says", async () => {
+    const user = userEvent.setup();
+    fetchMock.mockReturnValueOnce(answer(404, { detail: "document not found" }));
+    show();
+    await openAdd(user);
+    await user.type(inDialog().getByLabelText(/Title/), "Linked");
+    await user.selectOptions(inDialog().getByLabelText(/Linked document/), "d1");
+
+    await user.click(inDialog().getByRole("button", { name: "Add reminder" }));
+
+    expect(await inDialog().findByRole("alert")).toHaveTextContent("That document could not be found");
   });
 });

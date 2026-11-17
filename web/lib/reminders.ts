@@ -161,7 +161,13 @@ export async function errorText(response: Response): Promise<string> {
     detail = undefined;
   }
   if (response.status === 401) return "Your session has ended. Sign in again to continue.";
-  if (response.status === 404) return "That reminder or document could not be found. Refresh the page and try again.";
+  if (response.status === 404) {
+    // The API says which thing is missing. When it says only "Not Found" it does not have the route at all, such as while a new version is
+    // still being put live, and the person is told that and not sent to look for a reminder or a document.
+    if (detail === "document not found") return "That document could not be found. It may have been deleted. Choose another one, or none.";
+    if (detail === "reminder not found") return "That reminder no longer exists. Refresh the page.";
+    return "Reminders are not available right now. Please try again in a few minutes.";
+  }
   // A refusal the person can act on comes with a sentence written for them. Anything else is not shown as it is.
   if (typeof detail === "string" && detail.trim() !== "" && response.status < 500) return detail;
   if (response.status === 422) return "Please check the reminder's title, date and time, and try again.";
