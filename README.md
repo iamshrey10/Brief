@@ -8,7 +8,10 @@ Under the hood it is a retrieval-augmented pipeline where code, not the model, d
 
 Live at **[briefcontracts.com](https://briefcontracts.com)**
 
-[![CI](https://github.com/iamshrey10/Brief/actions/workflows/ci.yml/badge.svg)](https://github.com/iamshrey10/Brief/actions/workflows/ci.yml) ![Next.js](https://img.shields.io/badge/Next.js-16-000000?logo=nextdotjs&logoColor=white) ![FastAPI](https://img.shields.io/badge/FastAPI-Python_3.12-009688?logo=fastapi&logoColor=white) ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-pgvector-4169E1?logo=postgresql&logoColor=white) ![Gemini](https://img.shields.io/badge/Google-Gemini-8E75B2?logo=googlegemini&logoColor=white)
+<p align="center">
+<a href="https://nextjs.org"><img src="https://img.shields.io/badge/NEXT.JS-000000?style=for-the-badge&logo=nextdotjs&logoColor=white" alt="NEXT.JS"></a>  <a href="https://www.typescriptlang.org"><img src="https://img.shields.io/badge/TYPESCRIPT-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TYPESCRIPT"></a>  <a href="https://fastapi.tiangolo.com"><img src="https://img.shields.io/badge/FASTAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white" alt="FASTAPI"></a>  <a href="https://www.python.org"><img src="https://img.shields.io/badge/PYTHON-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="PYTHON"></a><br>
+<a href="https://www.postgresql.org"><img src="https://img.shields.io/badge/POSTGRESQL-336791?style=for-the-badge&logo=postgresql&logoColor=white" alt="POSTGRESQL"></a>  <a href="https://ai.google.dev"><img src="https://img.shields.io/badge/GEMINI_AI-4285F4?style=for-the-badge&logo=google&logoColor=white" alt="GEMINI AI"></a>  <a href="https://github.com/iamshrey10/Brief/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/iamshrey10/Brief/ci.yml?style=for-the-badge&logo=githubactions&logoColor=white&label=CI" alt="CI"></a>
+</p>
 
 ## Overview
 
