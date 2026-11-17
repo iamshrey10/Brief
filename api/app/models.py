@@ -15,6 +15,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    Time,
     UniqueConstraint,
     func,
 )
@@ -269,6 +270,29 @@ class DashboardShare(Base):
     access_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # When access stops. Set on approval, and moved by the owner to give more time or less.
     access_ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class Reminder(Base):
+    """Something a person asked to be reminded of, in their own words: a title, a date, and optionally a time, a note and
+    one of their documents. Brief shows these on the dashboard and sends nothing. The date and time are the person's own
+    wall clock, with no time zone, because a reminder to "call the landlord on March 3" means March 3 wherever they are.
+    It goes when the account goes, and keeping a reminder never depends on its document: if the document is deleted the
+    reminder stays, without the link."""
+
+    __tablename__ = "reminders"
+    __table_args__ = (Index("ix_reminders_user_id_due_date", "user_id", "due_date"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    document_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("documents.id", ondelete="SET NULL"), index=True, nullable=True
+    )
+    title: Mapped[str] = mapped_column(String(120))
+    description: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    due_date: Mapped[dt.date] = mapped_column(Date)
+    due_time: Mapped[dt.time | None] = mapped_column(Time, nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class TwoFactor(Base):
