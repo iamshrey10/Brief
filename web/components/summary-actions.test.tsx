@@ -3,13 +3,13 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/lib/download", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/download")>()), downloadBytes: vi.fn() }));
+vi.mock("@/lib/download", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/download")>()), saveFile: vi.fn() }));
 
-import { downloadBytes } from "@/lib/download";
+import { saveFile } from "@/lib/download";
 import type { ChecklistResult, KeyTermsResult } from "@/lib/overview";
 import { SummaryActions } from "./summary-actions";
 
-const download = vi.mocked(downloadBytes);
+const download = vi.mocked(saveFile);
 const KEY_TERMS: KeyTermsResult = {
   terms: [{ name: "monthly_rent", label: "Monthly rent", found: true, value: "$1,650.00", clause_id: "c1", page_number: 1, quote: "q", evidence: [] }],
   truncated: false,
@@ -27,6 +27,9 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   download.mockReset();
+});
+beforeEach(() => {
+  download.mockResolvedValue("downloaded");
 });
 
 describe("the summary buttons", () => {
@@ -52,11 +55,12 @@ describe("the summary buttons", () => {
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("would not allow copying"));
   });
 
-  it("saves a PDF named after the document, which the PDF's own text does not repeat", () => {
+  it("saves a PDF named after the document, which the PDF's own text does not repeat", async () => {
     render(<SummaryActions documentId="d1" docType="loan" filename="Loan Sanction Letter pdf.pdf" keyTerms={KEY_TERMS} checklist={CHECKLIST} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Download summary (PDF)" }));
 
+    await waitFor(() => expect(download).toHaveBeenCalledOnce());
     const [name, bytes, type] = download.mock.calls[0];
     expect(name).toBe("Loan-Sanction-Letter-pdf-summary.pdf");
     expect(type).toBe("application/pdf");
@@ -65,6 +69,33 @@ describe("the summary buttons", () => {
     expect(text).toContain("/Title <FEFF");
     expect(text).not.toContain("Sanction");
     expect(text).toContain("/Type /Page ");
+  });
+
+  it("says when the PDF was saved, so a phone never looks like it did nothing", async () => {
+    render(<SummaryActions documentId="d1" docType="loan" filename="a.pdf" keyTerms={KEY_TERMS} checklist={CHECKLIST} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Download summary (PDF)" }));
+
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Saved. Look in your downloads or the Files app."));
+  });
+
+  it("says nothing when the share sheet was simply closed", async () => {
+    download.mockResolvedValue("cancelled");
+    render(<SummaryActions documentId="d1" docType="loan" filename="a.pdf" keyTerms={KEY_TERMS} checklist={CHECKLIST} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Download summary (PDF)" }));
+
+    await waitFor(() => expect(download).toHaveBeenCalledOnce());
+    expect(screen.getByRole("status")).toBeEmptyDOMElement();
+  });
+
+  it("says so, and points to the other ways, when the file cannot be saved", async () => {
+    download.mockRejectedValue(new Error("blocked"));
+    render(<SummaryActions documentId="d1" docType="loan" filename="a.pdf" keyTerms={KEY_TERMS} checklist={CHECKLIST} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Download summary (PDF)" }));
+
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("would not save the file. Try Print or save as PDF"));
   });
 
   it("is left off the printed page", () => {
