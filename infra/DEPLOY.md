@@ -1,8 +1,9 @@
 # Putting Brief online: a checklist
 
-**Status: nothing is deployed yet.** This is what the code requires, collected in one place so going online is not
-done from memory. Each step names the file or command that backs it. The plan for the first deploy (October 28) is in
-section 1; it is a plan, not something done.
+**Status: deployed.** Brief is live at https://briefcontracts.com. The website is on Vercel, the API on Render (from
+`api/Dockerfile`), the database on Neon, Redis on Upstash and the files on Cloudflare R2, and UptimeRobot checks the site and the
+API's `/health/ready` every 5 minutes. This page is what the code requires, collected in one place so a deploy is not done from
+memory. Each step names the file or command that backs it. Section 1 is the plan the hosts were chosen from.
 
 ## 1. Decide first
 
@@ -109,7 +110,7 @@ try a downgrade on a copy of the data before relying on it for an older one. Wit
 
 - Database backups and a tested restore (use the host's snapshots, or `pg_dump`).
 - Bucket versioning or a lifecycle rule for deleted files.
-- Alerts on a failing `/health/ready` or a rising number of `failed` answer traces.
+- Alerts on a rising number of `failed` answer traces. (An alert on a failing `/health/ready` is set up: UptimeRobot checks it and the website every 5 minutes and emails on a failure.)
 - A lawyer's read of the privacy and terms pages before real contracts are uploaded. They are written from what the code does
   and `docs/PRIVACY-REVIEW.md` lists what only the owner can confirm. Deleting an account already removes the files, documents
   and everything read from them.
