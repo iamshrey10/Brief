@@ -56,6 +56,8 @@ const fresh = () => ({
   name: { first_name: "Test", last_name: "Reader" },
   shares: [],
   sharedWithMe: [],
+  // Each reader's own reminders, by the address they signed in with, so one reader can never see another's.
+  reminders: {},
   documents: [
     { id: "doc-lease", filename: "sample-lease.pdf", doc_type: "lease", status: "ready", ocr_confidence: null, created_at: "2026-10-01T12:00:00Z", status_changed_at: "2026-10-01T12:01:00Z" },
     { id: "doc-loan", filename: "sample-loan.pdf", doc_type: "loan", status: "ready", ocr_confidence: null, created_at: "2026-10-02T12:00:00Z", status_changed_at: "2026-10-02T12:01:00Z" },
@@ -287,6 +289,79 @@ const server = createServer(async (request, response) => {
       { document_id: "doc-lease", field: "lease_end", label: "Lease ends", value: "December 31, 2099" },
       { document_id: "doc-loan", field: "repayment_start", label: "Repayments start", value: "six months after graduation" },
     ]);
+  }
+  // A person's own reminders, kept for that reader alone. Like the real API, an id that is not theirs is simply not found.
+  if (path === "/me/reminders" || path.startsWith("/me/reminders/")) {
+    if (reader.startsWith("reminders-down-") && method === "GET") return send(response, 500, { detail: "internal error" });
+    if (reader.startsWith("reminders-fail-") && method !== "GET") return send(response, 500, { detail: "internal error" });
+    const mine = (state.reminders[reader] ??= []);
+    const out = (item) => {
+      const doc = state.documents.find((candidate) => candidate.id === item.document_id);
+      return { ...item, document_id: doc ? item.document_id : null, document_name: doc ? doc.filename : null, completed: item.completed_at !== null };
+    };
+    const real = (text) => {
+      const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text ?? "");
+      if (!m) return false;
+      const d = new Date(Date.UTC(2000, Number(m[2]) - 1, Number(m[3])));
+      d.setUTCFullYear(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+      return d.getUTCFullYear() === Number(m[1]) && d.getUTCMonth() === Number(m[2]) - 1 && d.getUTCDate() === Number(m[3]);
+    };
+    const problem = (body, partial) => {
+      if (!partial || "title" in body) {
+        const title = String(body.title ?? "").trim().replace(/\s+/g, " ");
+        if (!title) return "Give the reminder a title.";
+        if (title.length > 120) return "Keep the title to 120 characters or fewer.";
+      }
+      if (!partial || "due_date" in body) {
+        if (!real(body.due_date)) return "Choose a date for the reminder.";
+        const year = Number(String(body.due_date).slice(0, 4));
+        if (year < 2000 || year > new Date().getFullYear() + 10) return `Choose a date between 2000 and ${new Date().getFullYear() + 10}.`;
+      }
+      if (body.document_id && !state.documents.some((candidate) => candidate.id === body.document_id)) return "NOT_FOUND";
+      return null;
+    };
+    if (method === "GET" && path === "/me/reminders") {
+      const sorted = [...mine].sort((a, b) => a.due_date.localeCompare(b.due_date) || (a.due_time ?? "99:99").localeCompare(b.due_time ?? "99:99"));
+      return send(response, 200, sorted.map(out));
+    }
+    if (method === "POST" && path === "/me/reminders") {
+      const body = await readJson(request);
+      if (reader.startsWith("slow-reminders-")) await new Promise((resolve) => setTimeout(resolve, 700));
+      const wrong = problem(body, false);
+      if (wrong === "NOT_FOUND") return send(response, 404, { detail: "document not found" });
+      if (wrong) return send(response, 422, { detail: wrong });
+      const item = {
+        id: `rem-${++state.created}`,
+        title: String(body.title).trim().replace(/\s+/g, " "),
+        description: body.description ? String(body.description).trim() : null,
+        due_date: body.due_date,
+        due_time: body.due_time ? String(body.due_time).slice(0, 5) : null,
+        document_id: body.document_id ?? null,
+        completed_at: null,
+      };
+      mine.push(item);
+      return send(response, 201, out(item));
+    }
+    const one = /^\/me\/reminders\/([^/]+)$/.exec(path);
+    const found = one ? mine.find((item) => item.id === decodeURIComponent(one[1])) : undefined;
+    if (!found) return send(response, 404, { detail: "reminder not found" });
+    if (method === "DELETE") {
+      mine.splice(mine.indexOf(found), 1);
+      return send(response, 204);
+    }
+    if (method === "PATCH") {
+      const body = await readJson(request);
+      const wrong = problem(body, true);
+      if (wrong === "NOT_FOUND") return send(response, 404, { detail: "document not found" });
+      if (wrong) return send(response, 422, { detail: wrong });
+      if ("title" in body) found.title = String(body.title).trim().replace(/\s+/g, " ");
+      if ("due_date" in body) found.due_date = body.due_date;
+      if ("due_time" in body) found.due_time = body.due_time ? String(body.due_time).slice(0, 5) : null;
+      if ("description" in body) found.description = body.description ? String(body.description).trim() : null;
+      if ("document_id" in body) found.document_id = body.document_id ?? null;
+      if ("completed" in body && body.completed !== null) found.completed_at = body.completed ? found.completed_at ?? new Date().toISOString() : null;
+      return send(response, 200, out(found));
+    }
   }
   if (method === "GET" && path === "/admin/stats") {
     if (!state.admin) return send(response, 404, { detail: "not found" });

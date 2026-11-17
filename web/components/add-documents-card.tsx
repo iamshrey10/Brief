@@ -12,9 +12,9 @@ export function AddDocumentsCard() {
   return (
     <section
       aria-label="Add documents"
-      className="rounded-3xl border border-primary/25 bg-gradient-to-br from-accent via-card to-accent/60 p-4 shadow-sm"
+      className="flex flex-col rounded-3xl border border-primary/25 bg-gradient-to-br from-accent via-card to-accent/60 p-4 shadow-sm"
     >
-      <div className="flex flex-col items-center gap-3 rounded-2xl border border-border bg-background/60 px-6 py-8 text-center">
+      <div className="flex flex-1 flex-col items-center justify-center gap-3 rounded-2xl border border-border bg-background/60 px-6 py-8 text-center">
         <span aria-hidden="true" className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-md shadow-primary/25 ring-4 ring-primary/10">
           <CloudUpload className="size-6" />
         </span>

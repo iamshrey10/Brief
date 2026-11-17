@@ -7,7 +7,7 @@ import { DashboardStats } from "@/components/dashboard-stats";
 import { AddDocumentsCard } from "@/components/add-documents-card";
 import { NowReading } from "@/components/now-reading";
 import { DocumentAnalysis } from "@/components/document-analysis";
-import { LeaseCountdown } from "@/components/lease-countdown";
+import { RemindersCard } from "@/components/reminders-card";
 import { KindBreakdown } from "@/components/kind-breakdown";
 import { OpenQuestions } from "@/components/open-questions";
 import { SharedWithYou } from "@/components/shared-with-you";
@@ -15,7 +15,9 @@ import { RecentActivity } from "@/components/recent-activity";
 import { buttonVariants } from "@/components/ui/button";
 import { Rise } from "@/components/rise";
 import { backendGet } from "@/lib/backend";
+import { localToday, toISODate } from "@/lib/dates";
 import { asKeyDates, nextLeaseEnd } from "@/lib/lease-end";
+import { asReminders } from "@/lib/reminders";
 import { needsName } from "@/lib/profile";
 import { asSharedWithMe } from "@/lib/sharing";
 import { asDocuments, asInsights, documentStats, openQuestionGroups, recentActivity } from "@/lib/dashboard";
@@ -28,12 +30,13 @@ export default async function DashboardHome() {
   // The proxy already turns visitors away, and this makes the page safe on its own too.
   if (!email) redirect("/");
 
-  const [documentsBody, insightsBody, datesBody, meBody, sharedBody] = await Promise.all([
+  const [documentsBody, insightsBody, datesBody, meBody, sharedBody, remindersBody] = await Promise.all([
     backendGet(email, "/documents"),
     backendGet(email, "/me/insights"),
     backendGet(email, "/me/key-dates"),
     backendGet(email, "/me"),
     backendGet(email, "/shared"),
+    backendGet(email, "/me/reminders"),
   ]);
   // Someone's first visit: ask for their name before showing anything else.
   if (needsName(meBody)) redirect("/dashboard/welcome");
@@ -74,10 +77,17 @@ export default async function DashboardHome() {
         <NowReading />
 
         <Rise order={3} className="grid grid-cols-1 items-stretch gap-5 lg:grid-cols-3">
-          <div className={lease ? "lg:col-span-2" : "lg:col-span-3"}>
+          {/* Stretches to the height of the Reminders card beside it, so a longer list does not leave a gap. */}
+          <div className="flex flex-col lg:col-span-2 [&>section]:flex-1">
             <AddDocumentsCard />
           </div>
-          {lease && <LeaseCountdown lease={lease} />}
+          <RemindersCard
+            initial={asReminders(remindersBody)}
+            loadFailed={remindersBody === null}
+            documents={documents.map((document) => ({ id: document.id, filename: document.filename }))}
+            lease={lease}
+            todayISO={toISODate(localToday())}
+          />
         </Rise>
 
         <Rise order={3}>
