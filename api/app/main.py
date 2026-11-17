@@ -182,6 +182,12 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+@app.head("/health", include_in_schema=False)
+def health_head() -> Response:
+    """The same answer without a body, for uptime monitors, which check with HEAD by default."""
+    return Response(status_code=200)
+
+
 @app.get(
     "/health/db",
     tags=["health"],
@@ -215,6 +221,14 @@ async def health_ready(
     response.status_code = 200 if ready else 503
     response.headers["Cache-Control"] = "no-store"
     return {"ready": ready, **status}
+
+
+@app.head("/health/ready", include_in_schema=False)
+async def health_ready_head(session: AsyncSession = Depends(get_session)) -> Response:
+    """The same answer, 200 or 503, without a body, for uptime monitors, which check with HEAD by default."""
+    status = await check_ready(session)
+    ready = status == {"database": "ok", "migrations": "current"}
+    return Response(status_code=200 if ready else 503, headers={"Cache-Control": "no-store"})
 
 
 class Me(BaseModel):
