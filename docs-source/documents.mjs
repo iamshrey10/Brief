@@ -11,9 +11,13 @@ export const DOCUMENTS = [
   { name: "ai", folder: "05-Technology-Stack", file: "Brief-AI-LLM-Documentation", title: "AI and LLM Documentation", kind: "AI and LLM", subtitle: "Where a language model is used in Brief, how, and what is deliberately not left to it", running: "AI and LLM" },
 ];
 
+// The private folder sits next to Brief-Resources, outside the repository. BRIEF_PRIVATE_SOURCES can point elsewhere.
+const PRIVATE_DIR = process.env.BRIEF_PRIVATE_SOURCES || "/Users/shreyasrevankar/Desktop/Fall Project/Brief-Private-Sources";
+const PRIVATE_URL = new URL(`file://${PRIVATE_DIR}/documents-private.mjs`).href;
+export { PRIVATE_DIR };
 // Extra documents that are kept on one computer and not committed (see documents-private.mjs when it exists).
 try {
-  const { PRIVATE } = await import("./documents-private.mjs");
+  const { PRIVATE } = await import(PRIVATE_URL);
   DOCUMENTS.push(...PRIVATE);
 } catch (error) {
   if (error?.code !== "ERR_MODULE_NOT_FOUND") throw error;

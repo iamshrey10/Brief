@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 
 import { chromium } from "../web/node_modules/@playwright/test/index.mjs";
 import { render } from "./md.mjs";
-import { DOCUMENTS } from "./documents.mjs";
+import { DOCUMENTS, PRIVATE_DIR } from "./documents.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = process.env.BRIEF_RESOURCES || "/Users/shreyasrevankar/Desktop/Fall Project/Brief-Resources";
@@ -59,7 +59,8 @@ async function pdfOf(browser, html, out) {
 const wanted = process.argv.slice(2);
 const browser = await chromium.launch();
 for (const spec of DOCUMENTS.filter((d) => wanted.length === 0 || wanted.includes(d.name))) {
-  const source = fs.readFileSync(path.join(HERE, "docs", `${spec.name}.md`), "utf8");
+  const own = path.join(HERE, "docs", `${spec.name}.md`);
+  const source = fs.readFileSync(fs.existsSync(own) ? own : path.join(PRIVATE_DIR, "docs", `${spec.name}.md`), "utf8");
   const { html, toc } = render(source, { figure: figureFinder(spec.folder) });
   const out = path.join(spec.outRoot ?? ROOT, spec.folder, `${spec.file}.pdf`);
   fs.mkdirSync(path.dirname(out), { recursive: true });
