@@ -2360,6 +2360,16 @@ async def test_new_uploads_stop_at_the_daily_limit_with_no_record_and_no_upload_
     assert len((await client.get("/documents")).json()) == 2
 
 
+async def test_an_empty_file_is_told_it_is_empty_not_too_large(client):
+    empty = await client.post("/documents", json={**_upload_body(), "file_size_bytes": 0})
+    huge = await client.post("/documents", json={**_upload_body(), "file_size_bytes": 50 * 1024 * 1024 + 1})
+
+    assert empty.status_code == 400
+    assert empty.json()["detail"] == "That file is empty. Choose a file with something in it."
+    assert huge.status_code == 400
+    assert "too large" in huge.json()["detail"]
+
+
 async def test_an_upload_that_is_not_valid_does_not_use_up_the_limit(
     client, db_session, test_user, monkeypatch, tiny_limits
 ):

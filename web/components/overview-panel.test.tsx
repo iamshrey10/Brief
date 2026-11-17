@@ -569,3 +569,11 @@ describe("OverviewPanel summary buttons", () => {
     expect(checklistMock).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("OverviewPanel keyboard", () => {
+  it("can take focus, because it scrolls on its own and a keyboard must be able to reach what is below the fold", async () => {
+    setup();
+    const panel = await screen.findByRole("region", { name: "Overview" });
+    expect(panel).toHaveAttribute("tabindex", "0");
+  });
+});
