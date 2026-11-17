@@ -18,3 +18,5 @@ before real people upload real contracts.
 - [ ] **Who the terms are with.** They say Brief is a personal project. Change that if it becomes a company.
 - [ ] **Where you and your users live.** Some places require specific wording or a cookie notice. There are no tracking cookies
       today, which is the simple case. Check if that changes, for example if analytics are added.
+- [ ] **Reminders.** A person can type free text into a reminder's title and note. It is stored for that person only, never logged, and
+      removed with the reminder or the account. The page lists it under what Brief keeps. Confirm that is how you want it described.

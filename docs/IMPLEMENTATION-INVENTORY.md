@@ -37,7 +37,7 @@ files on Cloudflare R2 (see `infra/DEPLOY.md` and `docs/ARCHITECTURE.md`).
 
 | Part | What | Where it is used |
 |---|---|---|
-| Framework | FastAPI 0.143, Uvicorn, Python 3.12, async | `api/app/main.py` (49 route decorators, 47 documented, 2 hidden HEAD routes), `api/Dockerfile` |
+| Framework | FastAPI 0.143, Uvicorn, Python 3.12, async | `api/app/main.py` (53 route decorators, 51 documented, 2 hidden HEAD routes), `api/Dockerfile` |
 | Settings | `pydantic-settings` reading `.env` (which needs `python-dotenv`) | `api/app/config.py` |
 | Database layer | SQLAlchemy 2 async with `asyncpg` (and `greenlet`), Alembic migrations | `api/app/models.py`, `api/migrations/versions` (21 files) |
 | Vector search | `pgvector` | `api/app/models.py`, `api/app/retrieval.py` |
@@ -51,9 +51,9 @@ files on Cloudflare R2 (see `infra/DEPLOY.md` and `docs/ARCHITECTURE.md`).
 
 ### Data and hosting
 
-Postgres with pgvector (Docker image `pgvector/pgvector:pg16` locally), Redis 7 (`docker-compose.yml`), 14 tables, listed
+Postgres with pgvector (Docker image `pgvector/pgvector:pg16` locally), Redis 7 (`docker-compose.yml`), 15 tables, listed
 in `docs/ARCHITECTURE.md`: `users`, `documents`, `clauses`, `embeddings`, `extractions`, `checklist_answers`, `usage`,
-`activity`, `answer_traces`, `dashboard_shares`, `two_factor`, `recovery_codes`, `trusted_devices`, `site_events`.
+`activity`, `answer_traces`, `dashboard_shares`, `two_factor`, `recovery_codes`, `trusted_devices`, `site_events`, `reminders`.
 
 ## The AI and LLM implementation, as built
 
