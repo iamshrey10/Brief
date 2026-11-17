@@ -30,7 +30,9 @@ for (const [label, viewport] of [
 
       await page.locator("nav[aria-label=Sections]:visible").getByRole("link", { name: "Documents" }).click();
 
-      await expect(bar(page)).toBeVisible({ timeout: 400 });
+      // The page is held back for 1.5 seconds, so a bar that is there within 1.2 seconds has answered the press before the page came. A
+      // tighter limit failed once on a busy build machine.
+      await expect(bar(page)).toBeVisible({ timeout: 1200 });
       await expect(page).toHaveURL(/\/dashboard\/documents$/);
       await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
       await expect(bar(page)).toHaveCount(0);
