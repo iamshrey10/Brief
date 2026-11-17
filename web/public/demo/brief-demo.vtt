@@ -1,67 +1,64 @@
 WEBVTT
 
-00:00:00.250 --> 00:00:04.826
-Before you sign a lease, a loan, or a job offer, do you understand every clause?
+00:00:00.800 --> 00:00:02.559
+Leases. Loans. Job offers.
 
-00:00:04.826 --> 00:00:05.455
-Brief does.
+00:00:02.700 --> 00:00:04.996
+Pages of fine print, and one signature.
 
-00:00:05.960 --> 00:00:08.584
-Sign in with Google, and a short tour shows you around.
+00:00:05.000 --> 00:00:07.096
+This is Brief: every clause, explained.
 
-00:00:15.125 --> 00:00:15.613
-No file?
+00:00:08.200 --> 00:00:11.037
+The terms that cost you money are buried in dense text.
 
-00:00:15.613 --> 00:00:18.359
-Snap up to five photos of the paper contract.
+00:00:11.300 --> 00:00:14.870
+A chatbot might guess, and a guess in a contract is dangerous.
 
-00:00:18.359 --> 00:00:21.226
-Brief makes them one document, a page for each.
+00:00:14.900 --> 00:00:17.599
+Brief shows the exact words behind every answer.
 
-00:00:25.548 --> 00:00:29.821
-Brief splits it into numbered clauses and lists every key term with its quote.
+00:00:18.300 --> 00:00:23.107
+Sign in with Google, and your dashboard shows every document, and what needs attention.
 
-00:00:29.821 --> 00:00:32.012
-Click one, and the exact words light up.
+00:00:24.200 --> 00:00:29.808
+Add a PDF, a scan, or up to five phone photos, and Brief reads it into numbered clauses.
 
-00:00:32.520 --> 00:00:36.360
-It flags the questions people forget to ask, with wording you can send.
+00:00:32.200 --> 00:00:35.536
+Open a document, and the key terms appear, each with its quote.
 
-00:00:36.870 --> 00:00:37.954
-Ask in plain words.
+00:00:35.800 --> 00:00:38.601
+Click one, and the exact words light up in the clause.
 
-00:00:37.954 --> 00:00:42.459
-Every answer cites its clause, and if the document does not say, Brief says so.
+00:00:39.200 --> 00:00:44.512
+Before you sign lists the questions people forget to ask, and flags what the document leaves out.
 
-00:00:47.032 --> 00:00:51.939
-Share your dashboard with someone you trust, for a time you choose, and take it back whenever you like.
+00:00:44.800 --> 00:00:48.918
+Copy the summary, download a PDF, or add the dates to your calendar.
 
-00:00:53.011 --> 00:00:54.159
-Deleted by mistake?
+00:00:50.800 --> 00:00:52.713
+Now ask a question in plain words.
 
-00:00:54.159 --> 00:00:56.092
-The Bin keeps it for seven days.
+00:00:53.100 --> 00:00:58.314
+Brief finds the right clauses by meaning and by keywords, then Gemini writes the answer.
 
-00:00:56.092 --> 00:00:58.750
-Two-step sign-in and dark mode are built in.
+00:00:58.200 --> 00:01:02.418
+Code checks every quote against the clause, and shows only what it can prove.
 
-00:01:01.466 --> 00:01:02.888
-Under the hood, a Next.
+00:01:02.400 --> 00:01:04.717
+If the document does not say, Brief says so.
 
-00:01:02.888 --> 00:01:06.351
-js website signs you in and keeps every request private.
+00:01:06.200 --> 00:01:10.388
+Under the hood, a Next.js website talks to a FastAPI service.
 
-00:01:06.751 --> 00:01:12.597
-A FastAPI service reads your document, and Postgres with pgvector finds the right clauses.
+00:01:10.400 --> 00:01:15.259
+Postgres with pgvector stores the clauses, and Gemini does the language work.
 
-00:01:12.997 --> 00:01:17.754
-Gemini writes the answer, and Brief checks every quote word for word before you see it.
+00:01:15.500 --> 00:01:19.916
+It runs on Vercel and Render, and GitHub Actions tests every change.
 
-00:01:18.904 --> 00:01:19.250
-Brief.
+00:01:20.100 --> 00:01:23.919
+Brief explains what a document says. It is not legal advice.
 
-00:01:19.250 --> 00:01:20.635
-Every clause, explained.
-
-00:01:20.635 --> 00:01:22.424
-Not legal advice, just clarity.
+00:01:24.200 --> 00:01:27.662
+Brief. Every clause, explained, at briefcontracts.com.
