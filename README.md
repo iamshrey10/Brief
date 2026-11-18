@@ -204,6 +204,17 @@ These are ideas, not features that exist today.
 - Reading PDFs from strangers in an isolated process, and an audit trail of who opened what.
 - Updating the development-tool dependencies behind the open alerts (none ship to users).
 
+### If Brief grows to many more users
+
+Today the API is one instance. It paces and limits its calls to the language model, and reads queue up when many people upload at once, which keeps cost and errors under control for a small number of users. It has not been load tested with many people at the same moment. If the number of users grows a lot, the next steps would be:
+
+- A real job queue and separate worker processes for reading documents, so uploads never compete with the web requests for the same server.
+- Moving the pacing counters out of one process's memory and into shared storage such as Redis, so several API instances can share one model-call allowance.
+- Running more than one API instance behind a load balancer, with the database connections pooled.
+- A load test with many simultaneous uploads, to find the real limit before users find it.
+- A higher model quota, or spreading the load across more than one model provider.
+- Moving the database and Redis off their free or entry plans.
+
 ## Development and acknowledgements
 
 I built Brief with Claude Code as an AI development assistant, and I see working well with AI coding tools as part of how I build software today. The thinking was mine: the product idea, the feature requirements, the architecture and the trade-offs behind it, reviewing what was produced, debugging, and validating the result. The test suites and AI evaluations in this repository are how I check that the work does what I say it does.
