@@ -8,6 +8,12 @@ import { RemindersCard } from "./reminders-card";
 import type { Reminder } from "@/lib/reminders";
 
 const TODAY = "2026-11-17";
+
+// The card swaps the server's date for the browser's own a moment after it loads, so the test pins the browser's date too. Without this it fails every day after TODAY.
+vi.mock("@/lib/dates", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/lib/dates")>();
+  return { ...real, localToday: () => ({ year: 2026, month: 11, day: 17 }) };
+});
 const fetchMock = vi.fn();
 
 const reminder = (over: Partial<Reminder> = {}): Reminder => ({
